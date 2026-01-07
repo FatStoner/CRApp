@@ -1,5 +1,6 @@
 use sqlx::{migrate::MigrateDatabase, sqlite::SqlitePoolOptions, Pool, Sqlite};
 use std::error::Error;
+use crate::models::{Character, Lorebook, Collection, Tag};
 
 #[derive(Clone)]
 pub struct Database {
@@ -52,11 +53,50 @@ impl Database {
         // Create collections table
         sqlx::query(
             "CREATE TABLE IF NOT EXISTS collections (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id INTEGER PRIMARY KEY,
                 name TEXT NOT NULL,
-                parent_id INTEGER,
-                FOREIGN KEY (parent_id) REFERENCES collections(id) ON DELETE CASCADE
+                parent_id INTEGER REFERENCES collections(id) ON DELETE CASCADE
             )"
+        )
+        .execute(&pool)
+        .await?;
+
+        // Create tags (App)
+        sqlx::query(
+            "CREATE TABLE IF NOT EXISTS tags (
+                id INTEGER PRIMARY KEY,
+                name TEXT NOT NULL UNIQUE
+            )",
+        )
+        .execute(&pool)
+        .await?;
+
+        sqlx::query(
+            "CREATE TABLE IF NOT EXISTS character_tags (
+                character_id INTEGER REFERENCES characters(id) ON DELETE CASCADE,
+                tag_id INTEGER REFERENCES tags(id) ON DELETE CASCADE,
+                PRIMARY KEY (character_id, tag_id)
+            )",
+        )
+        .execute(&pool)
+        .await?;
+
+        // Create tags (External)
+        sqlx::query(
+            "CREATE TABLE IF NOT EXISTS external_tags (
+                id INTEGER PRIMARY KEY,
+                name TEXT NOT NULL UNIQUE
+            )",
+        )
+        .execute(&pool)
+        .await?;
+
+        sqlx::query(
+            "CREATE TABLE IF NOT EXISTS character_external_tags (
+                 character_id INTEGER REFERENCES characters(id) ON DELETE CASCADE,
+                 tag_id INTEGER REFERENCES external_tags(id) ON DELETE CASCADE,
+                 PRIMARY KEY (character_id, tag_id)
+            )",
         )
         .execute(&pool)
         .await?;
@@ -169,34 +209,134 @@ impl Database {
                 .bind(&collection.name)
                 .bind(collection.parent_id)
                 .bind(collection.id)
-                .execute(&self.pool)
-                .await?;
+                 .execute(&self.pool)
+                 .await?;
              Ok(collection.id)
         }
     }
 
     pub async fn delete_collection(&self, id: i64) -> Result<(), sqlx::Error> {
-        // Orphan children collections (set parent_id to NULL) - wait, user preferred orphans.
-        // Actually for folders, usually you delete subfolders or move them up.
-        // User said: "osierocenie/null". So we set ParentID = NULL for children.
+        // Orphan children
         sqlx::query("UPDATE collections SET parent_id = NULL WHERE parent_id = ?")
             .bind(id)
             .execute(&self.pool)
             .await?;
             
-        // Orphan characters
         sqlx::query("UPDATE characters SET collection_id = NULL WHERE collection_id = ?")
             .bind(id)
             .execute(&self.pool)
             .await?;
-            
-        // Delete the collection itself
+
+        // Delete
         sqlx::query("DELETE FROM collections WHERE id = ?")
             .bind(id)
             .execute(&self.pool)
             .await?;
+
+        Ok(())
+    }
+
+    
+    // Tag Helpers
+    
+    pub async fn get_tags_for_character(&self, char_id: i64, is_external: bool) -> Result<Vec<Tag>, sqlx::Error> {
+        let (join_table, tag_table) = if is_external {
+            ("character_external_tags", "external_tags")
+        } else {
+            ("character_tags", "tags")
+        };
+
+        let query = format!(
+            "SELECT t.id, t.name FROM {} t
+             JOIN {} ct ON t.id = ct.tag_id
+             WHERE ct.character_id = ?",
+            tag_table, join_table
+        );
+        
+        sqlx::query_as::<_, Tag>(&query)
+            .bind(char_id)
+            .fetch_all(&self.pool)
+            .await
+    }
+    
+    pub async fn add_tag_to_character(&self, char_id: i64, tag_name: &str, is_external: bool) -> Result<(), sqlx::Error> {
+        let (join_table, tag_table) = if is_external {
+            ("character_external_tags", "external_tags")
+        } else {
+            ("character_tags", "tags")
+        };
+        
+        // 1. Ensure tag exists
+        // UPSERT syntax for SQLite? INSERT OR IGNORE works if name is UNIQUE
+        let insert_tag_query = format!("INSERT OR IGNORE INTO {} (name) VALUES (?)", tag_table);
+        sqlx::query(&insert_tag_query)
+            .bind(tag_name)
+            .execute(&self.pool)
+            .await?;
+            
+        // 2. Get Tag ID
+        let get_id_query = format!("SELECT id FROM {} WHERE name = ?", tag_table);
+        let tag_id: i64 = sqlx::query_scalar(&get_id_query)
+            .bind(tag_name)
+            .fetch_one(&self.pool)
+            .await?;
+            
+        // 3. Link
+        let link_query = format!("INSERT OR IGNORE INTO {} (character_id, tag_id) VALUES (?, ?)", join_table);
+        sqlx::query(&link_query)
+            .bind(char_id)
+            .bind(tag_id)
+            .execute(&self.pool)
+            .await?;
             
         Ok(())
+    }
+    
+    pub async fn remove_tag_from_character(&self, char_id: i64, tag_id: i64, is_external: bool) -> Result<(), sqlx::Error> {
+        let join_table = if is_external {
+            "character_external_tags"
+        } else {
+            "character_tags"
+        };
+        
+        let query = format!("DELETE FROM {} WHERE character_id = ? AND tag_id = ?", join_table);
+        sqlx::query(&query)
+            .bind(char_id)
+            .bind(tag_id)
+            .execute(&self.pool)
+            .await?;
+            
+        Ok(())
+    }
+
+    // Returns (character_id, Tag) for all tags of a specific type (external or app)
+    pub async fn get_all_tags_flat(&self, is_external: bool) -> Result<Vec<(i64, Tag)>, sqlx::Error> {
+        let (join_table, tag_table) = if is_external {
+            ("character_external_tags", "external_tags")
+        } else {
+            ("character_tags", "tags")
+        };
+        
+        let query = format!(
+            "SELECT ct.character_id, t.id, t.name FROM {} t
+             JOIN {} ct ON t.id = ct.tag_id",
+             tag_table, join_table
+        );
+        
+        let rows = sqlx::query(&query).fetch_all(&self.pool).await?;
+        
+        use sqlx::Row;
+        let mut results = Vec::new();
+        for row in rows {
+            let char_id: i64 = row.get(0);
+            let tag = Tag {
+                id: row.get(1),
+                name: row.get(2),
+            };
+            results.push((char_id, tag));
+        }
+        
+        Ok(results)
     }
 
     pub async fn get_all_lorebooks(&self) -> Result<Vec<crate::models::Lorebook>, sqlx::Error> {

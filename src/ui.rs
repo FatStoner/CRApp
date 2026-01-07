@@ -3,7 +3,7 @@ use tokio::sync::mpsc;
 use std::time::{Duration, Instant};
 use std::collections::HashSet;
 use crate::db::Database;
-use crate::models::{Character, Lorebook, Collection};
+use crate::models::{Character, Lorebook, Collection, Tag};
 
 pub enum UiEvent {
     CharactersLoaded(Result<Vec<Character>, String>),
@@ -15,6 +15,8 @@ pub enum UiEvent {
     CollectionSaved(Result<i64, String>),
     CollectionDeleted(Result<i64, String>), // Returns ID of deleted collection
     LinkUpdated(Result<(), String>),
+    TagsLoaded(Result<(i64, Vec<Tag>, Vec<Tag>), String>), // char_id, app_tags, ext_tags
+    TagOperationFinished(Result<(), String>),
 }
 
 #[derive(PartialEq)]
@@ -73,6 +75,8 @@ pub struct CrapApp {
     
     // Widgets
     search_query: String,
+    app_tag_input: String,
+    ext_tag_input: String,
 }
 
 impl CrapApp {
@@ -100,6 +104,8 @@ impl CrapApp {
             status_clear_time: None,
             loading_error: None,
             search_query: String::new(),
+            app_tag_input: String::new(),
+            ext_tag_input: String::new(),
         };
         
         app.refresh_all();
@@ -107,9 +113,59 @@ impl CrapApp {
     }
 
     fn refresh_all(&self) {
-        self.reload_characters();
-        self.reload_lorebooks();
-        self.reload_collections();
+        let tx = self.tx.clone();
+        let db = self.db.clone();
+        tokio::spawn(async move {
+            // Load characters
+            match db.get_all_characters().await {
+                Ok(mut chars) => {
+                    // Load Tags (Bulk)
+                    let app_tags_res = db.get_all_tags_flat(false).await;
+                    let ext_tags_res = db.get_all_tags_flat(true).await;
+                    
+                    if let (Ok(app_flat), Ok(ext_flat)) = (app_tags_res, ext_tags_res) {
+                         // Map char_id to tags
+                         // Optimizing with HashMap for lookup? 
+                         // Or just iterate since we are in async thread.
+                         // Let's use simple sorting or grouping if list is huge, but for now filtering is fine.
+                         // Actually, building a HashMap<char_id, Vec<Tag>> is O(N) and easier.
+                         use std::collections::HashMap;
+                         let mut app_map: HashMap<i64, Vec<Tag>> = HashMap::new();
+                         for (cid, tag) in app_flat {
+                             app_map.entry(cid).or_default().push(tag);
+                         }
+                         
+                         let mut ext_map: HashMap<i64, Vec<Tag>> = HashMap::new();
+                         for (cid, tag) in ext_flat {
+                             ext_map.entry(cid).or_default().push(tag);
+                         }
+                         
+                         // Merge into characters
+                         for c in &mut chars {
+                             if let Some(tags) = app_map.remove(&c.id) {
+                                 c.app_tags = tags;
+                             }
+                             if let Some(tags) = ext_map.remove(&c.id) {
+                                 c.external_tags = tags;
+                             }
+                         }
+                    } else {
+                        eprintln!("Failed to load specific tags bulk");
+                    }
+                    
+                    let _ = tx.send(UiEvent::CharactersLoaded(Ok(chars))).await;
+                },
+                Err(e) => { let _ = tx.send(UiEvent::CharactersLoaded(Err(e.to_string()))).await; }
+            }
+            
+            // Load collections
+            let collections_res = db.get_all_collections().await.map_err(|e| e.to_string());
+            let _ = tx.send(UiEvent::CollectionsLoaded(collections_res)).await;
+            
+            // Load Lorebooks
+            let books_res = db.get_all_lorebooks().await.map_err(|e| e.to_string());
+            let _ = tx.send(UiEvent::LorebooksLoaded(books_res)).await;
+        });
     }
 
     fn reload_characters(&self) {
@@ -137,6 +193,25 @@ impl CrapApp {
         tokio::spawn(async move {
             let result = db.get_lore_links(char_id).await.map_err(|e| e.to_string());
             let _ = tx.send(UiEvent::LoreLinksLoaded(result)).await;
+        });
+    }
+
+    fn load_tags(&self, char_id: i64) {
+        if char_id == 0 { return; }
+        let tx = self.tx.clone();
+        let db = self.db.clone();
+        tokio::spawn(async move {
+            let app_tags = db.get_tags_for_character(char_id, false).await;
+            let ext_tags = db.get_tags_for_character(char_id, true).await;
+            
+            match (app_tags, ext_tags) {
+                (Ok(app), Ok(ext)) => {
+                    let _ = tx.send(UiEvent::TagsLoaded(Ok((char_id, app, ext)))).await;
+                },
+                (Err(e), _) | (_, Err(e)) => {
+                    let _ = tx.send(UiEvent::TagsLoaded(Err(e.to_string()))).await;
+                }
+            }
         });
     }
 
@@ -355,8 +430,14 @@ fn render_tree(
     
     // Filter
     if is_search_active {
+
          node_chars.retain(|c| {
-             c.name.to_lowercase().contains(&query_lower) || c.char_title.to_lowercase().contains(&query_lower)
+             let in_name = c.name.to_lowercase().contains(&query_lower);
+             let in_title = c.char_title.to_lowercase().contains(&query_lower);
+             let in_app_tags = c.app_tags.iter().any(|t| t.name.to_lowercase().contains(&query_lower));
+             let in_ext_tags = c.external_tags.iter().any(|t| t.name.to_lowercase().contains(&query_lower));
+             
+             in_name || in_title || in_app_tags || in_ext_tags
          });
     }
 
@@ -458,7 +539,14 @@ fn render_tree(
 // Helper to check for matches recursively
 fn has_matches(collection_id: i64, collections: &[Collection], characters: &[Character], query: &str) -> bool {
     // 1. Check characters in this collection
-    if characters.iter().any(|c| c.collection_id == Some(collection_id) && (c.name.to_lowercase().contains(query) || c.char_title.to_lowercase().contains(query))) {
+    if characters.iter().any(|c| c.collection_id == Some(collection_id) && {
+        let name_match = c.name.to_lowercase().contains(query);
+        let title_match = c.char_title.to_lowercase().contains(query);
+        let app_tag_match = c.app_tags.iter().any(|t| t.name.to_lowercase().contains(query));
+        let ext_tag_match = c.external_tags.iter().any(|t| t.name.to_lowercase().contains(query));
+        
+        name_match || title_match || app_tag_match || ext_tag_match
+    }) {
         return true;
     }
     
@@ -476,6 +564,24 @@ impl CrapApp {
     fn set_status(&mut self, msg: String, color: egui::Color32) {
         self.status_message = Some((msg, color));
         self.status_clear_time = Some(Instant::now() + Duration::from_secs(3));
+    }
+
+    fn add_tag(&self, char_id: i64, name: String, is_external: bool) {
+        let tx = self.tx.clone();
+        let db = self.db.clone();
+        tokio::spawn(async move {
+            let res = db.add_tag_to_character(char_id, &name, is_external).await.map_err(|e| e.to_string());
+            let _ = tx.send(UiEvent::TagOperationFinished(res)).await;
+        });
+    }
+
+    fn remove_tag(&self, char_id: i64, tag_id: i64, is_external: bool) {
+        let tx = self.tx.clone();
+        let db = self.db.clone();
+        tokio::spawn(async move {
+            let res = db.remove_tag_from_character(char_id, tag_id, is_external).await.map_err(|e| e.to_string());
+            let _ = tx.send(UiEvent::TagOperationFinished(res)).await;
+        });
     }
 }
 
@@ -556,8 +662,32 @@ impl eframe::App for CrapApp {
                     }
                 },
                 UiEvent::LinkUpdated(res) => {
-                    if let Err(e) = res {
-                         self.set_status(format!("Link Error: {}", e), egui::Color32::RED);
+                     if let Err(e) = res {
+                          self.set_status(format!("Link Error: {}", e), egui::Color32::RED);
+                     }
+                },
+                UiEvent::TagsLoaded(res) => {
+                    match res {
+                        Ok((id, app, ext)) => {
+                            if let Some(c) = &mut self.selected_character {
+                                if c.id == id {
+                                    c.app_tags = app;
+                                    c.external_tags = ext;
+                                }
+                            }
+                        },
+                        Err(e) => self.set_status(format!("Tag Load Error: {}", e), egui::Color32::RED),
+                    }
+                },
+                UiEvent::TagOperationFinished(res) => {
+                    match res {
+                        Ok(_) => {
+                            // Reload tags for current char
+                            if let Some(c) = &self.selected_character {
+                                self.load_tags(c.id);
+                            }
+                        },
+                        Err(e) => self.set_status(format!("Tag Error: {}", e), egui::Color32::RED),
                     }
                 },
             }
@@ -676,6 +806,7 @@ impl eframe::App for CrapApp {
                                              self.active_char_tab = CharacterTab::MainData;
                                              self.status_message = None;
                                              self.load_links(c.id);
+                                             self.load_tags(c.id);
                                          },
                                          TreeAction::SelectCollection(id) => {
                                              self.selected_collection_id = Some(id);
@@ -731,6 +862,11 @@ impl eframe::App for CrapApp {
             (c.id, self.get_collection_path(c.id))
         }).collect();
 
+        // Clone for closures
+        let tx_clone = self.tx.clone();
+        let db_clone = self.db.clone();
+
+
         egui::CentralPanel::default().show(ctx, |ui| {
             match self.mode {
                 AppMode::Characters => {
@@ -777,6 +913,106 @@ impl eframe::App for CrapApp {
                                     ui.text_edit_singleline(&mut character.char_name);
                                     ui.label("Title");
                                     ui.text_edit_singleline(&mut character.char_title);
+                                    
+                                    ui.label("Personality");
+                                    // Tags Section
+                                    ui.add_space(8.0);
+                                    egui::CollapsingHeader::new("Tags & Metadata")
+                                        .default_open(true)
+                                        .show(ui, |ui| {
+                                            ui.vertical(|ui| {
+                                                // App Tags
+                                                ui.label(egui::RichText::new("App Tags").strong().color(egui::Color32::from_rgb(100, 150, 255)));
+                                                ui.horizontal(|ui| {
+                                                    for tag in &character.app_tags {
+                                                        let chip_color = egui::Color32::from_rgb(50, 80, 150);
+                                                        let text_color = egui::Color32::WHITE;
+                                                        
+                                                        egui::Frame::none()
+                                                            .fill(chip_color)
+                                                            .rounding(12.0)
+                                                            .inner_margin(4.0)
+                                                            .show(ui, |ui| {
+                                                                ui.horizontal(|ui| {
+                                                                    ui.label(egui::RichText::new(&tag.name).color(text_color).size(12.0));
+                                                                    if ui.small_button(egui::RichText::new("x").color(egui::Color32::from_white_alpha(200))).clicked() {
+                                                                         let tx = tx_clone.clone();
+                                                                         let db = db_clone.clone();
+                                                                         let char_id = character.id;
+                                                                         let tag_id = tag.id;
+                                                                         tokio::spawn(async move {
+                                                                             let res = db.remove_tag_from_character(char_id, tag_id, false).await.map_err(|e| e.to_string());
+                                                                             let _ = tx.send(UiEvent::TagOperationFinished(res)).await;
+                                                                         });
+                                                                    }
+                                                                });
+                                                            });
+                                                    }
+                                                });
+                                                
+                                                ui.horizontal(|ui| {
+                                                    ui.text_edit_singleline(&mut self.app_tag_input);
+                                                    if ui.button("Add").clicked() && !self.app_tag_input.is_empty() {
+                                                         let tx = tx_clone.clone();
+                                                         let db = db_clone.clone();
+                                                         let char_id = character.id;
+                                                         let name = self.app_tag_input.clone();
+                                                         tokio::spawn(async move {
+                                                             let res = db.add_tag_to_character(char_id, &name, false).await.map_err(|e| e.to_string());
+                                                             let _ = tx.send(UiEvent::TagOperationFinished(res)).await;
+                                                         });
+                                                        self.app_tag_input.clear();
+                                                    }
+                                                });
+                                                
+                                                ui.add_space(8.0);
+                                                
+                                                // External Tags
+                                                ui.label(egui::RichText::new("External Tags").strong().color(egui::Color32::GRAY));
+                                                ui.horizontal(|ui| {
+                                                    for tag in &character.external_tags {
+                                                        let chip_color = egui::Color32::from_gray(80);
+                                                        let text_color = egui::Color32::WHITE;
+                                                        
+                                                        egui::Frame::none()
+                                                            .fill(chip_color)
+                                                            .rounding(12.0)
+                                                            .inner_margin(4.0)
+                                                            .show(ui, |ui| {
+                                                                ui.horizontal(|ui| {
+                                                                    ui.label(egui::RichText::new(&tag.name).color(text_color).size(12.0));
+                                                                    if ui.small_button(egui::RichText::new("x").color(egui::Color32::from_white_alpha(200))).clicked() {
+                                                                         let tx = tx_clone.clone();
+                                                                         let db = db_clone.clone();
+                                                                         let char_id = character.id;
+                                                                         let tag_id = tag.id;
+                                                                         tokio::spawn(async move {
+                                                                             let res = db.remove_tag_from_character(char_id, tag_id, true).await.map_err(|e| e.to_string());
+                                                                             let _ = tx.send(UiEvent::TagOperationFinished(res)).await;
+                                                                         });
+                                                                    }
+                                                                });
+                                                            });
+                                                    }
+                                                });
+                                                
+                                                ui.horizontal(|ui| {
+                                                    ui.text_edit_singleline(&mut self.ext_tag_input);
+                                                    if ui.button("Add").clicked() && !self.ext_tag_input.is_empty() {
+                                                         let tx = tx_clone.clone();
+                                                         let db = db_clone.clone();
+                                                         let char_id = character.id;
+                                                         let name = self.ext_tag_input.clone();
+                                                         tokio::spawn(async move {
+                                                             let res = db.add_tag_to_character(char_id, &name, true).await.map_err(|e| e.to_string());
+                                                             let _ = tx.send(UiEvent::TagOperationFinished(res)).await;
+                                                         });
+                                                        self.ext_tag_input.clear();
+                                                    }
+                                                });
+                                            });
+                                        });
+                                    ui.add_space(8.0);
                                     
                                     ui.label("Personality");
                                     if ui.text_edit_multiline(&mut character.personality).changed() {}

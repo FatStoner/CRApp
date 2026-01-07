@@ -1,6 +1,14 @@
 use chrono::{DateTime, Utc};
 use sqlx::FromRow;
 
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, FromRow, Default, PartialEq, Eq, Hash)]
+pub struct Tag {
+    pub id: i64,
+    pub name: String,
+}
+
 #[derive(Debug, Clone, FromRow)]
 pub struct Character {
     pub id: i64,
@@ -16,6 +24,10 @@ pub struct Character {
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub collection_id: Option<i64>,
+    #[sqlx(skip)]
+    pub app_tags: Vec<Tag>,
+    #[sqlx(skip)]
+    pub external_tags: Vec<Tag>,
 }
 
 impl Default for Character {
@@ -34,6 +46,8 @@ impl Default for Character {
             created_at: Utc::now(),
             updated_at: Utc::now(),
             collection_id: None,
+            app_tags: Vec::new(),
+            external_tags: Vec::new(),
         }
     }
 }
