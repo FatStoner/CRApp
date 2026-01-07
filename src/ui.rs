@@ -70,6 +70,9 @@ pub struct CrapApp {
     status_message: Option<(String, egui::Color32)>,
     status_clear_time: Option<Instant>,
     loading_error: Option<String>,
+    
+    // Widgets
+    search_query: String,
 }
 
 impl CrapApp {
@@ -96,6 +99,7 @@ impl CrapApp {
             status_message: None,
             status_clear_time: None,
             loading_error: None,
+            search_query: String::new(),
         };
         
         app.refresh_all();
@@ -249,26 +253,63 @@ fn render_tree(
     selected_coll_id: Option<i64>,
     actions: &mut Vec<TreeAction>,
     sort_mode: SortMode,
+    search_query: &str,
 ) {
-    // 1. Render Sub-collections (Folders first is standard)
+    let query_lower = search_query.to_lowercase();
+    let is_search_active = !search_query.is_empty();
+
+    // 1. Render Sub-collections
     let node_colls: Vec<&Collection> = collections.iter().filter(|c| c.parent_id == parent_id).collect();
     for col in node_colls {
+        // Pre-calculate if this folder (or subfolders) has any matching chars
+        // Start simple recursive check if searching? Or let valid items show?
+        // User asked: "Jeśli folder jest pusty po przefiltrowaniu, lekko go wyszarz."
+        // We can check if `has_matches` locally, but we need deep check.
+        // Actually, render_tree calls itself.
+        // Standard approach: Render it, but maybe disable/dim if no children visible?
+        // Let's implement the dimming:
+        // Helper to count visible descendants matching query
+        let has_visible_descendants = if is_search_active {
+             has_matches(col.id, collections, characters, &query_lower)
+        } else {
+             true
+        };
+        
+        // Render
         let is_selected = Some(col.id) == selected_coll_id;
         let id_str = ui.make_persistent_id(col.id);
         
-        // Use CollapsingState to allow custom header logic (SelectableLabel)
         let mut state = egui::collapsing_header::CollapsingState::load_with_default_open(ui.ctx(), id_str, false);
         let was_open = state.is_open();
         
+        // If searching and has matches, force expand? User didn't ask, but good UX. 
+        // User asked for "grey out if empty after filter".
+        if is_search_active && has_visible_descendants {
+             state.set_open(true);
+        }
+
         let mut toggle = false;
         let header_res = state.show_header(ui, |ui| {
-             let label = if is_selected {
-                  egui::RichText::new(format!("📁 {}", col.name)).strong()
+             let alpha = if has_visible_descendants { 255 } else { 100 };
+             let _color = if is_selected { 
+                 ui.visuals().selection.bg_fill
              } else {
-                  egui::RichText::new(format!("📁 {}", col.name))
+                 egui::Color32::from_gray(200).linear_multiply(alpha as f32 / 255.0)
              };
              
-             let response = ui.selectable_label(is_selected, label);
+             let text_color = if is_selected { egui::Color32::WHITE } else {
+                  ui.visuals().text_color().linear_multiply(alpha as f32 / 255.0)
+             };
+
+             let label = egui::RichText::new(format!("📁 {}", col.name)).strong().color(text_color);
+             
+             let mut response = ui.selectable_label(is_selected, label);
+             
+             // Tooltip explaining empty
+             if !has_visible_descendants {
+                 response = response.on_hover_text("No matching characters in this folder");
+             }
+             
              if response.clicked() {
                  actions.push(TreeAction::SelectCollection(col.id));
                  toggle = true;
@@ -292,7 +333,7 @@ fn render_tree(
         });
         
         header_res.body(|ui| {
-            render_tree(ui, collections, characters, Some(col.id), selected_char_id, selected_coll_id, actions, sort_mode);
+            render_tree(ui, collections, characters, Some(col.id), selected_char_id, selected_coll_id, actions, sort_mode, search_query);
         });
 
         if toggle {
@@ -311,6 +352,15 @@ fn render_tree(
 
     // 2. Render Characters
     let mut node_chars: Vec<&Character> = characters.iter().filter(|c| c.collection_id == parent_id).collect();
+    
+    // Filter
+    if is_search_active {
+         node_chars.retain(|c| {
+             c.name.to_lowercase().contains(&query_lower) || c.char_title.to_lowercase().contains(&query_lower)
+         });
+    }
+
+    // Sort
     match sort_mode {
         SortMode::Alphabetical => node_chars.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase())),
         SortMode::NewestFirst => node_chars.sort_by(|a, b| b.created_at.cmp(&a.created_at)),
@@ -319,10 +369,108 @@ fn render_tree(
 
     for char in node_chars {
         let is_selected = Some(char.id) == selected_char_id;
-        if ui.selectable_label(is_selected, &char.name).clicked() {
-            actions.push(TreeAction::SelectChar(char.clone()));
+        
+        let item_height = 48.0; // 40px thumb + padding
+        let (rect, response) = ui.allocate_exact_size(
+             egui::vec2(ui.available_width(), item_height), 
+             egui::Sense::click()
+        );
+
+        // Interaction
+        if response.clicked() {
+             actions.push(TreeAction::SelectChar(char.clone()));
+        }
+        
+        // Hover/Select background
+        if is_selected {
+             ui.painter().rect_filled(rect, 4.0, ui.visuals().selection.bg_fill);
+        } else if response.hovered() {
+             ui.painter().rect_filled(rect, 4.0, ui.visuals().widgets.hovered.bg_fill);
+        }
+
+        // Content
+        let thumb_size = 40.0;
+        let thumb_rect = egui::Rect::from_min_size(rect.min + egui::vec2(4.0, 4.0), egui::vec2(thumb_size, thumb_size));
+        
+        // Thumbnail
+        if let Some(path_str) = &char.avatar_path {
+             // Simple check if it looks like a path.
+             // We use file:// prefix for local files.
+             let uri = if path_str.contains("://") { 
+                 path_str.clone() 
+             } else {
+                 if let Ok(abs_path) = std::fs::canonicalize(path_str) {
+                      format!("file://{}", abs_path.to_string_lossy())
+                 } else {
+                      path_str.clone() // Fallback
+                 }
+             };
+             
+             egui::Image::new(uri)
+                 .rounding(4.0)
+                 .paint_at(ui, thumb_rect);
+        } else {
+             ui.painter().rect_filled(thumb_rect, 4.0, egui::Color32::from_gray(70));
+             let initial = char.name.chars().next().unwrap_or('?').to_uppercase().to_string();
+             ui.painter().text(
+                 thumb_rect.center(), 
+                 egui::Align2::CENTER_CENTER, 
+                 initial, 
+                 egui::FontId::proportional(20.0), 
+                 egui::Color32::WHITE
+             );
+        }
+        
+        // Text
+        let text_left = thumb_rect.max.x + 8.0;
+        let _text_width = rect.width() - (text_left - rect.min.x) - 4.0; // Available width for text
+        
+        // Name
+        let name_font = egui::FontId::proportional(15.0); // Strong/Header-ish
+        let name_color = if is_selected { egui::Color32::WHITE } else { ui.visuals().text_color() };
+        
+        // We use layout_job for potentially better control, or just layout_no_wrap
+        // Let's use layout with wrapping disabled but strictly checking width if we wanted truncation.
+        // For simplicity: layout_no_wrap. To clip, we rely on painter clip or just let it overflow slightly if huge?
+        // Better: clip to rect.
+        let name_galley = ui.painter().layout_no_wrap(char.name.clone(), name_font, name_color);
+        let name_pos = egui::pos2(text_left, rect.min.y + 4.0);
+        
+        ui.painter().with_clip_rect(rect).galley(name_pos, name_galley, egui::Color32::WHITE);
+        
+        // Title
+        if !char.char_title.is_empty() {
+             let title_font = egui::FontId::proportional(12.0);
+             let title_color = if is_selected { 
+                 egui::Color32::from_white_alpha(200) 
+             } else { 
+                 ui.visuals().text_color().linear_multiply(0.7) 
+             };
+             
+             let title_galley = ui.painter().layout_no_wrap(char.char_title.clone(), title_font, title_color);
+             let title_pos = egui::pos2(text_left, rect.min.y + 24.0); // Below name
+             
+             ui.painter().with_clip_rect(rect).galley(title_pos, title_galley, egui::Color32::WHITE);
         }
     }
+}
+
+// Helper to check for matches recursively
+fn has_matches(collection_id: i64, collections: &[Collection], characters: &[Character], query: &str) -> bool {
+    // 1. Check characters in this collection
+    if characters.iter().any(|c| c.collection_id == Some(collection_id) && (c.name.to_lowercase().contains(query) || c.char_title.to_lowercase().contains(query))) {
+        return true;
+    }
+    
+    // 2. Check sub-collections
+    let sub_colls: Vec<&Collection> = collections.iter().filter(|c| c.parent_id == Some(collection_id)).collect();
+    for sub in sub_colls {
+        if has_matches(sub.id, collections, characters, query) {
+            return true;
+        }
+    }
+    
+    false
 }
 impl CrapApp {
     fn set_status(&mut self, msg: String, color: egui::Color32) {
@@ -441,7 +589,18 @@ impl eframe::App for CrapApp {
             } else {
                  // Sorting Toolbar (only for Characters)
                  if self.mode == AppMode::Characters {
-                     ui.horizontal(|ui| {
+                      // Search Bar
+                      ui.horizontal(|ui| {
+                          ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
+                              ui.add(egui::TextEdit::singleline(&mut self.search_query).hint_text("Search characters..."));
+                              if !self.search_query.is_empty() && ui.button("x").clicked() {
+                                  self.search_query.clear();
+                              }
+                          });
+                      });
+                      ui.separator();
+                      
+                      ui.horizontal(|ui| {
                          ui.label("Sort:");
                          ui.selectable_value(&mut self.sort_mode, SortMode::Alphabetical, "A-Z");
                          ui.selectable_value(&mut self.sort_mode, SortMode::NewestFirst, "New");
@@ -504,7 +663,8 @@ impl eframe::App for CrapApp {
                                      sel_char, 
                                      sel_col, 
                                      &mut actions,
-                                     self.sort_mode
+                                     self.sort_mode,
+                                     &self.search_query,
                                  );
                                  
                                  // Process actions
