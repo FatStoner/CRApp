@@ -237,6 +237,7 @@ enum TreeAction {
     RenameCollection(i64, String),
     RequestDeleteCollection(i64),
     CreateSubfolder(i64),
+    CreateRootFolder,
 }
 
 fn render_tree(
@@ -255,38 +256,57 @@ fn render_tree(
         let is_selected = Some(col.id) == selected_coll_id;
         let id_str = ui.make_persistent_id(col.id);
         
-        egui::collapsing_header::CollapsingState::load_with_default_open(ui.ctx(), id_str, false)
-            .show_header(ui, |ui| {
-                let label = if is_selected {
-                     egui::RichText::new(format!("📁 {}", col.name)).strong()
-                } else {
-                     egui::RichText::new(format!("📁 {}", col.name))
-                };
-                
-                let response = ui.selectable_label(is_selected, label);
-                if response.clicked() {
-                    actions.push(TreeAction::SelectCollection(col.id));
-                }
-                
-                response.context_menu(|ui| {
-                    if ui.button("Rename").clicked() {
-                        actions.push(TreeAction::RenameCollection(col.id, col.name.clone()));
-                        ui.close_menu();
-                    }
-                    if ui.button("New Subfolder").clicked() {
-                        actions.push(TreeAction::CreateSubfolder(col.id));
-                        ui.close_menu();
-                    }
-                    ui.separator();
-                    if ui.button("Delete").clicked() {
-                        actions.push(TreeAction::RequestDeleteCollection(col.id));
-                        ui.close_menu();
-                    }
-                });
-            })
-            .body(|ui| {
-                render_tree(ui, collections, characters, Some(col.id), selected_char_id, selected_coll_id, actions, sort_mode);
-            });
+        // Use CollapsingState to allow custom header logic (SelectableLabel)
+        let mut state = egui::collapsing_header::CollapsingState::load_with_default_open(ui.ctx(), id_str, false);
+        let was_open = state.is_open();
+        
+        let mut toggle = false;
+        let header_res = state.show_header(ui, |ui| {
+             let label = if is_selected {
+                  egui::RichText::new(format!("📁 {}", col.name)).strong()
+             } else {
+                  egui::RichText::new(format!("📁 {}", col.name))
+             };
+             
+             let response = ui.selectable_label(is_selected, label);
+             if response.clicked() {
+                 actions.push(TreeAction::SelectCollection(col.id));
+                 toggle = true;
+             }
+             
+             response.context_menu(|ui| {
+                 if ui.button("Rename").clicked() {
+                     actions.push(TreeAction::RenameCollection(col.id, col.name.clone()));
+                     ui.close_menu();
+                 }
+                 if ui.button("New Subfolder").clicked() {
+                     actions.push(TreeAction::CreateSubfolder(col.id));
+                     ui.close_menu();
+                 }
+                 ui.separator();
+                 if ui.button("Delete").clicked() {
+                     actions.push(TreeAction::RequestDeleteCollection(col.id));
+                     ui.close_menu();
+                 }
+             });
+        });
+        
+        header_res.body(|ui| {
+            render_tree(ui, collections, characters, Some(col.id), selected_char_id, selected_coll_id, actions, sort_mode);
+        });
+
+        if toggle {
+             // Manual toggle triggered from inside header
+             // Verify if auto-toggle already happened by checking if state changed
+             if let Some(mut state) = egui::collapsing_header::CollapsingState::load(ui.ctx(), id_str) {
+                 let is_open_now = state.is_open();
+                 if was_open == is_open_now {
+                      state.toggle(ui);
+                      state.store(ui.ctx());
+                      ui.ctx().request_repaint();
+                 }
+             }
+        }
     }
 
     // 2. Render Characters
@@ -405,7 +425,9 @@ impl eframe::App for CrapApp {
             }
         }
 
-        egui::SidePanel::left("side_panel").show(ctx, |ui| {
+        egui::SidePanel::left("side_panel")
+            .min_width(250.0) // Increased width
+            .show(ctx, |ui| {
             ui.add_space(4.0);
             ui.horizontal(|ui| {
                 ui.selectable_value(&mut self.mode, AppMode::Characters, "Characters");
@@ -431,16 +453,11 @@ impl eframe::App for CrapApp {
                      ui.horizontal(|ui| {
                          let label = if self.selected_collection_id.is_some() { "New Subfolder" } else { "New Folder" };
                          if ui.button(label).clicked() {
-                             // Popup for name
-                             // For MVP: Simple "New Folder" name default, user can rename later? Or Modal?
-                             // User requirement: "Dodaj w SidePanelu przycisk 'New Folder'"
-                             // I'll create it with default name and reload.
-                             // Actually, let's keep it simple: Create "New Collection" immediately.
-                             self.save_collection("New Folder".to_string(), self.selected_collection_id);
-                         }
-                         if self.selected_collection_id.is_some() {
-                             if ui.button("Unselect Folder").clicked() {
-                                 self.selected_collection_id = None;
+                             // Context-aware creation
+                             if let Some(pid) = self.selected_collection_id {
+                                 self.save_collection("New Folder".to_string(), Some(pid));
+                             } else {
+                                 self.save_collection("New Folder".to_string(), None);
                              }
                          }
                      });
@@ -467,9 +484,17 @@ impl eframe::App for CrapApp {
                                      egui::RichText::new("📁 Root")
                                  };
 
-                                 if ui.selectable_label(sel_col.is_none(), root_label).clicked() {
+                                 let root_response = ui.selectable_label(sel_col.is_none(), root_label);
+                                 if root_response.clicked() {
                                       actions.push(TreeAction::DeselectCollection);
                                  }
+                                 
+                                 root_response.context_menu(|ui| {
+                                     if ui.button("New Folder").clicked() {
+                                         actions.push(TreeAction::CreateRootFolder);
+                                         ui.close_menu();
+                                     }
+                                 });
                                  
                                  render_tree(
                                      ui, 
@@ -486,6 +511,7 @@ impl eframe::App for CrapApp {
                                  for action in actions {
                                      match action {
                                          TreeAction::SelectChar(c) => {
+                                             self.selected_collection_id = c.collection_id; // Auto-select parent folder
                                              self.selected_character = Some(c.clone());
                                              self.active_char_tab = CharacterTab::MainData;
                                              self.status_message = None;
@@ -504,6 +530,9 @@ impl eframe::App for CrapApp {
                                              self.save_collection("New Folder".to_string(), Some(parent_id));
                                              // Auto-expand? We don't track expansion state explicitly here (egui does internally), 
                                              // but creating it will likely show up.
+                                         },
+                                         TreeAction::CreateRootFolder => {
+                                             self.save_collection("New Folder".to_string(), None);
                                          },
                                          TreeAction::RequestDeleteCollection(id) => {
                                              self.popup_state = PopupState::DeleteConfirmation { id };
@@ -551,9 +580,6 @@ impl eframe::App for CrapApp {
                     if let Some(character) = &mut self.selected_character {
                         ui.horizontal(|ui| {
                             ui.heading("Edit Character");
-                            if ui.button("Save").clicked() {
-                                save_req = Some(character.clone());
-                            }
                         });
                         
                         ui.horizontal(|ui| {
