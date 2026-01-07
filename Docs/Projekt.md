@@ -66,3 +66,4 @@ Przy generowaniu kodu skup się na:
 * Użyciu tokio do operacji asynchronicznych na bazie danych.  
 * Implementacji egui::TextureHandle do sprawnego zarządzania obrazami w pamięci.  
 * Zachowaniu modularności: osobny plik dla bazy danych (db.rs), osobny dla UI (ui.rs) i modeli (models.rs).
+* **ENFORCED RULE:** All code (comments, variable names) and UI text MUST be in English.

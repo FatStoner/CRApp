@@ -73,4 +73,47 @@ impl Database {
             .fetch_all(&self.pool)
             .await
     }
+
+    pub async fn upsert_character(&self, character: &mut crate::models::Character) -> Result<(), sqlx::Error> {
+        character.updated_at = chrono::Utc::now();
+        
+        if character.id == 0 {
+            // INSERT
+            let id = sqlx::query(
+                "INSERT INTO characters (name, char_name, char_title, personality, first_message, author_notes, avatar_path, created_at, updated_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            )
+            .bind(&character.name)
+            .bind(&character.char_name)
+            .bind(&character.char_title)
+            .bind(&character.personality)
+            .bind(&character.first_message)
+            .bind(&character.author_notes)
+            .bind(&character.avatar_path)
+            .bind(character.created_at)
+            .bind(character.updated_at)
+            .execute(&self.pool)
+            .await?
+            .last_insert_rowid();
+
+            character.id = id;
+        } else {
+            // UPDATE
+            sqlx::query(
+                "UPDATE characters SET name=?, char_name=?, char_title=?, personality=?, first_message=?, author_notes=?, avatar_path=?, updated_at=? WHERE id=?"
+            )
+            .bind(&character.name)
+            .bind(&character.char_name)
+            .bind(&character.char_title)
+            .bind(&character.personality)
+            .bind(&character.first_message)
+            .bind(&character.author_notes)
+            .bind(&character.avatar_path)
+            .bind(character.updated_at)
+            .bind(character.id)
+            .execute(&self.pool)
+            .await?;
+        }
+        Ok(())
+    }
 }
