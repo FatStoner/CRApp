@@ -8,6 +8,8 @@ pub struct Character {
     pub char_name: String,
     pub char_title: String,
     pub personality: String,
+    pub scenario: String,
+    pub example_dialogue: String,
     pub first_message: String,
     pub author_notes: String,
     pub avatar_path: Option<String>,
@@ -23,6 +25,8 @@ impl Default for Character {
             char_name: "".to_string(),
             char_title: "".to_string(),
             personality: "".to_string(),
+            scenario: "".to_string(),
+            example_dialogue: "".to_string(),
             first_message: "".to_string(),
             author_notes: "".to_string(),
             avatar_path: None,
@@ -43,4 +47,23 @@ pub fn count_tokens(text: &str) -> usize {
     });
     
     bpe.encode_with_special_tokens(text).len()
+}
+
+#[derive(Debug, Clone, FromRow)]
+pub struct Lorebook {
+    pub id: i64,
+    pub title: String,
+    pub description: String,
+    pub cover_path: Option<String>,
+}
+
+impl Default for Lorebook {
+    fn default() -> Self {
+        Self {
+            id: 0,
+            title: "New Lorebook".to_string(),
+            description: "".to_string(),
+            cover_path: None,
+        }
+    }
 }
