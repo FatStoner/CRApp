@@ -45,6 +45,8 @@ impl Database {
         // Migration: Attempt to add columns to existing table
         let _ = sqlx::query("ALTER TABLE characters ADD COLUMN scenario TEXT NOT NULL DEFAULT ''").execute(&pool).await;
         let _ = sqlx::query("ALTER TABLE characters ADD COLUMN example_dialogue TEXT NOT NULL DEFAULT ''").execute(&pool).await;
+        let _ = sqlx::query("ALTER TABLE characters ADD COLUMN created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP").execute(&pool).await;
+        let _ = sqlx::query("ALTER TABLE characters ADD COLUMN updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP").execute(&pool).await;
 
 
         // Create lorebooks table

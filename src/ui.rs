@@ -27,6 +27,13 @@ enum CharacterTab {
     AssociatedLore,
 }
 
+#[derive(PartialEq, Clone, Copy)]
+pub enum SortMode {
+    Alphabetical,
+    NewestFirst,
+    RecentlyUpdated,
+}
+
 pub struct CrapApp {
     db: Database,
     tx: mpsc::Sender<UiEvent>,
@@ -42,6 +49,7 @@ pub struct CrapApp {
     selected_character: Option<Character>,
     selected_lorebook: Option<Lorebook>,
     active_char_tab: CharacterTab,
+    sort_mode: SortMode,
     
     // Feedback
     is_saving: bool,
@@ -66,6 +74,7 @@ impl CrapApp {
             selected_character: None,
             selected_lorebook: None,
             active_char_tab: CharacterTab::MainData,
+            sort_mode: SortMode::Alphabetical,
             is_saving: false,
             status_message: None,
             status_clear_time: None,
@@ -235,11 +244,39 @@ impl eframe::App for CrapApp {
                 ui.colored_label(egui::Color32::RED, format!("Error: {}", err));
                 if ui.button("Retry").clicked() { self.refresh_all(); }
             } else {
+                 // Sorting Toolbar (only for Characters)
+                 if self.mode == AppMode::Characters {
+                     ui.horizontal(|ui| {
+                         ui.label("Sort:");
+                         ui.selectable_value(&mut self.sort_mode, SortMode::Alphabetical, "A-Z");
+                         ui.selectable_value(&mut self.sort_mode, SortMode::NewestFirst, "New");
+                         ui.selectable_value(&mut self.sort_mode, SortMode::RecentlyUpdated, "Last");
+                     });
+                     ui.separator();
+                 }
+
                  egui::ScrollArea::vertical().show(ui, |ui| {
                      ui.vertical(|ui| {
                          match self.mode {
                              AppMode::Characters => {
-                                 for char in &self.characters {
+                                 // Sort characters based on mode
+                                 // We create a viewing list of indices to avoid cloning the whole vec repeatedly if possible,
+                                 // but for simplicity and since we want to iterate:
+                                 let mut indices: Vec<usize> = (0..self.characters.len()).collect();
+                                 match self.sort_mode {
+                                     SortMode::Alphabetical => {
+                                         indices.sort_by(|&a, &b| self.characters[a].name.to_lowercase().cmp(&self.characters[b].name.to_lowercase()));
+                                     },
+                                     SortMode::NewestFirst => {
+                                         indices.sort_by(|&a, &b| self.characters[b].created_at.cmp(&self.characters[a].created_at));
+                                     },
+                                     SortMode::RecentlyUpdated => {
+                                         indices.sort_by(|&a, &b| self.characters[b].updated_at.cmp(&self.characters[a].updated_at));
+                                     },
+                                 }
+
+                                 for i in indices {
+                                     let char = &self.characters[i];
                                      if ui.button(&char.name).clicked() {
                                          self.selected_character = Some(char.clone());
                                          self.active_char_tab = CharacterTab::MainData;
