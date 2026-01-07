@@ -15,6 +15,7 @@ pub struct Character {
     pub avatar_path: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+    pub collection_id: Option<i64>,
 }
 
 impl Default for Character {
@@ -32,6 +33,7 @@ impl Default for Character {
             avatar_path: None,
             created_at: Utc::now(),
             updated_at: Utc::now(),
+            collection_id: None,
         }
     }
 }
@@ -55,6 +57,13 @@ pub struct Lorebook {
     pub title: String,
     pub description: String,
     pub cover_path: Option<String>,
+}
+
+#[derive(Debug, Clone, FromRow)]
+pub struct Collection {
+    pub id: i64,
+    pub name: String,
+    pub parent_id: Option<i64>,
 }
 
 impl Default for Lorebook {

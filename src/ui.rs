@@ -3,14 +3,17 @@ use tokio::sync::mpsc;
 use std::time::{Duration, Instant};
 use std::collections::HashSet;
 use crate::db::Database;
-use crate::models::{Character, Lorebook};
+use crate::models::{Character, Lorebook, Collection};
 
 pub enum UiEvent {
     CharactersLoaded(Result<Vec<Character>, String>),
     LorebooksLoaded(Result<Vec<Lorebook>, String>),
+    CollectionsLoaded(Result<Vec<Collection>, String>),
     LoreLinksLoaded(Result<HashSet<i64>, String>),
     CharacterSaved(Result<Character, String>),
     LorebookSaved(Result<Lorebook, String>),
+    CollectionSaved(Result<i64, String>),
+    CollectionDeleted(Result<i64, String>), // Returns ID of deleted collection
     LinkUpdated(Result<(), String>),
 }
 
@@ -25,6 +28,14 @@ enum CharacterTab {
     MainData,
     AuthorNotes,
     AssociatedLore,
+}
+
+#[derive(Clone, PartialEq)]
+enum PopupState {
+    None,
+    Renaming { id: i64, name: String },
+    DeleteConfirmation { id: i64 },
+    DeleteWarning { id: i64, count: usize },
 }
 
 #[derive(PartialEq, Clone, Copy)]
@@ -42,6 +53,7 @@ pub struct CrapApp {
     // Data
     characters: Vec<Character>,
     lorebooks: Vec<Lorebook>,
+    collections: Vec<Collection>,
     lore_links: HashSet<i64>, // IDs of lorebooks linked to selected_character
 
     // State
@@ -50,6 +62,8 @@ pub struct CrapApp {
     selected_lorebook: Option<Lorebook>,
     active_char_tab: CharacterTab,
     sort_mode: SortMode,
+    selected_collection_id: Option<i64>, // For "New Folder" context
+    popup_state: PopupState,
     
     // Feedback
     is_saving: bool,
@@ -69,12 +83,15 @@ impl CrapApp {
             rx,
             characters: Vec::new(),
             lorebooks: Vec::new(),
+            collections: Vec::new(),
             lore_links: HashSet::new(),
             mode: AppMode::Characters,
             selected_character: None,
             selected_lorebook: None,
             active_char_tab: CharacterTab::MainData,
             sort_mode: SortMode::Alphabetical,
+            selected_collection_id: None,
+            popup_state: PopupState::None,
             is_saving: false,
             status_message: None,
             status_clear_time: None,
@@ -88,6 +105,7 @@ impl CrapApp {
     fn refresh_all(&self) {
         self.reload_characters();
         self.reload_lorebooks();
+        self.reload_collections();
     }
 
     fn reload_characters(&self) {
@@ -115,6 +133,15 @@ impl CrapApp {
         tokio::spawn(async move {
             let result = db.get_lore_links(char_id).await.map_err(|e| e.to_string());
             let _ = tx.send(UiEvent::LoreLinksLoaded(result)).await;
+        });
+    }
+
+    fn reload_collections(&self) {
+        let tx = self.tx.clone();
+        let db = self.db.clone();
+        tokio::spawn(async move {
+            let result = db.get_all_collections().await.map_err(|e| e.to_string());
+            let _ = tx.send(UiEvent::CollectionsLoaded(result)).await;
         });
     }
 
@@ -152,6 +179,37 @@ impl CrapApp {
         });
     }
 
+    fn save_collection(&mut self, name: String, parent_id: Option<i64>) {
+        self.is_saving = true;
+        let tx = self.tx.clone();
+        let db = self.db.clone();
+        let col = crate::models::Collection { id: 0, name, parent_id }; // ID 0 means insert
+        tokio::spawn(async move {
+            let result = db.upsert_collection(&col).await.map_err(|e| e.to_string());
+             let _ = tx.send(UiEvent::CollectionSaved(result)).await;
+        });
+    }
+    
+    fn get_collection_path(&self, mut col_id: i64) -> String {
+        let mut path = Vec::new();
+        // Simple loop to prevent infinite recursion if cycle exists (though DB shouldn't allow it easily without checking)
+        // We limit depth to 10 for safety.
+        for _ in 0..10 {
+            if let Some(col) = self.collections.iter().find(|c| c.id == col_id) {
+                path.push(col.name.clone());
+                if let Some(pid) = col.parent_id {
+                    col_id = pid;
+                } else {
+                    break;
+                }
+            } else {
+                break;
+            }
+        }
+        path.reverse();
+        path.join(" / ")
+    }
+
     fn toggle_lore_link(&mut self, char_id: i64, lore_id: i64, link: bool) {
         if link {
             self.lore_links.insert(lore_id);
@@ -170,7 +228,83 @@ impl CrapApp {
             let _ = tx.send(UiEvent::LinkUpdated(res.map_err(|e| e.to_string()))).await;
         });
     }
+}
 
+enum TreeAction {
+    SelectChar(Character),
+    SelectCollection(i64),
+    DeselectCollection,
+    RenameCollection(i64, String),
+    RequestDeleteCollection(i64),
+    CreateSubfolder(i64),
+}
+
+fn render_tree(
+    ui: &mut egui::Ui,
+    collections: &[Collection],
+    characters: &[Character],
+    parent_id: Option<i64>,
+    selected_char_id: Option<i64>,
+    selected_coll_id: Option<i64>,
+    actions: &mut Vec<TreeAction>,
+    sort_mode: SortMode,
+) {
+    // 1. Render Sub-collections (Folders first is standard)
+    let node_colls: Vec<&Collection> = collections.iter().filter(|c| c.parent_id == parent_id).collect();
+    for col in node_colls {
+        let is_selected = Some(col.id) == selected_coll_id;
+        let id_str = ui.make_persistent_id(col.id);
+        
+        egui::collapsing_header::CollapsingState::load_with_default_open(ui.ctx(), id_str, false)
+            .show_header(ui, |ui| {
+                let label = if is_selected {
+                     egui::RichText::new(format!("📁 {}", col.name)).strong()
+                } else {
+                     egui::RichText::new(format!("📁 {}", col.name))
+                };
+                
+                let response = ui.selectable_label(is_selected, label);
+                if response.clicked() {
+                    actions.push(TreeAction::SelectCollection(col.id));
+                }
+                
+                response.context_menu(|ui| {
+                    if ui.button("Rename").clicked() {
+                        actions.push(TreeAction::RenameCollection(col.id, col.name.clone()));
+                        ui.close_menu();
+                    }
+                    if ui.button("New Subfolder").clicked() {
+                        actions.push(TreeAction::CreateSubfolder(col.id));
+                        ui.close_menu();
+                    }
+                    ui.separator();
+                    if ui.button("Delete").clicked() {
+                        actions.push(TreeAction::RequestDeleteCollection(col.id));
+                        ui.close_menu();
+                    }
+                });
+            })
+            .body(|ui| {
+                render_tree(ui, collections, characters, Some(col.id), selected_char_id, selected_coll_id, actions, sort_mode);
+            });
+    }
+
+    // 2. Render Characters
+    let mut node_chars: Vec<&Character> = characters.iter().filter(|c| c.collection_id == parent_id).collect();
+    match sort_mode {
+        SortMode::Alphabetical => node_chars.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase())),
+        SortMode::NewestFirst => node_chars.sort_by(|a, b| b.created_at.cmp(&a.created_at)),
+        SortMode::RecentlyUpdated => node_chars.sort_by(|a, b| b.updated_at.cmp(&a.updated_at)),
+    }
+
+    for char in node_chars {
+        let is_selected = Some(char.id) == selected_char_id;
+        if ui.selectable_label(is_selected, &char.name).clicked() {
+            actions.push(TreeAction::SelectChar(char.clone()));
+        }
+    }
+}
+impl CrapApp {
     fn set_status(&mut self, msg: String, color: egui::Color32) {
         self.status_message = Some((msg, color));
         self.status_clear_time = Some(Instant::now() + Duration::from_secs(3));
@@ -186,13 +320,27 @@ impl eframe::App for CrapApp {
                     Ok(list) => { self.characters = list; self.loading_error = None; }
                     Err(e) => { eprintln!("Load error: {}", e); self.loading_error = Some(e); }
                 },
-                UiEvent::LorebooksLoaded(res) => match res {
-                    Ok(list) => self.lorebooks = list,
-                    Err(e) => eprintln!("Lore load error: {}", e),
+                UiEvent::LorebooksLoaded(res) => {
+                    match res {
+                        Ok(books) => self.lorebooks = books,
+                        Err(e) => {
+                            self.loading_error = Some(e);
+                        }
+                    }
                 },
-                UiEvent::LoreLinksLoaded(res) => match res {
-                    Ok(set) => self.lore_links = set,
-                    Err(e) => eprintln!("Link load error: {}", e),
+                UiEvent::CollectionsLoaded(res) => {
+                    match res {
+                        Ok(collections) => self.collections = collections,
+                        Err(e) => {
+                             self.loading_error = Some(e);
+                        }
+                    }
+                },
+                UiEvent::LoreLinksLoaded(res) => {
+                    match res {
+                        Ok(set) => self.lore_links = set,
+                        Err(e) => eprintln!("Link load error: {}", e),
+                    }
                 },
                 UiEvent::CharacterSaved(res) => {
                     self.is_saving = false;
@@ -212,6 +360,31 @@ impl eframe::App for CrapApp {
                             self.set_status("Lorebook Saved!".to_string(), egui::Color32::GREEN);
                         },
                         Err(e) => self.set_status(format!("Save Error: {}", e), egui::Color32::RED),
+                    }
+                },
+                UiEvent::CollectionSaved(res) => {
+                    self.is_saving = false;
+                    match res {
+                        Ok(_) => { 
+                            self.set_status("Collection Saved!".to_string(), egui::Color32::GREEN);
+                            self.reload_collections(); // Refresh tree
+                            self.popup_state = PopupState::None; // Close rename popup if open
+                        },
+                        Err(e) => self.set_status(format!("Save Error: {}", e), egui::Color32::RED),
+                    }
+                },
+                UiEvent::CollectionDeleted(res) => {
+                    self.is_saving = false;
+                     match res {
+                        Ok(id) => { 
+                            self.set_status("Collection Deleted".to_string(), egui::Color32::GREEN);
+                            self.reload_collections(); // Refresh tree
+                            self.reload_characters(); // Refresh chars (orphans)
+                            if self.selected_collection_id == Some(id) {
+                                self.selected_collection_id = None;
+                            }
+                        },
+                        Err(e) => self.set_status(format!("Delete Error: {}", e), egui::Color32::RED),
                     }
                 },
                 UiEvent::LinkUpdated(res) => {
@@ -253,36 +426,88 @@ impl eframe::App for CrapApp {
                          ui.selectable_value(&mut self.sort_mode, SortMode::RecentlyUpdated, "Last");
                      });
                      ui.separator();
+                     
+                     // Toolbar for folders
+                     ui.horizontal(|ui| {
+                         let label = if self.selected_collection_id.is_some() { "New Subfolder" } else { "New Folder" };
+                         if ui.button(label).clicked() {
+                             // Popup for name
+                             // For MVP: Simple "New Folder" name default, user can rename later? Or Modal?
+                             // User requirement: "Dodaj w SidePanelu przycisk 'New Folder'"
+                             // I'll create it with default name and reload.
+                             // Actually, let's keep it simple: Create "New Collection" immediately.
+                             self.save_collection("New Folder".to_string(), self.selected_collection_id);
+                         }
+                         if self.selected_collection_id.is_some() {
+                             if ui.button("Unselect Folder").clicked() {
+                                 self.selected_collection_id = None;
+                             }
+                         }
+                     });
+                     ui.separator();
                  }
 
                  egui::ScrollArea::vertical().show(ui, |ui| {
                      ui.vertical(|ui| {
                          match self.mode {
                              AppMode::Characters => {
-                                 // Sort characters based on mode
-                                 // We create a viewing list of indices to avoid cloning the whole vec repeatedly if possible,
-                                 // but for simplicity and since we want to iterate:
-                                 let mut indices: Vec<usize> = (0..self.characters.len()).collect();
-                                 match self.sort_mode {
-                                     SortMode::Alphabetical => {
-                                         indices.sort_by(|&a, &b| self.characters[a].name.to_lowercase().cmp(&self.characters[b].name.to_lowercase()));
-                                     },
-                                     SortMode::NewestFirst => {
-                                         indices.sort_by(|&a, &b| self.characters[b].created_at.cmp(&self.characters[a].created_at));
-                                     },
-                                     SortMode::RecentlyUpdated => {
-                                         indices.sort_by(|&a, &b| self.characters[b].updated_at.cmp(&self.characters[a].updated_at));
-                                     },
-                                 }
+                                 let mut actions = Vec::new();
+                                 let sel_char = self.selected_character.as_ref().map(|c| c.id);
+                                 let sel_col = self.selected_collection_id;
+                                 
+                                 // Render "Uncategorized" explicit section or just root characters?
+                                 // Plan said: "Top: Uncategorized... Standard: Recursive..."
+                                 // `render_tree` with parent_id: None handles root items (which are uncategorized/root).
+                                 // If we want a specific "Uncategorized" folder visual, we can fake it, but passing None to render_tree mimics standard file system root.
+                                 // Let's stick to calling render_tree with None.
+                                 
+                                 let root_label = if sel_col.is_none() {
+                                     egui::RichText::new("📁 Root").strong()
+                                 } else {
+                                     egui::RichText::new("📁 Root")
+                                 };
 
-                                 for i in indices {
-                                     let char = &self.characters[i];
-                                     if ui.button(&char.name).clicked() {
-                                         self.selected_character = Some(char.clone());
-                                         self.active_char_tab = CharacterTab::MainData;
-                                         self.status_message = None;
-                                         // Load links
-                                         self.load_links(char.id);
+                                 if ui.selectable_label(sel_col.is_none(), root_label).clicked() {
+                                      actions.push(TreeAction::DeselectCollection);
+                                 }
+                                 
+                                 render_tree(
+                                     ui, 
+                                     &self.collections, 
+                                     &self.characters, 
+                                     None, 
+                                     sel_char, 
+                                     sel_col, 
+                                     &mut actions,
+                                     self.sort_mode
+                                 );
+                                 
+                                 // Process actions
+                                 for action in actions {
+                                     match action {
+                                         TreeAction::SelectChar(c) => {
+                                             self.selected_character = Some(c.clone());
+                                             self.active_char_tab = CharacterTab::MainData;
+                                             self.status_message = None;
+                                             self.load_links(c.id);
+                                         },
+                                         TreeAction::SelectCollection(id) => {
+                                             self.selected_collection_id = Some(id);
+                                         },
+                                         TreeAction::DeselectCollection => {
+                                             self.selected_collection_id = None;
+                                         },
+                                         TreeAction::RenameCollection(id, name) => {
+                                             self.popup_state = PopupState::Renaming { id, name };
+                                         },
+                                         TreeAction::CreateSubfolder(parent_id) => {
+                                             self.save_collection("New Folder".to_string(), Some(parent_id));
+                                             // Auto-expand? We don't track expansion state explicitly here (egui does internally), 
+                                             // but creating it will likely show up.
+                                         },
+                                         TreeAction::RequestDeleteCollection(id) => {
+                                             self.popup_state = PopupState::DeleteConfirmation { id };
+                                         }
                                      }
                                  }
                              },
@@ -312,6 +537,11 @@ impl eframe::App for CrapApp {
              }
         });
 
+        // Prepare collection options to avoid borrow checker issues inside the closure where we mutate char.
+        let collection_options: Vec<(i64, String)> = self.collections.iter().map(|c| {
+            (c.id, self.get_collection_path(c.id))
+        }).collect();
+
         egui::CentralPanel::default().show(ctx, |ui| {
             match self.mode {
                 AppMode::Characters => {
@@ -319,7 +549,32 @@ impl eframe::App for CrapApp {
                     let mut toggle_requests = Vec::new();
                     
                     if let Some(character) = &mut self.selected_character {
-                        ui.heading("Edit Character");
+                        ui.horizontal(|ui| {
+                            ui.heading("Edit Character");
+                            if ui.button("Save").clicked() {
+                                save_req = Some(character.clone());
+                            }
+                        });
+                        
+                        ui.horizontal(|ui| {
+                            ui.label("Collection:");
+                            let current_col_name = character.collection_id.and_then(|id| {
+                                collection_options.iter().find(|(cid, _)| *cid == id).map(|(_, name)| name.clone())
+                            }).unwrap_or_else(|| "Uncategorized".to_string());
+                            
+                            egui::ComboBox::from_id_source("collection_combo")
+                                .selected_text(current_col_name)
+                                .show_ui(ui, |ui| {
+                                    ui.selectable_value(&mut character.collection_id, None, "Uncategorized");
+                                    for (id, name) in &collection_options {
+                                        ui.selectable_value(&mut character.collection_id, Some(*id), name);
+                                    }
+                                });
+                        });
+                        
+                        ui.separator();
+                        
+                        // Tabs
                         ui.horizontal(|ui| {
                             ui.selectable_value(&mut self.active_char_tab, CharacterTab::MainData, "Main Data");
                             ui.selectable_value(&mut self.active_char_tab, CharacterTab::AuthorNotes, "Author Notes");
@@ -435,6 +690,8 @@ impl eframe::App for CrapApp {
                     for (char_id, lore_id, link) in toggle_requests {
                         self.toggle_lore_link(char_id, lore_id, link);
                     }
+                    
+
                 },
                 AppMode::Lorebooks => {
                     let mut save_req = None;
@@ -505,5 +762,116 @@ impl eframe::App for CrapApp {
                 }
             }
         });
+        
+        // Modals
+        let mut close_popup = false;
+        let mut save_rename = None;
+        let mut confirm_delete = None;
+        let mut check_delete_contents = None;
+
+        match &mut self.popup_state {
+            PopupState::None => {},
+            PopupState::Renaming { id, name } => {
+                egui::Window::new("Rename Collection")
+                    .collapsible(false)
+                    .resizable(false)
+                    .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
+                    .show(ctx, |ui| {
+                        ui.label("Enter new name:");
+                        ui.text_edit_singleline(name);
+                        ui.horizontal(|ui| {
+                            if ui.button("Cancel").clicked() {
+                                close_popup = true;
+                            }
+                            if ui.button("Rename").clicked() {
+                                save_rename = Some((*id, name.clone()));
+                                close_popup = true;
+                            }
+                        });
+                    });
+            },
+            PopupState::DeleteConfirmation { id } => {
+                 egui::Window::new("Delete Collection")
+                    .collapsible(false)
+                    .resizable(false)
+                    .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
+                    .show(ctx, |ui| {
+                        ui.label("Are you sure you want to delete this folder?");
+                        ui.horizontal(|ui| {
+                            if ui.button("Cancel").clicked() {
+                                close_popup = true;
+                            }
+                            if ui.button("Delete").clicked() {
+                                check_delete_contents = Some(*id);
+                                close_popup = true; // We might transition, not close to None, logic below
+                            }
+                        });
+                    });
+            },
+            PopupState::DeleteWarning { id, count } => {
+                 egui::Window::new("Delete Non-Empty Folder")
+                    .collapsible(false)
+                    .resizable(false)
+                    .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
+                    .show(ctx, |ui| {
+                        ui.colored_label(egui::Color32::RED, format!("Warning: This folder contains {} items (subfolders/characters).", count));
+                        ui.label("Deleting it will ORPHAN these items (they will move to Root).");
+                        ui.label("Are you REALLY sure?");
+                        ui.horizontal(|ui| {
+                            if ui.button("Cancel").clicked() {
+                                close_popup = true;
+                            }
+                            if ui.button("Yes, Delete Everything").clicked() {
+                                confirm_delete = Some(*id);
+                                close_popup = true;
+                            }
+                        });
+                    });
+            }
+        }
+
+        if close_popup {
+            // Only reset if we are NOT transitioning to another state
+            if check_delete_contents.is_none() {
+                 self.popup_state = PopupState::None;
+            }
+        }
+
+        if let Some((id, name)) = save_rename {
+            // Reuse upsert logic, need parent_id. Find existing.
+            let parent_id = self.collections.iter().find(|c| c.id == id).and_then(|c| c.parent_id);
+            let col = Collection { id, name, parent_id };
+            let tx = self.tx.clone();
+            let db = self.db.clone();
+            self.is_saving = true;
+            tokio::spawn(async move {
+                 let result = db.upsert_collection(&col).await.map_err(|e| e.to_string());
+                 let _ = tx.send(UiEvent::CollectionSaved(result)).await;
+            });
+        }
+        
+        if let Some(id) = check_delete_contents {
+            // Count children locally
+            let child_colls = self.collections.iter().filter(|c| c.parent_id == Some(id)).count();
+            let child_chars = self.characters.iter().filter(|c| c.collection_id == Some(id)).count();
+            let total = child_colls + child_chars;
+            
+            if total > 0 {
+                self.popup_state = PopupState::DeleteWarning { id, count: total };
+            } else {
+                confirm_delete = Some(id);
+                self.popup_state = PopupState::None;
+            }
+        }
+        
+        if let Some(id) = confirm_delete {
+             let tx = self.tx.clone();
+             let db = self.db.clone();
+             self.is_saving = true;
+             tokio::spawn(async move {
+                 let result = db.delete_collection(id).await.map(|_| id).map_err(|e| e.to_string());
+                 let _ = tx.send(UiEvent::CollectionDeleted(result)).await;
+             });
+        }
     }
 }

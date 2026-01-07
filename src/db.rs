@@ -47,7 +47,19 @@ impl Database {
         let _ = sqlx::query("ALTER TABLE characters ADD COLUMN example_dialogue TEXT NOT NULL DEFAULT ''").execute(&pool).await;
         let _ = sqlx::query("ALTER TABLE characters ADD COLUMN created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP").execute(&pool).await;
         let _ = sqlx::query("ALTER TABLE characters ADD COLUMN updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP").execute(&pool).await;
+        let _ = sqlx::query("ALTER TABLE characters ADD COLUMN collection_id INTEGER REFERENCES collections(id) ON DELETE SET NULL").execute(&pool).await;
 
+        // Create collections table
+        sqlx::query(
+            "CREATE TABLE IF NOT EXISTS collections (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                parent_id INTEGER,
+                FOREIGN KEY (parent_id) REFERENCES collections(id) ON DELETE CASCADE
+            )"
+        )
+        .execute(&pool)
+        .await?;
 
         // Create lorebooks table
         sqlx::query(
@@ -93,8 +105,8 @@ impl Database {
         if character.id == 0 {
             // INSERT
             let id = sqlx::query(
-                "INSERT INTO characters (name, char_name, char_title, personality, scenario, example_dialogue, first_message, author_notes, avatar_path, created_at, updated_at)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+                "INSERT INTO characters (name, char_name, char_title, personality, scenario, example_dialogue, first_message, author_notes, avatar_path, created_at, updated_at, collection_id)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
             )
             .bind(&character.name)
             .bind(&character.char_name)
@@ -107,6 +119,7 @@ impl Database {
             .bind(&character.avatar_path)
             .bind(character.created_at)
             .bind(character.updated_at)
+            .bind(character.collection_id)
             .execute(&self.pool)
             .await?
             .last_insert_rowid();
@@ -115,7 +128,7 @@ impl Database {
         } else {
             // UPDATE
             sqlx::query(
-                "UPDATE characters SET name=?, char_name=?, char_title=?, personality=?, scenario=?, example_dialogue=?, first_message=?, author_notes=?, avatar_path=?, updated_at=? WHERE id=?"
+                "UPDATE characters SET name=?, char_name=?, char_title=?, personality=?, scenario=?, example_dialogue=?, first_message=?, author_notes=?, avatar_path=?, updated_at=?, collection_id=? WHERE id=?"
             )
             .bind(&character.name)
             .bind(&character.char_name)
@@ -127,10 +140,62 @@ impl Database {
             .bind(&character.author_notes)
             .bind(&character.avatar_path)
             .bind(character.updated_at)
+            .bind(character.collection_id)
             .bind(character.id)
             .execute(&self.pool)
             .await?;
         }
+        Ok(())
+    }
+
+    // Collections
+    pub async fn get_all_collections(&self) -> Result<Vec<crate::models::Collection>, sqlx::Error> {
+        sqlx::query_as::<_, crate::models::Collection>("SELECT * FROM collections")
+            .fetch_all(&self.pool)
+            .await
+    }
+
+    pub async fn upsert_collection(&self, collection: &crate::models::Collection) -> Result<i64, sqlx::Error> {
+        if collection.id == 0 {
+             let id = sqlx::query("INSERT INTO collections (name, parent_id) VALUES (?, ?)")
+                .bind(&collection.name)
+                .bind(collection.parent_id)
+                .execute(&self.pool)
+                .await?
+                .last_insert_rowid();
+             Ok(id)
+        } else {
+             sqlx::query("UPDATE collections SET name=?, parent_id=? WHERE id=?")
+                .bind(&collection.name)
+                .bind(collection.parent_id)
+                .bind(collection.id)
+                .execute(&self.pool)
+                .await?;
+             Ok(collection.id)
+        }
+    }
+
+    pub async fn delete_collection(&self, id: i64) -> Result<(), sqlx::Error> {
+        // Orphan children collections (set parent_id to NULL) - wait, user preferred orphans.
+        // Actually for folders, usually you delete subfolders or move them up.
+        // User said: "osierocenie/null". So we set ParentID = NULL for children.
+        sqlx::query("UPDATE collections SET parent_id = NULL WHERE parent_id = ?")
+            .bind(id)
+            .execute(&self.pool)
+            .await?;
+            
+        // Orphan characters
+        sqlx::query("UPDATE characters SET collection_id = NULL WHERE collection_id = ?")
+            .bind(id)
+            .execute(&self.pool)
+            .await?;
+            
+        // Delete the collection itself
+        sqlx::query("DELETE FROM collections WHERE id = ?")
+            .bind(id)
+            .execute(&self.pool)
+            .await?;
+            
         Ok(())
     }
 
