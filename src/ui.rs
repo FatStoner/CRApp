@@ -1,5 +1,6 @@
 use eframe::egui;
 use tokio::sync::mpsc;
+use std::time::{Duration, Instant};
 use crate::db::Database;
 use crate::models::Character;
 
@@ -14,10 +15,17 @@ pub struct CrapApp {
     selected_character: Option<Character>,
     tx: mpsc::Sender<UiEvent>,
     rx: mpsc::Receiver<UiEvent>,
+    
+    // UI State
+    is_saving: bool,
+    status_message: Option<(String, egui::Color32)>,
+    status_clear_time: Option<Instant>,
+    loading_error: Option<String>,
 }
 
 impl CrapApp {
-    pub fn new(_cc: &eframe::CreationContext<'_>, db: Database) -> Self {
+    pub fn new(cc: &eframe::CreationContext<'_>, db: Database) -> Self {
+        egui_extras::install_image_loaders(&cc.egui_ctx);
         let (tx, rx) = mpsc::channel(10);
         
         let app = Self { 
@@ -26,6 +34,10 @@ impl CrapApp {
             selected_character: None,
             tx,
             rx,
+            is_saving: false,
+            status_message: None,
+            status_clear_time: None,
+            loading_error: None,
         };
         
         app.reload_characters();
@@ -42,10 +54,17 @@ impl CrapApp {
         });
     }
 
-    fn save_character(&self, mut character: Character) {
+    fn save_character(&mut self, mut character: Character) {
+        self.is_saving = true;
+        self.status_message = None; // Clear previous status
+        
         let tx = self.tx.clone();
         let db = self.db.clone();
+        
         tokio::spawn(async move {
+            // Artificial delay for better UX if it's too fast (optional, but good for "Saving..." visibility check)
+            // tokio::time::sleep(Duration::from_millis(500)).await; 
+
             if let Err(e) = db.upsert_character(&mut character).await {
                 let _ = tx.send(UiEvent::CharacterSaved(Err(e.to_string()))).await;
             } else {
@@ -65,41 +84,71 @@ impl eframe::App for CrapApp {
             match event {
                 UiEvent::CharactersLoaded(result) => {
                     match result {
-                        Ok(chars) => self.characters = chars,
-                        Err(e) => eprintln!("Error loading characters: {}", e),
+                        Ok(chars) => {
+                            self.characters = chars;
+                            self.loading_error = None;
+                        }
+                        Err(e) => {
+                            eprintln!("Error loading characters: {}", e);
+                            self.loading_error = Some(e);
+                        }
                     }
                 }
                 UiEvent::CharacterSaved(result) => {
+                    self.is_saving = false;
                     match result {
                         Ok(updated_char) => {
-                            // Update the selected character with the verified/ID-updated version
-                            // only if the IDs match or it was a new creation (ID 0 turned into ID X)
-                            // Ideally we want to keep the editing session valid.
                             self.selected_character = Some(updated_char);
+                            self.status_message = Some(("Saved successfully!".to_string(), egui::Color32::GREEN));
                         }
-                        Err(e) => eprintln!("Error saving character: {}", e),
+                        Err(e) => {
+                            self.status_message = Some((format!("Error: {}", e), egui::Color32::RED));
+                        }
                     }
+                    // Set timeout for status message
+                    self.status_clear_time = Some(Instant::now() + Duration::from_secs(3));
                 }
             }
         }
 
+        // Clean up status message
+        if let Some(deadline) = self.status_clear_time {
+            if Instant::now() > deadline {
+                self.status_message = None;
+                self.status_clear_time = None;
+            } else {
+                ctx.request_repaint(); // Animation frame for timer
+            }
+        }
+
         egui::SidePanel::left("side_panel").show(ctx, |ui| {
+            ui.add_space(4.0);
             ui.heading("Characters");
             ui.separator();
             
-            egui::ScrollArea::vertical().show(ui, |ui| {
-                ui.vertical(|ui| {
-                    for char in &self.characters {
-                        if ui.button(&char.name).clicked() {
-                            self.selected_character = Some(char.clone());
+            if let Some(err) = &self.loading_error {
+                ui.colored_label(egui::Color32::RED, format!("Failed to load: {}", err));
+                if ui.button("Retry").clicked() {
+                    self.reload_characters();
+                }
+            } else {
+                egui::ScrollArea::vertical().show(ui, |ui| {
+                    ui.vertical(|ui| {
+                        for char in &self.characters {
+                            if ui.button(&char.name).clicked() {
+                                self.selected_character = Some(char.clone());
+                                // Also clear status when switching
+                                self.status_message = None;
+                            }
                         }
-                    }
+                    });
                 });
-            });
+            }
             
             ui.add_space(10.0);
             if ui.button("+ Add New").clicked() {
                 self.selected_character = Some(Character::default());
+                self.status_message = None;
             }
         });
 
@@ -122,25 +171,72 @@ impl eframe::App for CrapApp {
                     ui.text_edit_singleline(&mut character.char_title);
                     
                     ui.label("Personality");
-                    ui.text_edit_multiline(&mut character.personality);
+                    if ui.text_edit_multiline(&mut character.personality).changed() {
+                        // calculate on change if needed, but we calculate for display below anyway
+                    }
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::TOP), |ui| {
+                        ui.label(format!("Tokens: {}", crate::models::count_tokens(&character.personality)));
+                    });
                     
                     ui.label("First Message");
                     ui.text_edit_multiline(&mut character.first_message);
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::TOP), |ui| {
+                        ui.label(format!("Tokens: {}", crate::models::count_tokens(&character.first_message)));
+                    });
                     
                     ui.label("Author Notes");
                     ui.text_edit_multiline(&mut character.author_notes);
 
-                    ui.label("Avatar Path");
-                    let mut path_str = character.avatar_path.clone().unwrap_or_default();
-                    if ui.text_edit_singleline(&mut path_str).changed() {
-                        character.avatar_path = if path_str.is_empty() { None } else { Some(path_str) };
+                    ui.label("Avatar");
+                    if let Some(path_str) = &character.avatar_path {
+                         // Convert stored path to absolute URI for egui
+                         if let Ok(abs_path) = std::fs::canonicalize(path_str) {
+                             let uri = format!("file://{}", abs_path.to_string_lossy());
+                             ui.add(egui::Image::new(uri).max_width(200.0).max_height(200.0));
+                         } else {
+                             ui.label(format!("Image not found at: {}", path_str));
+                         }
+                    }
+
+                    if ui.button("Browse Avatar").clicked() {
+                        if let Some(path) = rfd::FileDialog::new().add_filter("image", &["png", "jpg", "jpeg", "webp"]).pick_file() {
+                            let dest_dir = std::path::Path::new("data/avatars");
+                            if let Err(e) = std::fs::create_dir_all(dest_dir) {
+                                eprintln!("Failed to create avatars directory: {}", e);
+                            } else {
+                                if let Some(file_name) = path.file_name() {
+                                    let dest_path = dest_dir.join(file_name);
+                                    match std::fs::copy(&path, &dest_path) {
+                                        Ok(_) => {
+                                            character.avatar_path = Some(dest_path.to_string_lossy().to_string());
+                                        }
+                                        Err(e) => eprintln!("Failed to copy avatar: {}", e),
+                                    }
+                                }
+                            }
+                        }
                     }
                     
-                    ui.add_space(10.0);
-                    if ui.button("Save").clicked() {
-                        return Some(character.clone());
-                    }
-                    None
+                    ui.add_space(20.0);
+                    
+                    // Save bar
+                    ui.horizontal(|ui| {
+                        if self.is_saving {
+                            ui.add(egui::Spinner::new());
+                            ui.label("Saving...");
+                            None
+                        } else {
+                            if ui.button("Save").clicked() {
+                                return Some(character.clone());
+                            }
+                            
+                            if let Some((msg, color)) = &self.status_message {
+                                ui.colored_label(*color, msg);
+                            }
+                            None
+                        }
+                    }).inner
+
                 }).inner;
             } else {
                 ui.heading("Main Dashboard");

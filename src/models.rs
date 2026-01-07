@@ -31,3 +31,16 @@ impl Default for Character {
         }
     }
 }
+
+pub fn count_tokens(text: &str) -> usize {
+    use std::sync::OnceLock;
+    use tiktoken_rs::CoreBPE;
+
+    static BPE: OnceLock<CoreBPE> = OnceLock::new();
+    
+    let bpe = BPE.get_or_init(|| {
+        tiktoken_rs::cl100k_base().expect("Failed to load cl100k_base tokenizer")
+    });
+    
+    bpe.encode_with_special_tokens(text).len()
+}

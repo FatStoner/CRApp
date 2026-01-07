@@ -20,7 +20,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // However, eframe::run_native blocks.
     
     eframe::run_native(
-        "C.R.A.P. - Character Repository & Archive Program",
+        "Character Repository & Archive Program",
         options,
         Box::new(|cc| Ok(Box::new(CrapApp::new(cc, db)))),
     )?;
