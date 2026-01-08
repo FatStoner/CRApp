@@ -22,33 +22,23 @@ pub struct ParsedCharacterData {
 pub fn parse_clipboard(text: &str) -> ParsedCharacterData {
     let mut data = ParsedCharacterData::default();
     
-    // Pre-processing: simple clean lines
+    // Pre-processing
     let lines: Vec<&str> = text.lines()
         .map(|l| l.trim())
         .filter(|l| !l.is_empty())
         .collect();
 
-    if lines.is_empty() {
-        return data;
-    }
+    if lines.is_empty() { return data; }
 
     // -------------------------------------------------------------------------
-    // Strategy 1: Structural Parsing (Spicychat Copy-Paste Format)
+    // 1. ANCHORS & METADATA
     // -------------------------------------------------------------------------
-    
-    // Find Anchors
     let idx_back = lines.iter().position(|&l| l == "Back");
-    let idx_share = lines.iter().position(|&l| l == "Share").or_else(|| lines.iter().position(|&l| l == "Favorite")); 
+    let idx_share = lines.iter().position(|&l| l == "Share").or_else(|| lines.iter().position(|&l| l == "Favorite"));
     let idx_suggest_tag = lines.iter().position(|&l| l.eq_ignore_ascii_case("suggest tag"));
-    let idx_greeting_header = lines.iter().position(|&l| l.eq_ignore_ascii_case("greeting"));
-    let idx_show_less = lines.iter().position(|&l| l.eq_ignore_ascii_case("show less"));
-    let idx_personality = lines.iter().position(|&l| l.eq_ignore_ascii_case("personality"));
-    let idx_scenario = lines.iter().position(|&l| l.eq_ignore_ascii_case("scenario"));
 
-    // 1. NAME
-    // Pattern: Back -> avatar image -> NAME
+    // Name extraction (Back -> avatar image -> Name)
     if let Some(idx) = idx_back {
-        // Look for "avatar image" in next few lines
         if let Some(offset) = lines.iter().skip(idx).take(3).position(|&l| l == "avatar image") {
             let name_idx = idx + offset + 1;
             if name_idx < lines.len() {
@@ -57,17 +47,13 @@ pub fn parse_clipboard(text: &str) -> ParsedCharacterData {
         }
     }
 
-    // 2. TITLE & TAGS
-    // Pattern: Share -> [Stats x3] -> TITLE -> TAGS... -> Suggest Tag
-    // Note: Stats lines can be 2 or 3. 
-    // Heuristic: Scan from Share+1 until Suggest Tag.
-    if let Some(start) = idx_share {
-        if let Some(end) = idx_suggest_tag {
+    // Title & Tags extraction (Share -> ... -> Suggest Tag)
+    // We prioritize this block for tags to avoid reading section headers as tags or vice versa.
+    let content_start_idx = if let Some(end) = idx_suggest_tag {
+        if let Some(start) = idx_share {
             if end > start {
-                let range = &lines[(start + 1)..end];
-                // We typically have: [Num], [Percent], [Tokens], [Title], [Tag1], [Tag2]...
-                // Filter out the stats (digits, %, "tokens")
-                let candidates: Vec<&str> = range.iter().filter(|&&l| {
+                 let range = &lines[(start + 1)..end];
+                 let candidates: Vec<&str> = range.iter().filter(|&&l| {
                     let s = l.to_lowercase();
                     !s.chars().all(|c| c.is_numeric() || c == ',' || c == '.') && // pure numbers
                     !s.contains('%') &&
@@ -78,79 +64,59 @@ pub fn parse_clipboard(text: &str) -> ParsedCharacterData {
                 }).cloned().collect();
                 
                 if !candidates.is_empty() {
-                    // First candidate is Title
                     data.title = candidates[0].to_string();
-                    
-                    // Rest are tags
                     for tag in candidates.iter().skip(1) {
-                        data.external_tags.push(tag.to_string());
+                         data.external_tags.push(tag.to_string());
                     }
                 }
             }
         }
-    }
-
-    // 3. FIRST MESSAGE
-    // Pattern: Greeting -> [Message Lines] -> (Next Header: SHOW LESS, Personality, Scenario, or end)
-    if let Some(start) = idx_greeting_header {
-        let mut end = lines.len();
-        
-        // Find nearest next section/stopper
-        let stoppers = [idx_show_less, idx_personality, idx_scenario];
-        for &stop in stoppers.iter().flatten() {
-            if stop > start && stop < end {
-                end = stop;
-            }
-        }
-        
-        for i in (start + 1)..end {
-            data.first_message.push_str(lines[i]);
-            data.first_message.push('\n');
-        }
-    }
+        end + 1 // Start scanning content just after "Suggest Tag"
+    } else {
+        0 // Fallback: if no strict metadata block, scan whole file (less safe but necessary fallback)
+    };
 
     // -------------------------------------------------------------------------
-    // Strategy 2: Scan for Blocks (Personality, Scenario) & Key-Values
+    // 2. CONTENT SECTIONS (Strict Scan)
     // -------------------------------------------------------------------------
-    
     let mut current_section = "";
     
-    for line in &lines {
+    for i in content_start_idx..lines.len() {
+        let line = lines[i];
         let lower = line.to_lowercase();
+
+        // Footer Stop
+        if lower == "spicychat" || lower.starts_with("owned & operated by") {
+            break; 
+        }
+
+        // Headers
+        if lower == "greeting" || lower == "first message" { current_section = "first_message"; continue; }
+        if lower == "personality" { current_section = "personality"; continue; }
+        if lower == "scenario" { current_section = "scenario"; continue; }
+        if lower == "example dialogues" || lower == "example dialogue" { current_section = "example_dialogue"; continue; }
+        if lower == "show less" { current_section = "ignore"; continue; }
         
-        // Key-Value Detection (High priority overrides)
-        if lower.starts_with("name:") && data.name.is_empty() {
+        // Key-Value checks (Only inside relevant sections or if valid)
+        // Note: Name might be in Personality if we missed it earlier
+        if current_section == "personality" && lower.starts_with("name:") && data.name.is_empty() {
              if let Some((_, val)) = line.split_once(':') {
                  data.name = val.trim().to_string();
              }
         }
-        
-        // Section Headers
-        if lower == "personality" { current_section = "personality"; continue; }
-        if lower == "scenario" { current_section = "scenario"; continue; }
-        if lower == "greeting" || lower == "first message" { current_section = "ignore"; continue; } // Handled structurally
-        if lower == "show less" { current_section = "ignore"; continue; }
-        
-        // Footer Detection (Stop parsing)
-        if lower == "spicychat" || lower.starts_with("owned & operated by") {
-            current_section = "ignore";
-            continue;
-        }
-        
-        // Append to sections
+
         match current_section {
-            "personality" => {
-                // Avoid capturing other headers if they accidentally triggered
-                 if lower != "scenario" {
-                    data.personality.push_str(line);
-                    data.personality.push('\n');
+            "first_message" => { data.first_message.push_str(line); data.first_message.push('\n'); },
+            "personality" => { data.personality.push_str(line); data.personality.push('\n'); },
+            "scenario" => { data.scenario.push_str(line); data.scenario.push('\n'); },
+            "example_dialogue" => { data.example_dialogue.push_str(line); data.example_dialogue.push('\n'); },
+            _ => {
+                 // Fallback catch for Name if purely unstructured and we are outside sections
+                 if i < 20 && data.name.is_empty() && line.len() < 50 && !line.contains(':') && !lower.starts_with('@') && !lower.contains("tokens") {
+                      // Only if we haven't found a name yet and we are early in the file
+                      // data.name = line.to_string(); // Too risky with strict parsing?
                  }
-            },
-            "scenario" => {
-                 data.scenario.push_str(line);
-                 data.scenario.push('\n');
-            },
-            _ => {}
+            }
         }
     }
 
@@ -158,6 +124,7 @@ pub fn parse_clipboard(text: &str) -> ParsedCharacterData {
     data.personality = data.personality.trim().to_string();
     data.scenario = data.scenario.trim().to_string();
     data.first_message = data.first_message.trim().to_string();
+    data.example_dialogue = data.example_dialogue.trim().to_string();
     
     data
 }
@@ -514,7 +481,7 @@ fn render_browser_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                 
                 // Text Area
                 let text_top = avatar_rect.max.y + 8.0;
-                let text_rect = egui::Rect::from_min_max(
+                let _text_rect = egui::Rect::from_min_max(
                     egui::pos2(content_rect.min.x, text_top),
                     content_rect.max
                 );
@@ -919,6 +886,8 @@ fn render_lorebook_editor(app: &mut CrapApp, ui: &mut egui::Ui) {
                     ui.label("Select a lorebook.");
                 }
             }
+
+
 
 
 
