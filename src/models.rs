@@ -17,13 +17,19 @@ pub struct DeepSearchResult {
     pub matches: Vec<(String, String)>, // (Field Name, Snippet)
 }
 
-#[derive(Debug, Clone, FromRow, Default, PartialEq, Eq, Hash, Serialize)]
+#[derive(Debug, Clone, FromRow, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Tag {
     pub id: i64,
     pub name: String,
 }
 
-#[derive(Debug, Clone, FromRow, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct TagPair {
+    pub tag: Tag,
+    pub is_external: bool,
+}
+
+#[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
 pub struct Character {
     pub id: i64,
     pub name: String,

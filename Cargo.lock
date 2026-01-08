@@ -977,10 +977,12 @@ dependencies = [
 name = "crap"
 version = "0.1.0"
 dependencies = [
+ "base64 0.21.7",
  "chrono",
  "eframe",
  "egui_extras",
  "image",
+ "png 0.17.16",
  "rfd",
  "serde",
  "serde_json",

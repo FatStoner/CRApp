@@ -57,6 +57,7 @@ pub enum UiEvent {
     TagsLoaded(Result<(i64, Vec<Tag>, Vec<Tag>), String>),
     TagOperationFinished(Result<(), String>),
     DeepSearchCompleted(Result<Vec<DeepSearchResult>, String>),
+    ImportFileLoaded(Result<String, String>),
 }
 
 pub struct CrapApp {
@@ -582,6 +583,40 @@ impl eframe::App for CrapApp {
                     match res {
                         Ok(results) => self.deep_search_results = results,
                         Err(e) => self.set_status(format!("Search failed: {}", e), egui::Color32::RED),
+                    }
+                },
+                UiEvent::ImportFileLoaded(res) => {
+                    match res {
+                         Ok(json_content) => {
+                             if let Ok(mut char_obj) = serde_json::from_str::<Character>(&json_content) {
+                                  // Clean ID for new import
+                                  char_obj.id = 0;
+                                  
+                                  // Map to ParsedCharacterData for review
+                                  let parsed = ParsedCharacterData {
+                                      name: char_obj.name.clone(),
+                                      title: char_obj.char_title.clone(),
+                                      personality: char_obj.personality.clone(),
+                                      scenario: char_obj.scenario.clone(),
+                                      first_message: char_obj.first_message.clone(),
+                                      example_dialogue: char_obj.example_dialogue.clone(),
+                                      external_tags: char_obj.external_tags.iter().map(|t| t.name.clone()).collect(),
+                                  };
+                                  
+                                  // Force "New Character" mode
+                                  self.selected_character = Some(Character::default()); 
+                                  self.mode = AppMode::Characters;
+                                  
+                                  self.parsed_data = Some(parsed);
+                                  self.show_import_modal = true;
+                                  self.import_text.clear(); // Clear clipboard text if any
+                                  
+                                  self.set_status("File loaded for review.".to_string(), egui::Color32::GREEN);
+                             } else {
+                                 self.set_status("Failed to parse file structure.".to_string(), egui::Color32::RED);
+                             }
+                         },
+                         Err(e) => self.set_status(format!("Read Error: {}", e), egui::Color32::RED),
                     }
                 }
             }

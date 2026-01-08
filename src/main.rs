@@ -1,6 +1,7 @@
 mod db;
 mod models;
 mod ui;
+mod card_v2;
 
 use db::Database;
 use ui::CrapApp;
@@ -20,7 +21,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // However, eframe::run_native blocks.
     
     eframe::run_native(
-        "Character Repository & Archive Program",
+        "Character Repository Application",
         options,
         Box::new(|cc| Ok(Box::new(CrapApp::new(cc, db)))),
     )?;

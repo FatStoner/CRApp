@@ -1,6 +1,8 @@
 use eframe::egui;
 use crate::models::Tag;
 use crate::ui::{CrapApp, AppMode, CharacterTab, UiEvent};
+use crate::card_v2::CharacterCardV2;
+use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 
 // ----------------------------------------------------------------------------
 // Parsing Logic (Moved from ui.rs)
@@ -13,6 +15,7 @@ pub struct ParsedCharacterData {
     pub personality: String,
     pub scenario: String,
     pub first_message: String,
+    pub example_dialogue: String,
     pub external_tags: Vec<String>,
 }
 
@@ -235,7 +238,11 @@ pub fn render_central_panel(app: &mut CrapApp, ctx: &egui::Context) {
                                 ui.end_row();
                                 
                                 ui.label("First Message:");
-                                ui.add(egui::TextEdit::multiline(&mut data.first_message).desired_rows(8).desired_width(f32::INFINITY));
+                                ui.add(egui::TextEdit::multiline(&mut data.first_message).desired_rows(6).desired_width(f32::INFINITY));
+                                ui.end_row();
+
+                                ui.label("Example Dialogue:");
+                                ui.add(egui::TextEdit::multiline(&mut data.example_dialogue).desired_rows(6).desired_width(f32::INFINITY));
                                 ui.end_row();
                                 
                                 ui.label("External Tags:");
@@ -255,6 +262,7 @@ pub fn render_central_panel(app: &mut CrapApp, ctx: &egui::Context) {
                                     if !d.personality.is_empty() { c.personality = d.personality.clone(); }
                                     if !d.scenario.is_empty() { c.scenario = d.scenario; }
                                     if !d.first_message.is_empty() { c.first_message = d.first_message; }
+                                    if !d.example_dialogue.is_empty() { c.example_dialogue = d.example_dialogue; }
                                     
                                     if c.id != 0 {
                                         let tx_clone = app.tx.clone();
@@ -268,12 +276,15 @@ pub fn render_central_panel(app: &mut CrapApp, ctx: &egui::Context) {
                                             }
                                             let _ = tx_clone.send(UiEvent::TagOperationFinished(Ok(()))).await;
                                         });
-                                        app.set_status("Data applied. Tags are being added in background.".to_string(), egui::Color32::GREEN);
+                                        app.set_status("Data updated. Tags being added.".to_string(), egui::Color32::GREEN);
                                     } else {
+                                        // New Character - Tags are added to the list but not saved to DB yet (will be on Save)
+                                        // Wait, the "d.external_tags" strings need to be converted to Tag structs.
+                                        // The original code loop at line 273 was doing this.
                                         for tag_name in d.external_tags {
                                             c.external_tags.push(Tag { id: 0, name: tag_name });
                                         }
-                                        app.set_status("Data applied. Tags added to unsaved character (Save to persist).".to_string(), egui::Color32::YELLOW);
+                                        app.set_status("Import applied to New Character (Unsaved).".to_string(), egui::Color32::YELLOW);
                                     }
                                 }
                                 app.show_import_modal = false;
@@ -301,7 +312,6 @@ pub fn render_central_panel(app: &mut CrapApp, ctx: &egui::Context) {
         // Main Content
         match app.mode {
             AppMode::Characters => {
-                let mut export_json = None;
                 let mut trigger_import = false;
                 let mut save_req = None;
                 let mut toggle_requests = Vec::new();
@@ -319,14 +329,146 @@ pub fn render_central_panel(app: &mut CrapApp, ctx: &egui::Context) {
                      ui.horizontal(|ui| {
                         ui.heading("Edit Character");
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                            if ui.button("EXPORT").clicked() {
-                                if let Ok(json) = serde_json::to_string_pretty(character) {
-                                    export_json = Some(json);
+                            ui.menu_button("EXPORT", |ui| {
+                                let name_slug = character.name.replace(" ", "_");
+                                
+                                if ui.button("Native (.crapp)").clicked() {
+                                    if let Ok(json) = serde_json::to_string_pretty(&character) {
+                                        let task_name = format!("{}.crapp", name_slug);
+                                        let task_json = json.clone();
+                                        tokio::spawn(async move {
+                                            if let Some(path) = rfd::FileDialog::new().set_file_name(task_name).save_file() {
+                                                let _ = std::fs::write(path, task_json);
+                                            }
+                                        });
+                                    }
+                                    ui.close_menu();
                                 }
-                            }
-                            if ui.button("IMPORT").clicked() {
-                                trigger_import = true;
-                            }
+                                
+                                if ui.button("Platform V2 (.json)").clicked() {
+                                    let v2 = CharacterCardV2::new(
+                                        character.char_name.clone(),
+                                        character.char_title.clone(),
+                                        character.personality.clone(),
+                                        character.scenario.clone(),
+                                        character.first_message.clone(),
+                                        character.example_dialogue.clone(),
+                                    );
+                                    if let Ok(json) = serde_json::to_string_pretty(&v2) {
+                                        let task_name = format!("{}.json", name_slug);
+                                        tokio::spawn(async move {
+                                            if let Some(path) = rfd::FileDialog::new().set_file_name(task_name).save_file() {
+                                                let _ = std::fs::write(path, json);
+                                            }
+                                        });
+                                    }
+                                    ui.close_menu();
+                                }
+                                
+                                if ui.button("Document (.md)").clicked() {
+                                    let md = format!(
+                                        "# {}\n\n## Description\n{}\n\n## Personality\n{}\n\n## Scenario\n{}\n\n## First Message\n{}\n\n## Example Dialogue\n{}\n",
+                                        character.char_name, character.char_title, character.personality, character.scenario, character.first_message, character.example_dialogue
+                                    );
+                                    let task_name = format!("{}.md", name_slug);
+                                    tokio::spawn(async move {
+                                        if let Some(path) = rfd::FileDialog::new().set_file_name(task_name).save_file() {
+                                            let _ = std::fs::write(path, md);
+                                        }
+                                    });
+                                    ui.close_menu();
+                                }
+                                
+                                if ui.button("Character Card (.png)").clicked() {
+                                    if let Some(avatar_path) = &character.avatar_path {
+                                        // Logic to export PNG
+                                        let v2 = CharacterCardV2::new(
+                                            character.char_name.clone(),
+                                            character.char_title.clone(),
+                                            character.personality.clone(),
+                                            character.scenario.clone(),
+                                            character.first_message.clone(),
+                                            character.example_dialogue.clone(),
+                                        );
+                                        
+                                        if let Ok(json) = serde_json::to_string(&v2) {
+                                            let b64 = BASE64.encode(json);
+                                            let path_clone = avatar_path.clone(); // Path string
+                                            let task_name = format!("{}.png", name_slug);
+                                            
+                                            // Clone tx to report status if needed, though we can't easily set status from async without event 
+                                            // Assuming "app" is not available here easily (it is captured?) - wait, "character" is borrowed from app.
+                                            // We need to be careful with app access. "app" is available in outer scope but mutable borrow of "character" exists.
+                                            // So we cannot touch app.
+                                            
+                                            // We'll spawn the IO.
+                                            tokio::spawn(async move {
+                                                // 1. Read Valid Image
+                                                if let Ok(img_bytes) = std::fs::read(&path_clone) {
+                                                    if let Some(save_path) = rfd::FileDialog::new().set_file_name(task_name).save_file() {
+                                                        // 2. Decode to get raw pixels (via image crate) to ensure clean state or just append?
+                                                        // Appending to existing PNG is risky if it has other chunks.
+                                                        // Best is: Decode -> Encode with new chunk.
+                                                        
+                                                        if let Ok(img) = image::load_from_memory(&img_bytes) {
+                                                            let (w, h) = (img.width(), img.height());
+                                                            let color_type = img.color();
+                                                            let pixels = img.into_bytes();
+                                                            
+                                                            let mut out_file = std::fs::File::create(save_path).unwrap();
+                                                            
+                                                            {
+                                                                let mut encoder = png::Encoder::new(&mut out_file, w, h);
+                                                                encoder.set_color(match color_type {
+                                                                    image::ColorType::Rgb8 => png::ColorType::Rgb,
+                                                                    image::ColorType::Rgba8 => png::ColorType::Rgba,
+                                                                    image::ColorType::L8 => png::ColorType::Grayscale,
+                                                                    image::ColorType::La8 => png::ColorType::GrayscaleAlpha,
+                                                                    _ => png::ColorType::Rgba, // Fallback
+                                                                });
+                                                                encoder.set_depth(png::BitDepth::Eight);
+                                                                                                                            
+                                                                let mut writer = encoder.write_header().expect("Failed to write PNG header");
+                                                                // Add tEXt chunk
+                                                                let chunk = png::text_metadata::ITXtChunk::new("chara".to_string(), b64.to_string());
+                                                                if writer.write_text_chunk(&chunk).is_ok() {
+                                                                    let _ = writer.write_image_data(&pixels);
+                                                                    let _ = writer.finish();
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            });
+                                        }
+                                    } else {
+                                        // Cannot set status here because 'character' is borrowing 'app'.
+                                        // Ideally we should flag this error visually or deferred.
+                                        // For now, let's just print to stderr/log, or we need a UI feedback mechanism that doesn't borrow app.
+                                        // We can use a local flag in the UI loop if we structure differently.
+                                        // But here we are inside the button closure.
+                                        eprintln!("Cannot export PNG: No avatar.");
+                                    }
+                                    ui.close_menu();
+                                }
+                            });
+                            ui.menu_button("IMPORT", |ui| {
+                                if ui.button("Load from .crapp file").clicked() {
+                                    let tx_clone = app.tx.clone();
+                                    tokio::spawn(async move {
+                                        if let Some(path) = rfd::FileDialog::new().add_filter("Native", &["crapp", "json"]).pick_file() {
+                                            let res = std::fs::read_to_string(path).map_err(|e| e.to_string());
+                                            let _ = tx_clone.send(UiEvent::ImportFileLoaded(res)).await;
+                                        }
+                                    });
+                                    ui.close_menu();
+                                }
+                                
+                                if ui.button("Paste from Clipboard").clicked() {
+                                    trigger_import = true;
+                                    ui.close_menu();
+                                }
+                            });
                         });
                     });
                      
@@ -482,10 +624,6 @@ pub fn render_central_panel(app: &mut CrapApp, ctx: &egui::Context) {
                      });
                      
                      // Handle events
-                     if let Some(json) = export_json {
-                        ui.ctx().output_mut(|o| o.copied_text = json);
-                        app.set_status("JSON copied to clipboard!".to_string(), egui::Color32::GREEN);
-                     }
                      if trigger_import {
                          app.show_import_modal = true;
                          app.import_text.clear();
