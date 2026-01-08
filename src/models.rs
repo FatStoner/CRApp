@@ -3,6 +3,20 @@ use sqlx::FromRow;
 
 use serde::{Deserialize, Serialize};
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum SearchResultKind {
+    Character,
+    Lorebook,
+}
+
+#[derive(Debug, Clone)]
+pub struct DeepSearchResult {
+    pub id: i64,
+    pub kind: SearchResultKind,
+    pub display_name: String,
+    pub matches: Vec<(String, String)>, // (Field Name, Snippet)
+}
+
 #[derive(Debug, Clone, FromRow, Default, PartialEq, Eq, Hash)]
 pub struct Tag {
     pub id: i64,

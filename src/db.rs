@@ -338,6 +338,88 @@ impl Database {
         
         Ok(results)
     }
+    
+    // Deep Search
+    pub async fn search_characters_text(&self, query: &str) -> Result<Vec<crate::models::Character>, sqlx::Error> {
+        let pattern = format!("%{}%", query);
+        // We search in all text fields
+        sqlx::query_as::<_, crate::models::Character>(
+            "SELECT * FROM characters WHERE 
+             name LIKE ? OR 
+             personality LIKE ? OR 
+             scenario LIKE ? OR 
+             example_dialogue LIKE ? OR 
+             first_message LIKE ? OR 
+             author_notes LIKE ?"
+        )
+        .bind(&pattern)
+        .bind(&pattern)
+        .bind(&pattern)
+        .bind(&pattern)
+        .bind(&pattern)
+        .bind(&pattern)
+        .fetch_all(&self.pool)
+        .await
+    }
+    
+    pub async fn search_tags_matching(&self, query: &str) -> Result<Vec<(i64, String, bool)>, sqlx::Error> {
+        let pattern = format!("%{}%", query);
+        let q = "
+            SELECT ct.character_id, t.name, 0 as is_ext
+            FROM character_tags ct 
+            JOIN tags t ON ct.tag_id = t.id 
+            WHERE t.name LIKE ?
+            UNION ALL
+            SELECT cet.character_id, et.name, 1 as is_ext
+            FROM character_external_tags cet 
+            JOIN external_tags et ON cet.tag_id = et.id 
+            WHERE et.name LIKE ?
+        ";
+        
+        let rows = sqlx::query(q)
+            .bind(&pattern)
+            .bind(&pattern)
+            .fetch_all(&self.pool)
+            .await?;
+            
+        use sqlx::Row;
+        let mut results = Vec::new();
+        for row in rows {
+            let cid: i64 = row.get(0);
+            let name: String = row.get(1);
+            let is_ext: i32 = row.get(2); // Boolean returned as integer in union
+            results.push((cid, name, is_ext != 0));
+        }
+        Ok(results)
+    }
+    
+    pub async fn get_characters_by_ids(&self, ids: &[i64]) -> Result<Vec<crate::models::Character>, sqlx::Error> {
+        if ids.is_empty() { return Ok(Vec::new()); }
+        
+        // Dynamic IN clause
+        let placeholders: Vec<String> = ids.iter().map(|_| "?".to_string()).collect();
+        let query = format!("SELECT * FROM characters WHERE id IN ({})", placeholders.join(","));
+        
+        let mut q = sqlx::query_as::<_, crate::models::Character>(&query);
+        for id in ids {
+            q = q.bind(id);
+        }
+        
+        q.fetch_all(&self.pool).await
+    }
+    
+    pub async fn search_lorebooks_text(&self, query: &str) -> Result<Vec<crate::models::Lorebook>, sqlx::Error> {
+        let pattern = format!("%{}%", query);
+        sqlx::query_as::<_, crate::models::Lorebook>(
+            "SELECT * FROM lorebooks WHERE 
+             title LIKE ? OR 
+             description LIKE ?"
+        )
+        .bind(&pattern)
+        .bind(&pattern)
+        .fetch_all(&self.pool)
+        .await
+    }
 
     pub async fn get_all_lorebooks(&self) -> Result<Vec<crate::models::Lorebook>, sqlx::Error> {
         sqlx::query_as::<_, crate::models::Lorebook>("SELECT * FROM lorebooks")

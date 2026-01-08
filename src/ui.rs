@@ -3,7 +3,7 @@ use tokio::sync::mpsc;
 use std::time::{Duration, Instant};
 use std::collections::HashSet;
 use crate::db::Database;
-use crate::models::{Character, Lorebook, Collection, Tag};
+use crate::models::{Character, Lorebook, Collection, Tag, DeepSearchResult, SearchResultKind};
 
 pub enum UiEvent {
     CharactersLoaded(Result<Vec<Character>, String>),
@@ -17,12 +17,14 @@ pub enum UiEvent {
     LinkUpdated(Result<(), String>),
     TagsLoaded(Result<(i64, Vec<Tag>, Vec<Tag>), String>), // char_id, app_tags, ext_tags
     TagOperationFinished(Result<(), String>),
+    DeepSearchCompleted(Result<Vec<DeepSearchResult>, String>),
 }
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Clone, Copy)]
 enum AppMode {
     Characters,
     Lorebooks,
+    DeepSearch,
 }
 
 #[derive(PartialEq)]
@@ -75,8 +77,37 @@ pub struct CrapApp {
     
     // Widgets
     search_query: String,
+    
+    // Deep Search
+    deep_search_query: String,
+    deep_search_results: Vec<DeepSearchResult>,
+    is_deep_searching: bool,
+    
     app_tag_input: String,
     ext_tag_input: String,
+}
+
+fn extract_snippets(full_text: &str, query: &str) -> Vec<String> {
+    let mut snippets = Vec::new();
+    let lower_text = full_text.to_lowercase();
+    let lower_query = query.to_lowercase();
+    
+    if lower_query.is_empty() { return snippets; }
+    
+    let mut start = 0;
+    while let Some(idx) = lower_text[start..].find(&lower_query) {
+        let abs_idx = start + idx;
+        
+        let context_radius = 40;
+        let s = abs_idx.saturating_sub(context_radius);
+        let e = std::cmp::min(abs_idx + lower_query.len() + context_radius, full_text.len());
+        
+        let snippet = format!("...{}...", &full_text[s..e].replace("\n", " "));
+        snippets.push(snippet);
+        
+        start = abs_idx + lower_query.len();
+    }
+    snippets
 }
 
 impl CrapApp {
@@ -104,6 +135,9 @@ impl CrapApp {
             status_clear_time: None,
             loading_error: None,
             search_query: String::new(),
+            deep_search_query: String::new(),
+            deep_search_results: Vec::new(),
+            is_deep_searching: false,
             app_tag_input: String::new(),
             ext_tag_input: String::new(),
         };
@@ -583,6 +617,97 @@ impl CrapApp {
             let _ = tx.send(UiEvent::TagOperationFinished(res)).await;
         });
     }
+
+    fn perform_deep_search(&mut self) {
+        if self.deep_search_query.trim().is_empty() { return; }
+        
+        self.is_deep_searching = true;
+        self.mode = AppMode::DeepSearch;
+        self.deep_search_results.clear();
+        
+        let query = self.deep_search_query.clone();
+        let tx = self.tx.clone();
+        let db = self.db.clone();
+        
+        tokio::spawn(async move {
+            let mut results = Vec::new();
+            
+            // 1. Search Characters Text
+            let mut char_map: std::collections::HashMap<i64, Character> = std::collections::HashMap::new();
+            
+            if let Ok(chars) = db.search_characters_text(&query).await {
+                for c in chars {
+                    char_map.insert(c.id, c);
+                }
+            }
+            
+            // 2. Search Tags
+            let mut tag_matches: Vec<(i64, String, bool)> = Vec::new(); // char_id, tag_name, is_ext
+            if let Ok(tags) = db.search_tags_matching(&query).await {
+                tag_matches = tags;
+            }
+            
+            // 3. Fetch missing characters found by tags
+            let found_ids: std::collections::HashSet<i64> = tag_matches.iter().map(|(id, _, _)| *id).collect();
+            let missing_ids: Vec<i64> = found_ids.into_iter().filter(|id| !char_map.contains_key(id)).collect();
+            
+            if !missing_ids.is_empty() {
+                if let Ok(fetched) = db.get_characters_by_ids(&missing_ids).await {
+                    for c in fetched {
+                        char_map.insert(c.id, c);
+                    }
+                }
+            }
+            
+            // 4. Build Character Results
+            for (_, c) in char_map {
+                let mut matches = Vec::new();
+                
+                // Text Matches
+                for s in extract_snippets(&c.personality, &query) { matches.push(("Personality".to_string(), s)); }
+                for s in extract_snippets(&c.scenario, &query) { matches.push(("Scenario".to_string(), s)); }
+                for s in extract_snippets(&c.example_dialogue, &query) { matches.push(("Example Dialogue".to_string(), s)); }
+                for s in extract_snippets(&c.first_message, &query) { matches.push(("First Message".to_string(), s)); }
+                for s in extract_snippets(&c.author_notes, &query) { matches.push(("Notes".to_string(), s)); }
+                
+                // Tag Matches for this character
+                for (tid, tname, is_ext) in &tag_matches {
+                    if *tid == c.id {
+                         let label = if *is_ext { "Ext. Tag" } else { "App Tag" };
+                         matches.push((label.to_string(), tname.clone()));
+                    }
+                }
+                
+                if !matches.is_empty() {
+                    results.push(DeepSearchResult {
+                        id: c.id,
+                        kind: SearchResultKind::Character,
+                        display_name: c.name,
+                        matches,
+                    });
+                }
+            }
+            
+            // Search Lorebooks (unchanged)
+            if let Ok(books) = db.search_lorebooks_text(&query).await {
+                for b in books {
+                     let mut matches = Vec::new();
+                     for s in extract_snippets(&b.description, &query) { matches.push(("Description".to_string(), s)); }
+                     
+                     if !matches.is_empty() {
+                         results.push(DeepSearchResult {
+                             id: b.id,
+                             kind: SearchResultKind::Lorebook,
+                             display_name: b.title,
+                             matches,
+                         });
+                     }
+                }
+            }
+            
+            let _ = tx.send(UiEvent::DeepSearchCompleted(Ok(results))).await;
+        });
+    }
 }
 
 impl eframe::App for CrapApp {
@@ -686,10 +811,18 @@ impl eframe::App for CrapApp {
                             if let Some(c) = &self.selected_character {
                                 self.load_tags(c.id);
                             }
+                            self.refresh_all(); // Update side panel filter if searching by tags
                         },
                         Err(e) => self.set_status(format!("Tag Error: {}", e), egui::Color32::RED),
                     }
                 },
+                UiEvent::DeepSearchCompleted(res) => {
+                    self.is_deep_searching = false;
+                    match res {
+                        Ok(results) => self.deep_search_results = results,
+                        Err(e) => self.set_status(format!("Search failed: {}", e), egui::Color32::RED),
+                    }
+                }
             }
         }
 
@@ -720,15 +853,26 @@ impl eframe::App for CrapApp {
                  // Sorting Toolbar (only for Characters)
                  if self.mode == AppMode::Characters {
                       // Search Bar
-                      ui.horizontal(|ui| {
-                          ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
-                              ui.add(egui::TextEdit::singleline(&mut self.search_query).hint_text("Search characters..."));
-                              if !self.search_query.is_empty() && ui.button("x").clicked() {
-                                  self.search_query.clear();
-                              }
-                          });
-                      });
-                      ui.separator();
+                      ui.add_space(4.0);
+                
+                // Search Bar
+                ui.horizontal(|ui| {
+                    ui.add(egui::TextEdit::singleline(&mut self.search_query).hint_text("Search..."));
+                    if ui.button("x").clicked() {
+                        self.search_query.clear();
+                    }
+                });
+                
+                // Deep Search Trigger
+                if ui.link("🔍 Deep Search (Global)").clicked() {
+                    self.mode = AppMode::DeepSearch;
+                    self.deep_search_query.clear(); 
+                    self.deep_search_results.clear();
+                }
+                
+                ui.separator();
+                
+                // Toolbar (Sort);
                       
                       ui.horizontal(|ui| {
                          ui.label("Sort:");
@@ -838,6 +982,9 @@ impl eframe::App for CrapApp {
                                          self.status_message = None;
                                      }
                                  }
+                             },
+                             AppMode::DeepSearch => {
+                                 ui.label("Global search active.");
                              }
                          }
                      });
@@ -852,6 +999,7 @@ impl eframe::App for CrapApp {
                          self.lore_links.clear();
                      },
                      AppMode::Lorebooks => self.selected_lorebook = Some(Lorebook::default()),
+                     AppMode::DeepSearch => {},
                  }
                  self.status_message = None;
              }
@@ -1180,6 +1328,75 @@ impl eframe::App for CrapApp {
                     }
                     if let Some(l) = save_req {
                         self.save_lorebook(l);
+                    }
+                },
+                AppMode::DeepSearch => {
+                    ui.heading("Deep Global Search");
+                    ui.horizontal(|ui| {
+                        ui.label("Query:");
+                        if ui.text_edit_singleline(&mut self.deep_search_query).lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
+                            self.perform_deep_search();
+                        }
+                        if ui.button("Search").clicked() {
+                            self.perform_deep_search();
+                        }
+                    });
+                    
+                    if self.is_deep_searching {
+                        ui.spinner();
+                        ui.label("Searching database...");
+                    } else {
+                        ui.separator();
+                        ui.label(format!("Found {} results", self.deep_search_results.len()));
+                        
+                        let mut nav_action: Option<(SearchResultKind, i64)> = None;
+                        
+                        egui::ScrollArea::vertical().show(ui, |ui| {
+                            for res in &self.deep_search_results {
+                                egui::Frame::group(ui.style()).show(ui, |ui| {
+                                    ui.set_width(ui.available_width());
+                                    
+                                    // Header
+                                    let icon = match res.kind {
+                                        SearchResultKind::Character => "👤",
+                                        SearchResultKind::Lorebook => "📖",
+                                    };
+                                    if ui.link(egui::RichText::new(format!("{} {}", icon, res.display_name)).heading().strong()).clicked() {
+                                        nav_action = Some((res.kind.clone(), res.id));
+                                    }
+                                    
+                                    // Snippets
+                                    for (field, snippet) in &res.matches {
+                                        ui.horizontal(|ui| {
+                                            ui.label(egui::RichText::new(format!("{}:", field)).strong().size(11.0));
+                                            ui.label(egui::RichText::new(snippet).italics());
+                                        });
+                                    }
+                                });
+                                ui.add_space(4.0);
+                            }
+                        });
+                        
+                        // Handle Navigation
+                        if let Some((kind, id)) = nav_action {
+                             match kind {
+                                SearchResultKind::Character => {
+                                    if let Some(c) = self.characters.iter().find(|x| x.id == id).cloned() {
+                                        self.selected_character = Some(c.clone());
+                                        self.load_tags(c.id);
+                                        self.mode = AppMode::Characters;
+                                    }
+                                },
+                                SearchResultKind::Lorebook => {
+                                     self.set_status("Lorebook editing not yet fully implemented in navigation".to_string(), egui::Color32::YELLOW);
+                                }
+                            }
+                        }
+                    }
+                    
+                    ui.add_space(10.0);
+                    if ui.button("Back").clicked() {
+                        self.mode = AppMode::Characters;
                     }
                 }
             }
