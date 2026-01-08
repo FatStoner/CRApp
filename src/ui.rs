@@ -450,9 +450,20 @@ impl CrapApp {
         let tx = self.tx.clone();
         let db = self.db.clone();
         tokio::spawn(async move {
+            let is_new = character.id == 0;
             if let Err(e) = db.upsert_character(&mut character).await {
                 let _ = tx.send(UiEvent::CharacterSaved(Err(e.to_string()))).await;
             } else {
+                // If this was a new character, we must save its tags now that it has an ID
+                if is_new {
+                    for tag in &character.external_tags {
+                        let _ = db.add_tag_to_character(character.id, &tag.name, true).await;
+                    }
+                    for tag in &character.app_tags {
+                        let _ = db.add_tag_to_character(character.id, &tag.name, false).await;
+                    }
+                }
+
                 let _ = tx.send(UiEvent::CharacterSaved(Ok(character))).await;
                 // Reload list to reflect name changes
                 let list = db.get_all_characters().await.map_err(|e| e.to_string());
@@ -1798,7 +1809,12 @@ impl eframe::App for CrapApp {
                                         });
                                         self.set_status("Data applied. Tags are being added in background.".to_string(), egui::Color32::GREEN);
                                     } else {
-                                         self.set_status("Data applied. *Tags skipped* because character is not saved yet.".to_string(), egui::Color32::YELLOW);
+                                        // Character is new (unsaved). Add tags to memory so they are saved later.
+                                        // We use dummy ID 0 for the tags since they are not in DB yet (or we don't know their ID)
+                                        for tag_name in d.external_tags {
+                                            c.external_tags.push(Tag { id: 0, name: tag_name });
+                                        }
+                                        self.set_status("Data applied. Tags added to unsaved character (Save to persist).".to_string(), egui::Color32::YELLOW);
                                     }
                                 }
                                 self.show_import_modal = false;
