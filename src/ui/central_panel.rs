@@ -407,9 +407,10 @@ fn render_browser_view(app: &mut CrapApp, ui: &mut egui::Ui) {
     egui::ScrollArea::vertical().show(ui, |ui| {
         ui.horizontal_wrapped(|ui| {
             // Render Subfolders
+            // Render Subfolders
             for folder in subfolders {
                 let card_width = 180.0;
-                let card_height = 50.0; // Smaller height for folders
+                let card_height = 260.0;
                 
                 let (rect, response) = ui.allocate_exact_size(
                     egui::vec2(card_width, card_height),
@@ -429,14 +430,28 @@ fn render_browser_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                     app.selected_collection_id = Some(folder.id);
                 }
                 
-                // Icon + Name
+                // Content
+                let content_rect = rect.shrink(8.0);
+                
+                // Avatar (Top Square - Folder Icon)
+                let avatar_size = content_rect.width();
+                let avatar_rect = egui::Rect::from_min_size(content_rect.min, egui::vec2(avatar_size, avatar_size));
+
+                // Draw centered folder icon
+                ui.painter().rect_filled(avatar_rect, 4.0, egui::Color32::from_rgb(60, 60, 70)); // Darker bg for folder
                 ui.painter().text(
-                    egui::pos2(rect.min.x + 10.0, rect.center().y),
-                    egui::Align2::LEFT_CENTER,
-                    format!("📁 {}", folder.name),
-                    egui::FontId::proportional(16.0),
-                    ui.visuals().text_color()
+                    avatar_rect.center(),
+                    egui::Align2::CENTER_CENTER,
+                    "📁",
+                    egui::FontId::proportional(64.0),
+                    egui::Color32::from_rgb(200, 200, 220)
                 );
+
+                // Text Area (Name)
+                let text_top = avatar_rect.max.y + 8.0;
+                let name_font = egui::FontId::proportional(16.0);
+                let name_galley = ui.painter().layout_no_wrap(folder.name.clone(), name_font.clone(), ui.visuals().text_color());
+                ui.painter().galley(egui::pos2(content_rect.min.x, text_top), name_galley, ui.visuals().text_color());
             }
             
             // Render Characters

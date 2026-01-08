@@ -97,13 +97,9 @@ pub fn render_side_panel(app: &mut CrapApp, ctx: &egui::Context) {
                             app.central_view = crate::ui::CentralView::Editor;
                         },
                         TreeAction::SelectCollection(id) => {
-                             if app.selected_collection_id == Some(id) {
-                                  app.selected_collection_id = None; // Deselect
-                             } else {
-                                  app.selected_collection_id = Some(id);
-                                  app.selected_character = None;
-                              }
-                              app.central_view = crate::ui::CentralView::Browser;
+                             app.selected_collection_id = Some(id);
+                             app.selected_character = None;
+                             app.central_view = crate::ui::CentralView::Browser;
                         },
                         TreeAction::DeselectCollection => {
                             app.selected_collection_id = None;
