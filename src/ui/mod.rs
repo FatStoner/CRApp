@@ -1,0 +1,606 @@
+use eframe::egui;
+use crate::db::Database;
+use crate::models::{Character, Lorebook, Collection, Tag, DeepSearchResult, count_tokens, SearchResultKind};
+
+use tokio::sync::mpsc;
+use std::collections::{HashSet, HashMap};
+use std::time::{Duration, Instant};
+
+pub mod side_panel;
+pub mod central_panel;
+pub mod global_search;
+pub mod widgets;
+
+// Re-export specific items if needed
+pub use central_panel::ParsedCharacterData;
+
+#[derive(PartialEq, Eq, Clone, Copy, Debug)]
+pub enum AppMode {
+    Characters,
+    Lorebooks,
+    DeepSearch,
+}
+
+#[derive(PartialEq, Eq, Clone, Copy, Debug)]
+pub enum CharacterTab {
+    MainData,
+    AuthorNotes,
+    AssociatedLore,
+}
+
+#[derive(PartialEq, Eq, Clone, Copy, Debug)]
+pub enum SortMode {
+    Alphabetical,
+    NewestFirst,
+    RecentlyUpdated,
+}
+
+#[derive(Clone, Debug)]
+pub enum PopupState {
+    None,
+    Renaming { id: i64, name: String },
+    DeleteConfirmation { id: i64 },
+    DeleteWarning { id: i64, count: usize },
+}
+
+
+pub enum UiEvent {
+    CharactersLoaded(Result<Vec<Character>, String>),
+    LorebooksLoaded(Result<Vec<Lorebook>, String>),
+    CollectionsLoaded(Result<Vec<Collection>, String>),
+    LoreLinksLoaded(Result<HashSet<i64>, String>),
+    CharacterSaved(Result<Character, String>),
+    LorebookSaved(Result<Lorebook, String>),
+    CollectionSaved(Result<i64, String>),
+    CollectionDeleted(Result<i64, String>),
+    LinkUpdated(Result<(), String>),
+    TagsLoaded(Result<(i64, Vec<Tag>, Vec<Tag>), String>),
+    TagOperationFinished(Result<(), String>),
+    DeepSearchCompleted(Result<Vec<DeepSearchResult>, String>),
+}
+
+pub struct CrapApp {
+    db: Database,
+    tx: mpsc::Sender<UiEvent>,
+    rx: mpsc::Receiver<UiEvent>,
+    
+    // Data (Cached)
+    pub characters: Vec<Character>,
+    pub lorebooks: Vec<Lorebook>,
+    pub collections: Vec<Collection>,
+    pub lore_links: HashSet<i64>,
+    
+    // State
+    pub mode: AppMode,
+    pub selected_character: Option<Character>,
+    pub selected_lorebook: Option<Lorebook>,
+    pub active_char_tab: CharacterTab,
+    pub sort_mode: SortMode,
+    pub selected_collection_id: Option<i64>,
+    
+    pub popup_state: PopupState,
+    pub is_saving: bool,
+    pub status_message: Option<(String, egui::Color32)>,
+    pub status_clear_time: Option<Instant>,
+    pub loading_error: Option<String>,
+    
+    // Search
+    pub search_query: String, // Side panel filter
+    pub deep_search_query: String, // Global
+    pub deep_search_results: Vec<DeepSearchResult>,
+    pub is_deep_searching: bool,
+    
+    // Tag editor
+    pub app_tag_input: String,
+    pub ext_tag_input: String,
+    
+    // Import Modal State
+    pub show_import_modal: bool,
+    pub import_text: String,
+    pub parsed_data: Option<ParsedCharacterData>,
+    
+    // Hidden internal for double-click/expand preservation if needed
+    // We rely on egui id for collapsing headers.
+}
+
+impl CrapApp {
+    pub fn new(cc: &eframe::CreationContext<'_>, db: Database) -> Self {
+        egui_extras::install_image_loaders(&cc.egui_ctx);
+        let (tx, rx) = mpsc::channel(20);
+        
+        let app = Self { 
+            db,
+            tx,
+            rx,
+            characters: Vec::new(),
+            lorebooks: Vec::new(),
+            collections: Vec::new(),
+            lore_links: HashSet::new(),
+            mode: AppMode::Characters,
+            selected_character: None,
+            selected_lorebook: None,
+            active_char_tab: CharacterTab::MainData,
+            sort_mode: SortMode::Alphabetical,
+            selected_collection_id: None,
+            popup_state: PopupState::None,
+            is_saving: false,
+            status_message: None,
+            status_clear_time: None,
+            loading_error: None,
+            search_query: String::new(),
+            deep_search_query: String::new(),
+            deep_search_results: Vec::new(),
+            is_deep_searching: false,
+            app_tag_input: String::new(),
+            ext_tag_input: String::new(),
+            
+            show_import_modal: false,
+            import_text: String::new(),
+            parsed_data: None,
+        };
+        
+        app.refresh_all();
+        app
+    }
+
+    pub fn refresh_all(&self) {
+        let tx = self.tx.clone();
+        let db = self.db.clone();
+        tokio::spawn(async move {
+            // Load characters
+            match db.get_all_characters().await {
+                Ok(mut chars) => {
+                    // Load Tags (Bulk)
+                    let app_tags_res = db.get_all_tags_flat(false).await;
+                    let ext_tags_res = db.get_all_tags_flat(true).await;
+                    
+                    if let (Ok(app_flat), Ok(ext_flat)) = (app_tags_res, ext_tags_res) {
+                         let mut app_map: HashMap<i64, Vec<Tag>> = HashMap::new();
+                         for (cid, tag) in app_flat {
+                             app_map.entry(cid).or_default().push(tag);
+                         }
+                         
+                         let mut ext_map: HashMap<i64, Vec<Tag>> = HashMap::new();
+                         for (cid, tag) in ext_flat {
+                             ext_map.entry(cid).or_default().push(tag);
+                         }
+                         
+                         // Merge into characters
+                         for c in &mut chars {
+                             if let Some(tags) = app_map.remove(&c.id) {
+                                 c.app_tags = tags;
+                             }
+                             if let Some(tags) = ext_map.remove(&c.id) {
+                                 c.external_tags = tags;
+                             }
+                         }
+                    } else {
+                        eprintln!("Failed to load specific tags bulk");
+                    }
+                    
+                    let _ = tx.send(UiEvent::CharactersLoaded(Ok(chars))).await;
+                },
+                Err(e) => { let _ = tx.send(UiEvent::CharactersLoaded(Err(e.to_string()))).await; }
+            }
+            
+            // Load collections
+            let collections_res = db.get_all_collections().await.map_err(|e| e.to_string());
+            let _ = tx.send(UiEvent::CollectionsLoaded(collections_res)).await;
+            
+            // Load Lorebooks
+            let books_res = db.get_all_lorebooks().await.map_err(|e| e.to_string());
+            let _ = tx.send(UiEvent::LorebooksLoaded(books_res)).await;
+        });
+    }
+
+    pub fn reload_characters(&self) {
+        let tx = self.tx.clone();
+        let db = self.db.clone();
+        tokio::spawn(async move {
+            let result = db.get_all_characters().await.map_err(|e| e.to_string());
+            let _ = tx.send(UiEvent::CharactersLoaded(result)).await;
+        });
+    }
+
+    pub fn reload_lorebooks(&self) {
+        let tx = self.tx.clone();
+        let db = self.db.clone();
+        tokio::spawn(async move {
+            let result = db.get_all_lorebooks().await.map_err(|e| e.to_string());
+            let _ = tx.send(UiEvent::LorebooksLoaded(result)).await;
+        });
+    }
+
+    pub fn load_links(&self, char_id: i64) {
+        if char_id == 0 { return; } 
+        let tx = self.tx.clone();
+        let db = self.db.clone();
+        tokio::spawn(async move {
+            let result = db.get_lore_links(char_id).await.map_err(|e| e.to_string());
+            let _ = tx.send(UiEvent::LoreLinksLoaded(result)).await;
+        });
+    }
+    
+    // Loads tags for a single character (used after selection or tag operations)
+    pub fn load_tags(&self, char_id: i64) {
+        if char_id == 0 { return; }
+        let tx = self.tx.clone();
+        let db = self.db.clone();
+        tokio::spawn(async move {
+            let app_tags = db.get_tags_for_character(char_id, false).await;
+            let ext_tags = db.get_tags_for_character(char_id, true).await;
+            
+            match (app_tags, ext_tags) {
+                (Ok(app), Ok(ext)) => {
+                    let _ = tx.send(UiEvent::TagsLoaded(Ok((char_id, app, ext)))).await;
+                },
+                (Err(e), _) | (_, Err(e)) => {
+                    let _ = tx.send(UiEvent::TagsLoaded(Err(e.to_string()))).await;
+                }
+            }
+        });
+    }
+    
+    // Now just a simplified helper that spawns a load
+    pub fn load_character(&mut self, id: i64) {
+        // Find in logic, or reload if needed. Currently we just select from list.
+        if let Some(c) = self.characters.iter().find(|c| c.id == id).cloned() {
+            self.selected_character = Some(c);
+            self.load_links(id);
+            self.load_tags(id);
+            self.mode = AppMode::Characters;
+        }
+    }
+
+    pub fn reload_collections(&self) {
+        let tx = self.tx.clone();
+        let db = self.db.clone();
+        tokio::spawn(async move {
+            let result = db.get_all_collections().await.map_err(|e| e.to_string());
+            let _ = tx.send(UiEvent::CollectionsLoaded(result)).await;
+        });
+    }
+
+    pub fn save_character(&mut self, mut character: Character) {
+        self.is_saving = true;
+        self.status_message = None;
+        let tx = self.tx.clone();
+        let db = self.db.clone();
+        tokio::spawn(async move {
+            let is_new = character.id == 0;
+            if let Err(e) = db.upsert_character(&mut character).await {
+                let _ = tx.send(UiEvent::CharacterSaved(Err(e.to_string()))).await;
+            } else {
+                if is_new {
+                    for tag in &character.external_tags {
+                        let _ = db.add_tag_to_character(character.id, &tag.name, true).await;
+                    }
+                    for tag in &character.app_tags {
+                        let _ = db.add_tag_to_character(character.id, &tag.name, false).await;
+                    }
+                }
+
+                let _ = tx.send(UiEvent::CharacterSaved(Ok(character))).await;
+                let list = db.get_all_characters().await.map_err(|e| e.to_string());
+                let _ = tx.send(UiEvent::CharactersLoaded(list)).await;
+            }
+        });
+    }
+
+    pub fn save_lorebook(&mut self, mut lorebook: Lorebook) {
+        self.is_saving = true;
+        self.status_message = None;
+        let tx = self.tx.clone();
+        let db = self.db.clone();
+        tokio::spawn(async move {
+            if let Err(e) = db.upsert_lorebook(&mut lorebook).await {
+                let _ = tx.send(UiEvent::LorebookSaved(Err(e.to_string()))).await;
+            } else {
+                let _ = tx.send(UiEvent::LorebookSaved(Ok(lorebook))).await;
+                let list = db.get_all_lorebooks().await.map_err(|e| e.to_string());
+                let _ = tx.send(UiEvent::LorebooksLoaded(list)).await;
+            }
+        });
+    }
+
+    pub fn save_collection(&mut self, name: String, parent_id: Option<i64>) {
+        self.is_saving = true;
+        let tx = self.tx.clone();
+        let db = self.db.clone();
+        let col = crate::models::Collection { id: 0, name, parent_id };
+        tokio::spawn(async move {
+            let result = db.upsert_collection(&col).await.map_err(|e| e.to_string());
+             let _ = tx.send(UiEvent::CollectionSaved(result)).await;
+        });
+    }
+    
+    pub fn get_collection_path(&self, mut col_id: i64) -> String {
+        let mut path = Vec::new();
+        for _ in 0..10 {
+            if let Some(col) = self.collections.iter().find(|c| c.id == col_id) {
+                path.push(col.name.clone());
+                if let Some(pid) = col.parent_id {
+                    col_id = pid;
+                } else {
+                    break;
+                }
+            } else {
+                break;
+            }
+        }
+        path.reverse();
+        path.join(" / ")
+    }
+
+    pub fn toggle_lore_link(&mut self, char_id: i64, lore_id: i64, link: bool) {
+        if link {
+            self.lore_links.insert(lore_id);
+        } else {
+            self.lore_links.remove(&lore_id);
+        }
+
+        let tx = self.tx.clone();
+        let db = self.db.clone();
+        tokio::spawn(async move {
+            let res = if link {
+                db.link_lore(char_id, lore_id).await
+            } else {
+                db.unlink_lore(char_id, lore_id).await
+            };
+            let _ = tx.send(UiEvent::LinkUpdated(res.map_err(|e| e.to_string()))).await;
+        });
+    }
+    
+    pub fn set_status(&mut self, msg: String, color: egui::Color32) {
+        self.status_message = Some((msg, color));
+        self.status_clear_time = Some(Instant::now() + Duration::from_secs(3));
+    }
+    
+    pub fn add_tag(&self, char_id: i64, name: String, is_external: bool) {
+        let tx = self.tx.clone();
+        let db = self.db.clone();
+        tokio::spawn(async move {
+            let res = db.add_tag_to_character(char_id, &name, is_external).await.map_err(|e| e.to_string());
+            let _ = tx.send(UiEvent::TagOperationFinished(res)).await;
+        });
+    }
+
+    pub fn remove_tag(&self, char_id: i64, tag_id: i64, is_external: bool) {
+        let tx = self.tx.clone();
+        let db = self.db.clone();
+        tokio::spawn(async move {
+            let res = db.remove_tag_from_character(char_id, tag_id, is_external).await.map_err(|e| e.to_string());
+            let _ = tx.send(UiEvent::TagOperationFinished(res)).await;
+        });
+    }
+    
+    pub fn perform_deep_search(&mut self) {
+        // ... (This logically could be here or in global_search module if it was purely logic, 
+        // but it modifies App state heavily.
+        // Let's call the helper in global_search? No, global_search was ui rendering.
+        // Actually, logic IS in CrapApp usually. 
+        // I will keep the Logic here, but the Render in global_search.rs.
+        // Wait, I didn't move the perform_deep_search LOGIC to global_search.rs, I just made render call it.
+        // So I must implement it here.
+        
+        if self.deep_search_query.trim().is_empty() { return; }
+        
+        self.is_deep_searching = true;
+        self.mode = AppMode::DeepSearch;
+        self.deep_search_results.clear();
+        
+        let query = self.deep_search_query.clone();
+        let tx = self.tx.clone();
+        let db = self.db.clone();
+        
+        tokio::spawn(async move {
+            let mut results = Vec::new();
+            
+            // 1. Search Characters Text
+            let mut char_map: std::collections::HashMap<i64, Character> = std::collections::HashMap::new();
+            
+            if let Ok(chars) = db.search_characters_text(&query).await {
+                for c in chars {
+                    char_map.insert(c.id, c);
+                }
+            }
+            
+            // 2. Search Tags
+            let mut tag_matches: Vec<(i64, String, bool)> = Vec::new();
+            if let Ok(tags) = db.search_tags_matching(&query).await {
+                tag_matches = tags;
+            }
+            
+            // 3. Fetch missing characters found by tags
+            let found_ids: std::collections::HashSet<i64> = tag_matches.iter().map(|(id, _, _)| *id).collect();
+            let missing_ids: Vec<i64> = found_ids.into_iter().filter(|id| !char_map.contains_key(id)).collect();
+            
+            if !missing_ids.is_empty() {
+                if let Ok(fetched) = db.get_characters_by_ids(&missing_ids).await {
+                    for c in fetched {
+                        char_map.insert(c.id, c);
+                    }
+                }
+            }
+            
+            // 4. Build Character Results
+            for (_, c) in char_map {
+                let mut matches = Vec::new();
+                
+                // Use widget helper
+                use crate::ui::widgets::extract_snippets;
+                
+                for s in extract_snippets(&c.personality, &query) { matches.push(("Personality".to_string(), s)); }
+                for s in extract_snippets(&c.scenario, &query) { matches.push(("Scenario".to_string(), s)); }
+                for s in extract_snippets(&c.example_dialogue, &query) { matches.push(("Example Dialogue".to_string(), s)); }
+                for s in extract_snippets(&c.first_message, &query) { matches.push(("First Message".to_string(), s)); }
+                for s in extract_snippets(&c.author_notes, &query) { matches.push(("Notes".to_string(), s)); }
+                
+                for (tid, tname, is_ext) in &tag_matches {
+                    if *tid == c.id {
+                         let label = if *is_ext { "Ext. Tag" } else { "App Tag" };
+                         matches.push((label.to_string(), tname.clone()));
+                    }
+                }
+                
+                if !matches.is_empty() {
+                    results.push(DeepSearchResult {
+                        id: c.id,
+                        kind: SearchResultKind::Character,
+                        display_name: c.name,
+                        matches,
+                    });
+                }
+            }
+            
+            // Search Lorebooks
+             use crate::ui::widgets::extract_snippets;
+            if let Ok(books) = db.search_lorebooks_text(&query).await {
+                for b in books {
+                     let mut matches = Vec::new();
+                     for s in extract_snippets(&b.description, &query) { matches.push(("Description".to_string(), s)); }
+                     
+                     if !matches.is_empty() {
+                         results.push(DeepSearchResult {
+                             id: b.id,
+                             kind: SearchResultKind::Lorebook,
+                             display_name: b.title,
+                             matches,
+                         });
+                     }
+                }
+            }
+            
+            let _ = tx.send(UiEvent::DeepSearchCompleted(Ok(results))).await;
+        });
+    }
+}
+
+impl eframe::App for CrapApp {
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        // Event Loop
+        while let Ok(event) = self.rx.try_recv() {
+            match event {
+                UiEvent::CharactersLoaded(res) => match res {
+                    Ok(list) => { self.characters = list; self.loading_error = None; }
+                    Err(e) => { eprintln!("Load error: {}", e); self.loading_error = Some(e); }
+                },
+                UiEvent::LorebooksLoaded(res) => {
+                    match res {
+                        Ok(books) => self.lorebooks = books,
+                        Err(e) => { self.loading_error = Some(e); }
+                    }
+                },
+                UiEvent::CollectionsLoaded(res) => {
+                     match res {
+                        Ok(collections) => self.collections = collections,
+                        Err(e) => { self.loading_error = Some(e); }
+                     }
+                },
+                UiEvent::LoreLinksLoaded(res) => {
+                     match res {
+                        Ok(set) => self.lore_links = set,
+                        Err(e) => eprintln!("Link load error: {}", e),
+                     }
+                },
+                UiEvent::CharacterSaved(res) => {
+                    self.is_saving = false;
+                    match res {
+                        Ok(c) => {
+                            self.selected_character = Some(c);
+                            self.set_status("Character Saved!".to_string(), egui::Color32::GREEN);
+                        },
+                        Err(e) => self.set_status(format!("Save Error: {}", e), egui::Color32::RED),
+                    }
+                },
+                UiEvent::LorebookSaved(res) => {
+                    self.is_saving = false;
+                    match res {
+                        Ok(l) => {
+                            self.selected_lorebook = Some(l);
+                            self.set_status("Lorebook Saved!".to_string(), egui::Color32::GREEN);
+                        },
+                        Err(e) => self.set_status(format!("Save Error: {}", e), egui::Color32::RED),
+                    }
+                },
+                UiEvent::CollectionSaved(res) => {
+                    self.is_saving = false;
+                    match res {
+                        Ok(_) => { 
+                            self.set_status("Collection Saved!".to_string(), egui::Color32::GREEN);
+                            self.reload_collections();
+                            self.popup_state = PopupState::None;
+                        },
+                        Err(e) => self.set_status(format!("Save Error: {}", e), egui::Color32::RED),
+                    }
+                },
+                UiEvent::CollectionDeleted(res) => {
+                    self.is_saving = false;
+                     match res {
+                        Ok(id) => { 
+                            self.set_status("Collection Deleted".to_string(), egui::Color32::GREEN);
+                            self.reload_collections();
+                            self.reload_characters();
+                            if self.selected_collection_id == Some(id) {
+                                self.selected_collection_id = None;
+                            }
+                        },
+                        Err(e) => self.set_status(format!("Delete Error: {}", e), egui::Color32::RED),
+                    }
+                },
+                UiEvent::LinkUpdated(res) => {
+                     if let Err(e) = res {
+                          self.set_status(format!("Link Error: {}", e), egui::Color32::RED);
+                     }
+                },
+                UiEvent::TagsLoaded(res) => {
+                    match res {
+                        Ok((id, app, ext)) => {
+                            if let Some(c) = &mut self.selected_character {
+                                if c.id == id {
+                                    c.app_tags = app;
+                                    c.external_tags = ext;
+                                }
+                            }
+                        },
+                        Err(e) => self.set_status(format!("Tag Load Error: {}", e), egui::Color32::RED),
+                    }
+                },
+                UiEvent::TagOperationFinished(res) => {
+                    match res {
+                        Ok(_) => {
+                            if let Some(c) = &self.selected_character {
+                                self.load_tags(c.id);
+                            }
+                            self.refresh_all();
+                        },
+                        Err(e) => self.set_status(format!("Tag Error: {}", e), egui::Color32::RED),
+                    }
+                },
+                UiEvent::DeepSearchCompleted(res) => {
+                    self.is_deep_searching = false;
+                    match res {
+                        Ok(results) => self.deep_search_results = results,
+                        Err(e) => self.set_status(format!("Search failed: {}", e), egui::Color32::RED),
+                    }
+                }
+            }
+        }
+
+        // Timer
+        if let Some(deadline) = self.status_clear_time {
+            if Instant::now() > deadline {
+                self.status_message = None;
+                self.status_clear_time = None;
+            } else {
+                ctx.request_repaint();
+            }
+        }
+
+        // Side Panel
+        side_panel::render_side_panel(self, ctx);
+
+        // Central Panel
+        central_panel::render_central_panel(self, ctx);
+    }
+}
