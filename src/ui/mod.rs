@@ -29,6 +29,12 @@ pub enum CharacterTab {
 }
 
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
+pub enum CentralView {
+    Editor,
+    Browser,
+}
+
+#[derive(PartialEq, Eq, Clone, Copy, Debug)]
 pub enum SortMode {
     Alphabetical,
     NewestFirst,
@@ -76,6 +82,7 @@ pub struct CrapApp {
     pub selected_character: Option<Character>,
     pub selected_lorebook: Option<Lorebook>,
     pub active_char_tab: CharacterTab,
+    pub central_view: CentralView,
     pub sort_mode: SortMode,
     pub selected_collection_id: Option<i64>,
     
@@ -121,6 +128,7 @@ impl CrapApp {
             selected_character: None,
             selected_lorebook: None,
             active_char_tab: CharacterTab::MainData,
+            central_view: CentralView::Editor,
             sort_mode: SortMode::Alphabetical,
             selected_collection_id: None,
             popup_state: PopupState::None,

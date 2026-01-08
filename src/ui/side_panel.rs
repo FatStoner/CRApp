@@ -94,6 +94,7 @@ pub fn render_side_panel(app: &mut CrapApp, ctx: &egui::Context) {
                                 app.load_tags(c.id);
                                 app.load_links(c.id);
                             }
+                            app.central_view = crate::ui::CentralView::Editor;
                         },
                         TreeAction::SelectCollection(id) => {
                              if app.selected_collection_id == Some(id) {
@@ -101,10 +102,12 @@ pub fn render_side_panel(app: &mut CrapApp, ctx: &egui::Context) {
                              } else {
                                   app.selected_collection_id = Some(id);
                                   app.selected_character = None;
-                             }
+                              }
+                              app.central_view = crate::ui::CentralView::Browser;
                         },
                         TreeAction::DeselectCollection => {
                             app.selected_collection_id = None;
+                            app.central_view = crate::ui::CentralView::Browser;
                         },
                         TreeAction::RenameCollection(id, current_name) => {
                              app.popup_state = crate::ui::PopupState::Renaming { id, name: current_name };
@@ -154,7 +157,9 @@ pub fn render_side_panel(app: &mut CrapApp, ctx: &egui::Context) {
                          if ui.button("➕ New Character").clicked() {
                               app.selected_character = Some(Character::default());
                               app.selected_character.as_mut().unwrap().collection_id = app.selected_collection_id;
+                              app.selected_character.as_mut().unwrap().collection_id = app.selected_collection_id;
                               app.mode = AppMode::Characters;
+                              app.central_view = crate::ui::CentralView::Editor;
                          }
                          if ui.button("➕ New Lorebook").clicked() {
                               app.selected_lorebook = Some(crate::models::Lorebook::default());

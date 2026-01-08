@@ -310,9 +310,247 @@ pub fn render_central_panel(app: &mut CrapApp, ctx: &egui::Context) {
         }
 
         // Main Content
+        if app.mode == AppMode::DeepSearch {
+            super::global_search::render_deep_search(app, ui);
+            return;
+        }
+
+        // Main Content
         match app.mode {
             AppMode::Characters => {
-                let mut trigger_import = false;
+                match app.central_view {
+                    crate::ui::CentralView::Browser => {
+                        render_browser_view(app, ui);
+                    },
+                    crate::ui::CentralView::Editor => {
+                        render_editor_view(app, ui);
+                    }
+                }
+            },
+            AppMode::Lorebooks => {
+                render_lorebook_editor(app, ui);
+            },
+            _ => {
+                ui.label("Unknown mode");
+            }
+        }
+    });
+}
+
+fn render_browser_view(app: &mut CrapApp, ui: &mut egui::Ui) {
+    let collection_id = app.selected_collection_id;
+    let collection_name = if let Some(id) = collection_id {
+        app.collections.iter().find(|c| c.id == id).map(|c| c.name.clone()).unwrap_or("Unknown".to_string())
+    } else {
+        "All Characters".to_string()
+    };
+    
+    let parent_id = if let Some(id) = collection_id {
+        app.collections.iter().find(|c| c.id == id).and_then(|c| c.parent_id)
+    } else {
+        None
+    };
+
+    ui.horizontal(|ui| {
+        if collection_id.is_some() {
+             if ui.button("⬅ Back").clicked() {
+                 app.selected_collection_id = parent_id;
+             }
+        }
+        ui.heading(format!("Browsing: {}", collection_name));
+    });
+    ui.add_space(10.0);
+    
+    // Filter characters
+    // Note: We are filtering by direct parent currently.
+    // If "All Characters", show all? Or show root?
+    // Side panel logic implies "No selection" = "All/Root". 
+    // Let's assume Root means parent_id == None if we strictly follow folder logic.
+    // But typically "All Characters" view shows everything flat.
+    // User requested "Browser View... activates when selecting a collection".
+    // If selected_collection_id is None, let's show ALL characters for now, or Root? 
+    // SidePanel uses "None" for Root in tree view.
+    // Let's filter: if Some(id) -> c.collection_id == Some(id).
+    // If None -> Show ALL (Flat view) is usually more useful for a "Browser".
+    // Or if None -> c.collection_id == None (Root items only).
+    // Let's go with: If collection selected, show content. If None, show nothing/instruction? 
+    // Wait, side panel sets Browser view on "Deselect".
+    // Let's show "Uncategorized" (Root) if None? Or All?
+    // Let's show matching `collection_id` exactly for now. 
+    // If None, show those with None (Uncategorized).
+    
+    let subfolders: Vec<crate::models::Collection> = app.collections.iter()
+        .filter(|c| c.parent_id == collection_id)
+        .cloned()
+        .collect();
+
+    let chars: Vec<crate::models::Character> = app.characters.iter()
+        .filter(|c| c.collection_id == collection_id)
+        .cloned()
+        .collect();
+
+    if chars.is_empty() && subfolders.is_empty() {
+        ui.vertical_centered(|ui| {
+            ui.add_space(50.0);
+            ui.label(egui::RichText::new("No characters or subfolders in this collection").size(18.0).color(egui::Color32::GRAY));
+            ui.add_space(10.0);
+            if ui.button(egui::RichText::new("➕ Add New Character here").size(16.0)).clicked() {
+                 app.selected_character = Some(crate::models::Character::default());
+                 app.selected_character.as_mut().unwrap().collection_id = collection_id;
+                 app.mode = AppMode::Characters;
+                 app.central_view = crate::ui::CentralView::Editor;
+            }
+        });
+        return;
+    }
+
+    egui::ScrollArea::vertical().show(ui, |ui| {
+        ui.horizontal_wrapped(|ui| {
+            // Render Subfolders
+            for folder in subfolders {
+                let card_width = 180.0;
+                let card_height = 50.0; // Smaller height for folders
+                
+                let (rect, response) = ui.allocate_exact_size(
+                    egui::vec2(card_width, card_height),
+                    egui::Sense::click()
+                );
+                
+                let bg_color = if response.hovered() {
+                    ui.visuals().widgets.hovered.bg_fill
+                } else {
+                    ui.visuals().widgets.noninteractive.bg_fill
+                };
+                
+                ui.painter().rect_filled(rect, 8.0, bg_color);
+                ui.painter().rect_stroke(rect, 1.0, ui.visuals().widgets.noninteractive.bg_stroke);
+                
+                if response.clicked() {
+                    app.selected_collection_id = Some(folder.id);
+                }
+                
+                // Icon + Name
+                ui.painter().text(
+                    egui::pos2(rect.min.x + 10.0, rect.center().y),
+                    egui::Align2::LEFT_CENTER,
+                    format!("📁 {}", folder.name),
+                    egui::FontId::proportional(16.0),
+                    ui.visuals().text_color()
+                );
+            }
+            
+            // Render Characters
+            for char in chars {
+                let card_width = 180.0;
+                let card_height = 260.0;
+                
+                let (rect, response) = ui.allocate_exact_size(
+                    egui::vec2(card_width, card_height),
+                    egui::Sense::click()
+                );
+                
+                // Hover Effect
+                let bg_color = if response.hovered() {
+                    ui.visuals().widgets.hovered.bg_fill
+                } else {
+                    ui.visuals().widgets.noninteractive.bg_fill
+                };
+                
+                ui.painter().rect_filled(rect, 8.0, bg_color);
+                ui.painter().rect_stroke(rect, 8.0, ui.visuals().widgets.noninteractive.bg_stroke);
+
+                // Interaction
+                if response.clicked() {
+                    app.selected_character = Some(char.clone());
+                    app.central_view = crate::ui::CentralView::Editor;
+                    app.load_tags(char.id);
+                    app.load_links(char.id);
+                }
+                
+                // Content
+                let content_rect = rect.shrink(8.0);
+                
+                // Avatar (Top Square)
+                let avatar_size = content_rect.width();
+                let avatar_rect = egui::Rect::from_min_size(content_rect.min, egui::vec2(avatar_size, avatar_size));
+                
+                if let Some(path_str) = &char.avatar_path {
+                     let uri = if path_str.contains("://") { 
+                         path_str.clone() 
+                     } else {
+                         if let Ok(abs_path) = std::fs::canonicalize(path_str) {
+                              format!("file://{}", abs_path.to_string_lossy())
+                         } else {
+                              path_str.clone() 
+                         }
+                     };
+                     egui::Image::new(uri)
+                         .rounding(egui::Rounding::same(4.0))
+                         .paint_at(ui, avatar_rect);
+                } else {
+                     ui.painter().rect_filled(avatar_rect, 4.0, egui::Color32::from_gray(60));
+                     let initial = char.name.chars().next().unwrap_or('?').to_uppercase().to_string();
+                     ui.painter().text(
+                         avatar_rect.center(),
+                         egui::Align2::CENTER_CENTER,
+                         initial,
+                         egui::FontId::proportional(40.0),
+                         egui::Color32::WHITE
+                     );
+                }
+                
+                // Text Area
+                let text_top = avatar_rect.max.y + 8.0;
+                let text_rect = egui::Rect::from_min_max(
+                    egui::pos2(content_rect.min.x, text_top),
+                    content_rect.max
+                );
+                
+                let mut cursor_y = text_top;
+                
+                // Name
+                let name_font = egui::FontId::proportional(16.0);
+                let name_galley = ui.painter().layout_no_wrap(char.name.clone(), name_font.clone(), ui.visuals().text_color());
+                ui.painter().galley(egui::pos2(content_rect.min.x, cursor_y), name_galley, ui.visuals().text_color());
+                cursor_y += 20.0;
+                
+                // Title
+                if !char.char_title.is_empty() {
+                    let title_font = egui::FontId::proportional(12.0);
+                    let title_galley = ui.painter().layout_no_wrap(char.char_title.clone(), title_font, ui.visuals().text_color().linear_multiply(0.7));
+                    ui.painter().with_clip_rect(rect).galley(egui::pos2(content_rect.min.x, cursor_y), title_galley, ui.visuals().text_color());
+                    cursor_y += 16.0;
+                } else {
+                     cursor_y += 16.0; // Spacer
+                }
+                
+                cursor_y += 4.0;
+                
+                // Tags (Chips)
+                let tag_font = egui::FontId::proportional(10.0);
+                let mut tag_x = content_rect.min.x;
+                
+                for tag in char.app_tags.iter().take(3) {
+                    let tag_galley = ui.painter().layout_no_wrap(tag.name.clone(), tag_font.clone(), egui::Color32::WHITE);
+                    let pad = 4.0;
+                    let chip_w = tag_galley.rect.width() + pad * 2.0;
+                    
+                    if tag_x + chip_w > content_rect.max.x { break; }
+                    
+                    let chip_rect = egui::Rect::from_min_size(egui::pos2(tag_x, cursor_y), egui::vec2(chip_w, 16.0));
+                    ui.painter().rect_filled(chip_rect, 8.0, egui::Color32::from_rgb(50, 80, 150));
+                    ui.painter().galley(egui::pos2(tag_x + pad, cursor_y + 2.0), tag_galley, egui::Color32::WHITE);
+                    
+                    tag_x += chip_w + 4.0;
+                }
+            }
+        });
+    });
+}
+
+fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
+    let mut trigger_import = false;
+
                 let mut save_req = None;
                 let mut toggle_requests = Vec::new();
                 
@@ -644,8 +882,10 @@ pub fn render_central_panel(app: &mut CrapApp, ctx: &egui::Context) {
                 if let Some(c) = save_req {
                     app.save_character(c);
                 }
-            },
-            AppMode::Lorebooks => {
+    }
+
+
+fn render_lorebook_editor(app: &mut CrapApp, ui: &mut egui::Ui) {
                 if let Some(book) = &mut app.selected_lorebook {
                     let mut save_lore_req = None;
                     
@@ -665,10 +905,6 @@ pub fn render_central_panel(app: &mut CrapApp, ctx: &egui::Context) {
                 } else {
                     ui.label("Select a lorebook.");
                 }
-            },
-            _ => {
-                ui.label("Unknown mode");
             }
-        }
-    });
-}
+
+
