@@ -85,6 +85,11 @@ pub struct CrapApp {
     
     app_tag_input: String,
     ext_tag_input: String,
+    
+    // Import Modal
+    show_import_modal: bool,
+    import_text: String,
+    parsed_data: Option<ParsedCharacterData>,
 }
 
 fn extract_snippets(full_text: &str, query: &str) -> Vec<String> {
@@ -108,6 +113,183 @@ fn extract_snippets(full_text: &str, query: &str) -> Vec<String> {
         start = abs_idx + lower_query.len();
     }
     snippets
+}
+
+#[derive(Default, Clone)]
+struct ParsedCharacterData {
+    name: String,
+    title: String,
+    personality: String,
+    scenario: String,
+    first_message: String,
+    external_tags: Vec<String>,
+}
+
+fn parse_clipboard(text: &str) -> ParsedCharacterData {
+    let mut data = ParsedCharacterData::default();
+    let mut current_section = "";
+    
+    // STRICT Blacklist: These are always garbage. If a line contains them, NUKE IT.
+    let strict_blacklist = [
+        "NextDay AI", "Spicychat", "Owned & operated", "18 U.S.C.", "Compliance Statement", 
+        "Become an Affiliate", "Report Content", "Community Guidelines", "Join Us", 
+        "Refund Policy", "Refund", "Discord", "Twitter", "Reddit", "avatar image", 
+        "Download", "Get Premium", "Leaderboard", "Blocked Creators", "My Creations",
+        "My Personas", "Lorebooks", "Lorebook", "SHOW LESS", "Reporting", "Guidelines",
+        "Affiliates", "Edit"
+    ];
+
+    // SOFT Blacklist: These words might appear in prose. Only nuke if the line is short/isolated.
+    let soft_blacklist = [
+        "Home", "Chats", "Settings", "Sign Out", "Terms", "Privacy", "Resources", 
+        "Support", "Back", "Chat Now", "Favorite", "Share", "Start", "New", "Group", 
+        "Help", "Tokens", "tokens", "Create", "Chatbot", "Subscribe", "Recommendations",
+        "Free", "Community"
+    ];
+    
+    // Buffer for detection (Title/Tags block)
+    let mut potential_block: Vec<String> = Vec::new();
+    let mut tags_processed = false;
+    
+    
+    for line in text.lines() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() { continue; }
+
+        // Skip purely numeric lines or single/double characters (garbage "2", "M", "aa")
+        if current_section.is_empty() && (trimmed.len() < 3 || trimmed.chars().all(|c| !c.is_alphabetic())) {
+            continue;
+        }
+        
+        let lower = trimmed.to_lowercase();
+        
+        // 1. Strict Blacklist Check
+        let mut is_blacklisted = strict_blacklist.iter().any(|b| lower.contains(&b.to_lowercase()));
+        
+        // 2. Soft Blacklist Check (only if not already strict blacklisted)
+        if !is_blacklisted {
+            is_blacklisted = soft_blacklist.iter().any(|b| {
+                let b_lower = b.to_lowercase();
+                if lower.contains(&b_lower) {
+                    // Only blacklist if the line is "mostly" just this word
+                    // e.g. "Home" (4) -> Block "Home", "Go Home". Allow "I went home today" (len 17).
+                    // Heuristic: Line length < Word length * 3 + 4
+                    if trimmed.len() < b.len() * 3 + 4 { return true; }
+                }
+                false
+            });
+        }
+        
+        // Special case: "Suggest Tag" is a trigger, handled separately but effectively blacklisted as content
+        let is_tag_trigger = lower.contains("suggest tag");
+        if is_tag_trigger { is_blacklisted = true; }
+
+        if is_blacklisted {
+            
+            // Check if this was "Suggest Tag" triggering logic
+             if is_tag_trigger && !tags_processed {
+                 // Process the potential block accumulated so far
+                 // The block should contain Title followed by Tags
+                 if !potential_block.is_empty() {
+                     // Heuristic: Last N items? Or all items?
+                     // With "Clear on Blacklist", this buffer should only contain:
+                     // Title, Tag1, Tag2...
+                     
+                     if potential_block.len() > 0 {
+                         // Assume first item is Title, rest are Tags
+                         data.title = potential_block[0].clone();
+                         for i in 1..potential_block.len() {
+                             data.external_tags.push(potential_block[i].clone());
+                         }
+                     }
+                 }
+                 tags_processed = true;
+            }
+            
+            // CRITICAL: Clear potential block on ANY blacklist hit (except maybe if we just processed it)
+            // This ensures we don't carry over garbage from top of file
+            potential_block.clear();
+            continue;
+        }
+        
+        // Section Headers
+        if lower.starts_with("personality") || lower.starts_with("summary") {
+            current_section = "personality";
+            if let Some((_, content)) = trimmed.split_once(':') {
+                 if !content.trim().is_empty() {
+                     data.personality.push_str(content.trim());
+                     data.personality.push('\n');
+                 }
+            }
+            potential_block.clear();
+            continue;
+        }
+        if lower.starts_with("scenario") || lower.starts_with("context") {
+            current_section = "scenario";
+             if let Some((_, content)) = trimmed.split_once(':') {
+                 if !content.trim().is_empty() {
+                     data.scenario.push_str(content.trim());
+                     data.scenario.push('\n');
+                 }
+            }
+            potential_block.clear();
+            continue;
+        }
+        if lower.starts_with("first message") || lower.starts_with("greeting") || lower.starts_with("start") {
+            current_section = "first_message";
+             if let Some((_, content)) = trimmed.split_once(':') {
+                 if !content.trim().is_empty() {
+                     data.first_message.push_str(content.trim());
+                     data.first_message.push('\n');
+                 }
+            }
+            potential_block.clear();
+            continue;
+        }
+        if lower.starts_with("tags:") {
+             if let Some((_, content)) = trimmed.split_once(':') {
+                 let tags: Vec<String> = content.split(',').map(|s| s.trim().to_string()).collect();
+                 data.external_tags.extend(tags);
+             }
+             potential_block.clear();
+             continue; 
+        }
+        
+        // Content Accumulation
+        match current_section {
+            "personality" => { data.personality.push_str(trimmed); data.personality.push('\n'); },
+            "scenario" => { data.scenario.push_str(trimmed); data.scenario.push('\n'); },
+            "first_message" => { data.first_message.push_str(trimmed); data.first_message.push('\n'); },
+            _ => {
+                // Heuristic for name at start
+                if data.name.is_empty() && trimmed.len() < 50 && !trimmed.contains(':') && !lower.starts_with("description") && !lower.starts_with("@") {
+                    data.name = trimmed.to_string();
+                } 
+                
+                if !tags_processed {
+                     // Collect into potential block (Title/Tags candidate)
+                     // FIX: Increased limit to 250 to catch long titles that aren't description yet
+                     if trimmed.len() < 250 {
+                        potential_block.push(trimmed.to_string());
+                     } else {
+                        // Very long text before section = likely description/personality overflow
+                        data.personality.push_str(trimmed);
+                        data.personality.push('\n');
+                     }
+                } else {   // Fallback to personality for stray text after tags
+                     data.personality.push_str(trimmed);
+                     data.personality.push('\n');
+                }
+            }
+        }
+    }
+    
+    // Post-processing cleanup
+    data.personality = data.personality.trim().to_string();
+    data.scenario = data.scenario.trim().to_string();
+    data.first_message = data.first_message.trim().to_string();
+    
+    data
 }
 
 impl CrapApp {
@@ -140,6 +322,10 @@ impl CrapApp {
             is_deep_searching: false,
             app_tag_input: String::new(),
             ext_tag_input: String::new(),
+            
+            show_import_modal: false,
+            import_text: String::new(),
+            parsed_data: None,
         };
         
         app.refresh_all();
@@ -1020,10 +1206,22 @@ impl eframe::App for CrapApp {
                 AppMode::Characters => {
                     let mut save_req = None;
                     let mut toggle_requests = Vec::new();
+                    let mut export_json = None;
+                    let mut trigger_import = false;
                     
                     if let Some(character) = &mut self.selected_character {
                         ui.horizontal(|ui| {
                             ui.heading("Edit Character");
+                            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                if ui.button("EXPORT").clicked() {
+                                    if let Ok(json) = serde_json::to_string_pretty(character) {
+                                        export_json = Some(json);
+                                    }
+                                }
+                                if ui.button("IMPORT").clicked() {
+                                    trigger_import = true;
+                                }
+                            });
                         });
                         
                         ui.horizontal(|ui| {
@@ -1061,9 +1259,6 @@ impl eframe::App for CrapApp {
                                     ui.text_edit_singleline(&mut character.char_name);
                                     ui.label("Title");
                                     ui.text_edit_singleline(&mut character.char_title);
-                                    
-                                    ui.label("Personality");
-                                    // Tags Section
                                     ui.add_space(8.0);
                                     egui::CollapsingHeader::new("Tags & Metadata")
                                         .default_open(true)
@@ -1259,6 +1454,16 @@ impl eframe::App for CrapApp {
                     // Process toggle requests (mutable self borrow here is fine now)
                     for (char_id, lore_id, link) in toggle_requests {
                         self.toggle_lore_link(char_id, lore_id, link);
+                    }
+                    
+                    if let Some(json) = export_json {
+                        ui.output_mut(|o| o.copied_text = json);
+                        self.set_status("Character data copied to clipboard".to_string(), egui::Color32::GREEN);
+                    }
+                    if trigger_import {
+                        self.show_import_modal = true;
+                        self.import_text.clear();
+                        self.parsed_data = None;
                     }
                     
 
@@ -1489,6 +1694,128 @@ impl eframe::App for CrapApp {
             });
         }
         
+        // Modals
+        if self.show_import_modal {
+            let screen_rect = ctx.screen_rect();
+            egui::Window::new("Import from Clipboard")
+                .collapsible(false)
+                .resizable(true)
+                .pivot(egui::Align2::CENTER_CENTER)
+                .fixed_pos(screen_rect.center())
+                .default_width(screen_rect.width() * 0.6)
+                .max_height(screen_rect.height() * 0.8)
+                .show(ctx, |ui| {
+                    if self.parsed_data.is_none() {
+                        // Phase 1: Input
+                        ui.label("Paste raw character text below (Spicy/Janitor format):");
+                        ui.add_space(4.0);
+                        
+                        // Calculate available height for the text area, leaving room for buttons at the bottom
+                        let footer_height = 50.0; // Buttons + Separator + Spacing
+                        let scroll_height = ui.available_height() - footer_height;
+                        
+                        egui::ScrollArea::vertical()
+                            .max_height(scroll_height)
+                            .show(ui, |ui| {
+                                ui.add_sized(
+                                    egui::Vec2::new(ui.available_width(), scroll_height.max(200.0)),
+                                    egui::TextEdit::multiline(&mut self.import_text)
+                                        .hint_text("Paste here...")
+                                        .desired_width(f32::INFINITY)
+                                        .lock_focus(false)
+                                );
+                            });
+                        
+                        ui.add_space(10.0);
+                        ui.separator();
+                        ui.horizontal(|ui| {
+                            if ui.button("Analyze").clicked() {
+                                let data = parse_clipboard(&self.import_text);
+                                self.parsed_data = Some(data);
+                            }
+                            if ui.button("Cancel").clicked() {
+                                self.show_import_modal = false;
+                            }
+                        });
+                    } else {
+                        // Phase 2: Review
+                        ui.heading("Review Parsed Data");
+                        ui.separator();
+                        
+                        let data = self.parsed_data.as_mut().unwrap();
+                        
+                        egui::ScrollArea::vertical().show(ui, |ui| {
+                            egui::Grid::new("review_grid").striped(true).num_columns(2).show(ui, |ui| {
+                                ui.label("Name:");
+                                ui.text_edit_singleline(&mut data.name);
+                                ui.end_row();
+                                
+                                ui.label("Title:");
+                                ui.text_edit_singleline(&mut data.title);
+                                ui.end_row();
+                                
+                                ui.label("Personality:");
+                                ui.add(egui::TextEdit::multiline(&mut data.personality).desired_rows(10).desired_width(f32::INFINITY));
+                                ui.end_row();
+                                
+                                ui.label("Scenario:");
+                                ui.add(egui::TextEdit::multiline(&mut data.scenario).desired_rows(8).desired_width(f32::INFINITY));
+                                ui.end_row();
+                                
+                                ui.label("First Message:");
+                                ui.add(egui::TextEdit::multiline(&mut data.first_message).desired_rows(8).desired_width(f32::INFINITY));
+                                ui.end_row();
+                                
+                                ui.label("External Tags:");
+                                ui.label(data.external_tags.join(", "));
+                                ui.end_row();
+                            });
+                        });
+                        
+                        ui.add_space(10.0);
+                        ui.horizontal(|ui| {
+                            if ui.button("Apply to Character").clicked() {
+                                if let Some(c) = &mut self.selected_character {
+                                    let d = self.parsed_data.take().unwrap();
+                                    
+                                    if !d.name.is_empty() { c.name = d.name.clone(); }
+                                    if !d.title.is_empty() { c.char_title = d.title.clone(); }
+                                    if !d.personality.is_empty() { c.personality = d.personality.clone(); }
+                                    if !d.scenario.is_empty() { c.scenario = d.scenario; }
+                                    if !d.first_message.is_empty() { c.first_message = d.first_message; }
+                                    
+                                    if c.id != 0 {
+                                        let tx_clone = self.tx.clone();
+                                        let db_clone = self.db.clone();
+                                        let cid = c.id;
+                                        let tags = d.external_tags.clone();
+                                        
+                                        tokio::spawn(async move {
+                                            for tag_name in tags {
+                                                let _ = db_clone.add_tag_to_character(cid, &tag_name, true).await;
+                                            }
+                                            let _ = tx_clone.send(UiEvent::TagOperationFinished(Ok(()))).await;
+                                        });
+                                        self.set_status("Data applied. Tags are being added in background.".to_string(), egui::Color32::GREEN);
+                                    } else {
+                                         self.set_status("Data applied. *Tags skipped* because character is not saved yet.".to_string(), egui::Color32::YELLOW);
+                                    }
+                                }
+                                self.show_import_modal = false;
+                            }
+                            
+                            if ui.button("Back").clicked() {
+                                self.parsed_data = None;
+                            }
+                            
+                            if ui.button("Cancel").clicked() {
+                                self.show_import_modal = false;
+                            }
+                        });
+                    }
+                });
+        }
+
         if let Some(id) = check_delete_contents {
             // Count children locally
             let child_colls = self.collections.iter().filter(|c| c.parent_id == Some(id)).count();

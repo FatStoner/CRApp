@@ -17,13 +17,13 @@ pub struct DeepSearchResult {
     pub matches: Vec<(String, String)>, // (Field Name, Snippet)
 }
 
-#[derive(Debug, Clone, FromRow, Default, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, FromRow, Default, PartialEq, Eq, Hash, Serialize)]
 pub struct Tag {
     pub id: i64,
     pub name: String,
 }
 
-#[derive(Debug, Clone, FromRow)]
+#[derive(Debug, Clone, FromRow, Serialize)]
 pub struct Character {
     pub id: i64,
     pub name: String,
