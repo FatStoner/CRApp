@@ -536,6 +536,8 @@ fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
 
                 let mut save_req = None;
                 let mut toggle_requests = Vec::new();
+                let mut status_update = None;  
+
                 
                  // Prepare collection options to avoid borrow checker issues inside the closure where we mutate char.
                  let collection_options: Vec<(i64, String)> = app.collections.iter().map(|c| {
@@ -850,17 +852,58 @@ fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                                              ui.label(egui::RichText::new("No avatar selected").italics());
                                          }
                                          
-                                         if ui.button("Browse Avatar").clicked() {
-                                             if let Some(path) = rfd::FileDialog::new().add_filter("image", &["png", "jpg", "jpeg"]).pick_file() {
-                                                  let dest_dir = std::path::Path::new("data/avatars");
-                                                  let _ = std::fs::create_dir_all(dest_dir);
-                                                  if let Some(name) = path.file_name() {
-                                                      let dest = dest_dir.join(name);
-                                                      let _ = std::fs::copy(&path, &dest);
-                                                      character.avatar_path = Some(dest.to_string_lossy().to_string());
+                                         ui.horizontal(|ui| {
+                                             if ui.button("Browse Avatar").clicked() {
+                                                 if let Some(path) = rfd::FileDialog::new().add_filter("image", &["png", "jpg", "jpeg"]).pick_file() {
+                                                      let dest_dir = std::path::Path::new("data/avatars");
+                                                      let _ = std::fs::create_dir_all(dest_dir);
+                                                      if let Some(name) = path.file_name() {
+                                                          let dest = dest_dir.join(name);
+                                                          let _ = std::fs::copy(&path, &dest);
+                                                          character.avatar_path = Some(dest.to_string_lossy().to_string());
+                                                      }
+                                                 }
+                                             }
+                                             
+                                             if ui.button("Paste from Clipboard").clicked() {
+                                                  match arboard::Clipboard::new() {
+                                                      Ok(mut clipboard) => {
+                                                          match clipboard.get_image() {
+                                                              Ok(img_data) => {
+                                                                 let width = img_data.width as u32;
+                                                                 let height = img_data.height as u32;
+                                                                 
+                                                                 // Convert Cow<'a, [u8]> to Vec<u8>
+                                                                 let bytes = img_data.bytes.into_owned();
+                                                                 
+                                                                 if let Some(image_buffer) = image::ImageBuffer::<image::Rgba<u8>, Vec<u8>>::from_raw(width, height, bytes) {
+                                                                      let timestamp = chrono::Utc::now().timestamp_millis();
+                                                                      let filename = format!("pasted_avatar_{}.png", timestamp);
+                                                                      let dest_dir = std::path::Path::new("data/avatars");
+                                                                      let _ = std::fs::create_dir_all(dest_dir);
+                                                                      let dest_path = dest_dir.join(&filename);
+                                                                      
+                                                                      if let Ok(_) = image_buffer.save(&dest_path) {
+                                                                          character.avatar_path = Some(dest_path.to_string_lossy().to_string());
+                                                                          status_update = Some(("Avatar pasted successfully!".to_string(), egui::Color32::GREEN));
+                                                                      } else {
+                                                                           status_update = Some(("Failed to save avatar image to disk.".to_string(), egui::Color32::RED));
+                                                                      }
+                                                                 } else {
+                                                                      status_update = Some(("Failed to process image buffer from clipboard.".to_string(), egui::Color32::RED));
+                                                                 }
+                                                              },
+                                                              Err(_) => {
+                                                                  status_update = Some(("Clipboard does not contain an image.".to_string(), egui::Color32::RED));
+                                                              }
+                                                          }
+                                                      },
+                                                      Err(e) => {
+                                                          status_update = Some((format!("Clipboard access failed: {}", e), egui::Color32::RED));
+                                                      }
                                                   }
                                              }
-                                         }
+                                         });
                                      });
                                  });
                              },
@@ -883,6 +926,11 @@ fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                          
 
                      });
+                     
+                     
+                     if let Some((msg, color)) = status_update {
+                         app.set_status(msg, color);
+                     }
                      
                      // Handle events
                      if trigger_import {
