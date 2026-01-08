@@ -1,5 +1,5 @@
 use eframe::egui;
-use crate::models::Tag;
+use crate::models::{Tag, count_tokens};
 use crate::ui::{CrapApp, AppMode, CharacterTab, UiEvent};
 use crate::card_v2::CharacterCardV2;
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
@@ -222,7 +222,10 @@ pub fn render_central_panel(app: &mut CrapApp, ctx: &egui::Context) {
                                 if let Some(c) = &mut app.selected_character {
                                     let d = app.parsed_data.take().unwrap();
                                     
-                                    if !d.name.is_empty() { c.name = d.name.clone(); }
+                                    if !d.name.is_empty() { 
+                                        c.name = d.name.clone(); 
+                                        c.char_name = d.name.clone();
+                                    }
                                     if !d.title.is_empty() { c.char_title = d.title.clone(); }
                                     if !d.personality.is_empty() { c.personality = d.personality.clone(); }
                                     if !d.scenario.is_empty() { c.scenario = d.scenario; }
@@ -687,6 +690,19 @@ fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                                     ui.close_menu();
                                 }
                             });
+                            
+                            ui.add_space(10.0);
+                            if app.is_saving {
+                                ui.spinner();
+                                ui.label("Saving...");
+                            } else {
+                                if ui.button("SAVE").clicked() {
+                                    save_req = Some(character.clone());
+                                }
+                                if let Some((msg, color)) = &app.status_message {
+                                    ui.colored_label(*color, msg);
+                                }
+                            }
                         });
                     });
                      
@@ -721,92 +737,132 @@ fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                      egui::ScrollArea::vertical().show(ui, |ui| {
                          match app.active_char_tab {
                              CharacterTab::MainData => {
-                                 ui.label("Name (File Name)");
-                                 ui.text_edit_singleline(&mut character.name);
-                                 ui.label("Character Name");
-                                 ui.text_edit_singleline(&mut character.char_name);
-                                 ui.label("Title");
-                                 ui.text_edit_singleline(&mut character.char_title);
-                                 ui.add_space(8.0);
-                                 
-                                 egui::CollapsingHeader::new("Tags & Metadata")
-                                    .default_open(true)
-                                    .show(ui, |ui| {
-                                        ui.vertical(|ui| {
-                                             // App Tags
-                                            ui.label(egui::RichText::new("App Tags").strong().color(egui::Color32::from_rgb(100, 150, 255)));
-                                            ui.horizontal(|ui| {
-                                                for tag in &character.app_tags {
-                                                    egui::Frame::none().fill(egui::Color32::from_rgb(50, 80, 150)).rounding(12.0).inner_margin(4.0).show(ui, |ui| {
-                                                        ui.horizontal(|ui| {
-                                                            ui.label(egui::RichText::new(&tag.name).color(egui::Color32::WHITE).size(12.0));
-                                                            if ui.small_button("x").clicked() {
-                                                                 tag_remove_request = Some((character.id, tag.id, false));
-                                                            }
-                                                        });
+                                 ui.horizontal(|ui| {
+                                     let available_width = ui.available_width();
+                                     let left_width = available_width * 0.66;
+                                     // Right width is remaining
+                                     
+                                     ui.allocate_ui_with_layout(egui::vec2(left_width, ui.available_height()), egui::Layout::top_down(egui::Align::Min), |ui| {
+                                         ui.label("Name (File Name)");
+                                         ui.add(egui::TextEdit::singleline(&mut character.name).desired_width(f32::INFINITY));
+                                         ui.label("Character Name");
+                                         ui.add(egui::TextEdit::singleline(&mut character.char_name).desired_width(f32::INFINITY));
+                                         ui.label("Title");
+                                         ui.add(egui::TextEdit::singleline(&mut character.char_title).desired_width(f32::INFINITY));
+                                         ui.add_space(8.0);
+                                         
+                                         ui.label("First Message");
+                                         ui.add(egui::TextEdit::multiline(&mut character.first_message).desired_width(f32::INFINITY));
+                                         ui.label(egui::RichText::new(format!("Tokens: {}", count_tokens(&character.first_message))).size(10.0).color(egui::Color32::GRAY));
+                                         
+                                         ui.add_space(8.0);
+                                         ui.label("Personality");
+                                         ui.add(egui::TextEdit::multiline(&mut character.personality).desired_width(f32::INFINITY));
+                                         ui.label(egui::RichText::new(format!("Tokens: {}", count_tokens(&character.personality))).size(10.0).color(egui::Color32::GRAY));
+        
+                                         ui.label("Scenario");
+                                         ui.add(egui::TextEdit::multiline(&mut character.scenario).desired_width(f32::INFINITY));
+                                         ui.label(egui::RichText::new(format!("Tokens: {}", count_tokens(&character.scenario))).size(10.0).color(egui::Color32::GRAY));
+        
+                                         ui.label("Example Dialogue");
+                                         ui.add(egui::TextEdit::multiline(&mut character.example_dialogue).desired_width(f32::INFINITY));
+                                         ui.label(egui::RichText::new(format!("Tokens: {}", count_tokens(&character.example_dialogue))).size(10.0).color(egui::Color32::GRAY));
+                                         
+                                         egui::CollapsingHeader::new("Tags & Metadata")
+                                            .default_open(true)
+                                            .show(ui, |ui| {
+                                                ui.vertical(|ui| {
+                                                     // App Tags
+                                                    ui.label(egui::RichText::new("CRApp Tags").strong().color(egui::Color32::from_rgb(100, 150, 255)));
+                                                    ui.horizontal(|ui| {
+                                                        for tag in &character.app_tags {
+                                                            egui::Frame::none().fill(egui::Color32::from_rgb(50, 80, 150)).rounding(12.0).inner_margin(4.0).show(ui, |ui| {
+                                                                ui.horizontal(|ui| {
+                                                                    ui.label(egui::RichText::new(&tag.name).color(egui::Color32::WHITE).size(12.0));
+                                                                    if ui.small_button("x").clicked() {
+                                                                         tag_remove_request = Some((character.id, tag.id, false));
+                                                                    }
+                                                                });
+                                                            });
+                                                        }
                                                     });
-                                                }
-                                            });
-                                            ui.horizontal(|ui| {
-                                                ui.text_edit_singleline(&mut app.app_tag_input);
-                                                if ui.button("Add").clicked() && !app.app_tag_input.is_empty() {
-                                                    tag_add_request = Some((character.id, app.app_tag_input.clone(), false));
-                                                    app.app_tag_input.clear();
-                                                }
-                                            });
-                                            
-                                            ui.add_space(8.0);
-                                            
-                                            // External Tags
-                                            ui.label(egui::RichText::new("External Tags").strong().color(egui::Color32::GRAY));
-                                            ui.horizontal(|ui| {
-                                                for tag in &character.external_tags {
-                                                    egui::Frame::none().fill(egui::Color32::from_gray(80)).rounding(12.0).inner_margin(4.0).show(ui, |ui| {
-                                                        ui.horizontal(|ui| {
-                                                            ui.label(egui::RichText::new(&tag.name).color(egui::Color32::WHITE).size(12.0));
-                                                            if ui.small_button("x").clicked() {
-                                                                 tag_remove_request = Some((character.id, tag.id, true));
-                                                            }
-                                                        });
+                                                    ui.horizontal(|ui| {
+                                                        ui.text_edit_singleline(&mut app.app_tag_input);
+                                                        if ui.button("Add").clicked() && !app.app_tag_input.is_empty() {
+                                                            tag_add_request = Some((character.id, app.app_tag_input.clone(), false));
+                                                            app.app_tag_input.clear();
+                                                        }
                                                     });
-                                                }
+                                                    
+                                                    ui.add_space(8.0);
+                                                    
+                                                    // External Tags
+                                                    ui.label(egui::RichText::new("External Tags").strong().color(egui::Color32::GRAY));
+                                                    ui.horizontal(|ui| {
+                                                        for tag in &character.external_tags {
+                                                            egui::Frame::none().fill(egui::Color32::from_gray(80)).rounding(12.0).inner_margin(4.0).show(ui, |ui| {
+                                                                ui.horizontal(|ui| {
+                                                                    ui.label(egui::RichText::new(&tag.name).color(egui::Color32::WHITE).size(12.0));
+                                                                    if ui.small_button("x").clicked() {
+                                                                         tag_remove_request = Some((character.id, tag.id, true));
+                                                                    }
+                                                                });
+                                                            });
+                                                        }
+                                                    });
+                                                    ui.horizontal(|ui| {
+                                                        ui.text_edit_singleline(&mut app.ext_tag_input);
+                                                        if ui.button("Add").clicked() && !app.ext_tag_input.is_empty() {
+                                                             tag_add_request = Some((character.id, app.ext_tag_input.clone(), true));
+                                                             app.ext_tag_input.clear();
+                                                        }
+                                                    });
+                                                });
                                             });
-                                            ui.horizontal(|ui| {
-                                                ui.text_edit_singleline(&mut app.ext_tag_input);
-                                                if ui.button("Add").clicked() && !app.ext_tag_input.is_empty() {
-                                                     tag_add_request = Some((character.id, app.ext_tag_input.clone(), true));
-                                                     app.ext_tag_input.clear();
-                                                }
-                                            });
-                                        });
-                                    });
-                                 
-                                 ui.add_space(8.0);
-                                 ui.label("Personality");
-                                 ui.text_edit_multiline(&mut character.personality);
-                                 ui.label("Scenario");
-                                 ui.text_edit_multiline(&mut character.scenario);
-                                 ui.label("Example Dialogue");
-                                 ui.text_edit_multiline(&mut character.example_dialogue);
-                                 ui.label("First Message");
-                                 ui.text_edit_multiline(&mut character.first_message);
-                                 
-                                 ui.label("Avatar");
-                                 if let Some(path_str) = &character.avatar_path {
-                                     // ... existing image code ...
-                                     ui.label(path_str);
-                                 }
-                                 if ui.button("Browse Avatar").clicked() {
-                                     if let Some(path) = rfd::FileDialog::new().add_filter("image", &["png", "jpg", "jpeg"]).pick_file() {
-                                          let dest_dir = std::path::Path::new("data/avatars");
-                                          let _ = std::fs::create_dir_all(dest_dir);
-                                          if let Some(name) = path.file_name() {
-                                              let dest = dest_dir.join(name);
-                                              let _ = std::fs::copy(&path, &dest);
-                                              character.avatar_path = Some(dest.to_string_lossy().to_string());
-                                          }
-                                     }
-                                 }
+                                     });
+                                     
+                                     ui.add_space(8.0);
+                                     
+                                     ui.vertical(|ui| {
+                                         ui.label("Avatar");
+                                         
+                                         // Show image preview if available
+                                         if let Some(path_str) = &character.avatar_path {
+                                             let uri = if path_str.contains("://") { 
+                                                 path_str.clone() 
+                                             } else {
+                                                 if let Ok(abs_path) = std::fs::canonicalize(path_str) {
+                                                      format!("file://{}", abs_path.to_string_lossy())
+                                                 } else {
+                                                      path_str.clone() 
+                                                 }
+                                             };
+                                             
+                                             // Calculate preview size based on available width in this column
+                                             let preview_width = ui.available_width() - 8.0;
+                                             ui.add(egui::Image::new(uri)
+                                                 .rounding(egui::Rounding::same(4.0))
+                                                 .fit_to_original_size(0.5) // Adjust scaling logic if needed or use max_width
+                                                 .max_width(preview_width));
+                                              
+                                             ui.label(path_str);
+                                         } else {
+                                             ui.label(egui::RichText::new("No avatar selected").italics());
+                                         }
+                                         
+                                         if ui.button("Browse Avatar").clicked() {
+                                             if let Some(path) = rfd::FileDialog::new().add_filter("image", &["png", "jpg", "jpeg"]).pick_file() {
+                                                  let dest_dir = std::path::Path::new("data/avatars");
+                                                  let _ = std::fs::create_dir_all(dest_dir);
+                                                  if let Some(name) = path.file_name() {
+                                                      let dest = dest_dir.join(name);
+                                                      let _ = std::fs::copy(&path, &dest);
+                                                      character.avatar_path = Some(dest.to_string_lossy().to_string());
+                                                  }
+                                             }
+                                         }
+                                     });
+                                 });
                              },
                              CharacterTab::AuthorNotes => {
                                  ui.label("Author Notes");
@@ -825,20 +881,7 @@ fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                              }
                          }
                          
-                         ui.add_space(20.0);
-                         ui.horizontal(|ui| {
-                             if app.is_saving {
-                                 ui.spinner();
-                                 ui.label("Saving...");
-                             } else {
-                                 if ui.button("Save Character").clicked() {
-                                     save_req = Some(character.clone());
-                                 }
-                                 if let Some((msg, color)) = &app.status_message {
-                                     ui.colored_label(*color, msg);
-                                 }
-                             }
-                         });
+
                      });
                      
                      // Handle events
