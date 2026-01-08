@@ -22,141 +22,139 @@ pub struct ParsedCharacterData {
 pub fn parse_clipboard(text: &str) -> ParsedCharacterData {
     let mut data = ParsedCharacterData::default();
     
-    // Split into lines
-    let mut current_section = "";
-    let mut potential_block: Vec<String> = Vec::new();
-    let mut tags_processed = false;
+    // Pre-processing: simple clean lines
+    let lines: Vec<&str> = text.lines()
+        .map(|l| l.trim())
+        .filter(|l| !l.is_empty())
+        .collect();
+
+    if lines.is_empty() {
+        return data;
+    }
+
+    // -------------------------------------------------------------------------
+    // Strategy 1: Structural Parsing (Spicychat Copy-Paste Format)
+    // -------------------------------------------------------------------------
     
-    let strict_blacklist = [
-        "Spicychat", "Home", "Chats", "My Personas", "Create", "Chatbot", "Lorebook", "New", "Group", "My Creations", "Chatbots", "Lorebooks", "Groups", "Favorites", "Recommendations", "Leaderboard", "Blocked Creators", "Subscribe", "Help", "Sign Out", "Terms", "Privacy", "Refunds", "Reporting", "Guidelines", "Support", "Affiliates", "Download SpicychatAI on the PlayStore download", "Get Premium", "Free", "Back", "avatar image", "Chat Now",
-        "SHOW LESS", "Owned & operated by:", "NextDay AI Incorporated", "NextDay AI USA Inc", "NextDay AI EU Ltd", "Resources", "Terms & Conditions", "Privacy Policy", "Refund Policy", "Community", "Community Guidelines", "Become an Affiliate", "Report Content", "Join Us", "Discord", "Twitter", "Reddit", "18 U.S.C. 2257 Record-Keeping Requirements Compliance Statement", "Edit"
-    ];
-    
-    let soft_blacklist = ["Favorite", "Share"];
+    // Find Anchors
+    let idx_back = lines.iter().position(|&l| l == "Back");
+    let idx_share = lines.iter().position(|&l| l == "Share").or_else(|| lines.iter().position(|&l| l == "Favorite")); 
+    let idx_suggest_tag = lines.iter().position(|&l| l.eq_ignore_ascii_case("suggest tag"));
+    let idx_greeting_header = lines.iter().position(|&l| l.eq_ignore_ascii_case("greeting"));
+    let idx_show_less = lines.iter().position(|&l| l.eq_ignore_ascii_case("show less"));
+    let idx_personality = lines.iter().position(|&l| l.eq_ignore_ascii_case("personality"));
+    let idx_scenario = lines.iter().position(|&l| l.eq_ignore_ascii_case("scenario"));
 
-    for line in text.lines() {
-        let trimmed = line.trim();
-        if trimmed.is_empty() { continue; }
-        
-        // Skip garbage
-        if current_section.is_empty() && (trimmed.len() < 3 || trimmed.chars().all(|c| !c.is_alphabetic())) {
-            continue;
-        }
-        
-        // 1. Strict Blacklist Check
-        let lower = trimmed.to_lowercase();
-        let mut is_blacklisted = strict_blacklist.iter().any(|b| lower.contains(&b.to_lowercase()));
-        
-        // 2. Soft Blacklist Check
-        if !is_blacklisted {
-            if soft_blacklist.iter().any(|b| lower == b.to_lowercase()) {
-                is_blacklisted = true;
-            }
-        }
-        
-        let is_tag_trigger = lower.contains("suggest tag") || lower == "nsfw" || lower == "sfw" || lower == "tags";
-        if is_tag_trigger { is_blacklisted = true; }
-
-        if is_blacklisted {
-             if is_tag_trigger && !tags_processed {
-                 // Capture Title/Tags from potential block
-                 if !potential_block.is_empty() {
-                     // Assume first line of potential block is Title (if reasonable length)
-                     // The rest are tags.
-                     // Heuristic: Last line might be title if block is huge? No, usually Title is separate line above tags.
-                     
-                     if let Some(first) = potential_block.first() {
-                         if data.name.is_empty() {
-                             // If name wasn't found (rare), maybe this title is name? 
-                             // But usually name is specifically caught.
-                             // Let's assume title.
-                         }
-                         data.title = first.clone();
-                     }
-                     
-                     // Any subsequent lines in potential block, PLUS the lines after "Suggest Tag" found later, are tags.
-                     // But wait, "Suggest Tag" usually APPEARS BEFORE tags list in some views, or AFTER?
-                     // In Spicychat: Name -> Desc -> Suggest Tag -> Tags
-                     // Our block collected stuff BEFORE "Suggest Tag".
-                     // So actually, if we hit "Suggest Tag", the block *was* the description/title/tags area.
-                     // Let's trust the "potential_block" as tags if they are short.
-                     
-                     for item in potential_block.iter().skip(1) { // Skip title
-                         if item.len() < 50 {
-                             data.external_tags.push(item.clone());
-                         }
-                     }
-                     tags_processed = true;
-                 }
-                 potential_block.clear();
-             }
-             
-             // Clear potential block on ANY blacklist hit to prevent garbage accumulation
-             // UNLESS it was the tag trigger we just handled.
-             if !is_tag_trigger {
-                potential_block.clear();
-             }
-             continue; 
-        }
-
-        // Section Detection
-        if lower.starts_with("personality") { current_section = "personality"; continue; }
-        if lower.starts_with("scenario") { current_section = "scenario"; continue; }
-        if lower.starts_with("first message") || lower.starts_with("greeting") { current_section = "first_message"; continue; }
-        if lower.starts_with("example dialogue") { current_section = "personality"; continue; } // Map to personality/dialogue
-        
-        // Tag Line Detection (Comma separated)
-        if current_section.is_empty() && trimmed.contains(',') && trimmed.split(',').count() > 3 {
-             // Likely a tag line if we haven't processed tags yet
-             if !tags_processed {
-                 let tags: Vec<String> = trimmed.split(',').map(|s| s.trim().to_string()).collect();
-                 data.external_tags.extend(tags);
-                 tags_processed = true;
-             }
-             continue; // Don't add to potential block
-        }
-        
-        // Tag Accumulation (if we hit a block of short words after "Suggest Tag" or similar, handled via potential_block usually, but sometimes tags are just lines)
-        // If we extracted tags via "Suggest Tag" trigger, we might be done.
-        
-        if current_section.is_empty() {
-             // Check if it's a tag-like line (short, alphabetic)
-             // Spicychat tags are often just words on new lines.
-             if tags_processed && trimmed.len() < 30 {
-                  // Assume continuation of tags?
-                  data.external_tags.push(trimmed.to_string());
-                  continue;
-             }
-             
-             // Heuristic: If we are collecting "potential block" (pre-header), treat as candidates
-             if !tags_processed {
-                 // FIX: Increased limit to 250
-                  if trimmed.len() < 250 {
-                     potential_block.push(trimmed.to_string());
-                  } else {
-                     data.personality.push_str(trimmed);
-                     data.personality.push('\n');
-                  }
-             } else {
-                 // Fallback
-                 data.personality.push_str(trimmed);
-                 data.personality.push('\n');
-             }
-             continue;
-        }
-        
-        match current_section {
-            "personality" => { data.personality.push_str(trimmed); data.personality.push('\n'); },
-            "scenario" => { data.scenario.push_str(trimmed); data.scenario.push('\n'); },
-            "first_message" => { data.first_message.push_str(trimmed); data.first_message.push('\n'); },
-            _ => {
-                 if data.name.is_empty() && trimmed.len() < 50 && !trimmed.contains(':') && !lower.starts_with("description") && !lower.starts_with("@") {
-                     data.name = trimmed.to_string();
-                 }
+    // 1. NAME
+    // Pattern: Back -> avatar image -> NAME
+    if let Some(idx) = idx_back {
+        // Look for "avatar image" in next few lines
+        if let Some(offset) = lines.iter().skip(idx).take(3).position(|&l| l == "avatar image") {
+            let name_idx = idx + offset + 1;
+            if name_idx < lines.len() {
+                data.name = lines[name_idx].to_string();
             }
         }
     }
+
+    // 2. TITLE & TAGS
+    // Pattern: Share -> [Stats x3] -> TITLE -> TAGS... -> Suggest Tag
+    // Note: Stats lines can be 2 or 3. 
+    // Heuristic: Scan from Share+1 until Suggest Tag.
+    if let Some(start) = idx_share {
+        if let Some(end) = idx_suggest_tag {
+            if end > start {
+                let range = &lines[(start + 1)..end];
+                // We typically have: [Num], [Percent], [Tokens], [Title], [Tag1], [Tag2]...
+                // Filter out the stats (digits, %, "tokens")
+                let candidates: Vec<&str> = range.iter().filter(|&&l| {
+                    let s = l.to_lowercase();
+                    !s.chars().all(|c| c.is_numeric() || c == ',' || c == '.') && // pure numbers
+                    !s.contains('%') &&
+                    !s.contains("tokens") &&
+                    !s.contains("chat now") &&
+                    s != "share" &&
+                    s != "favorite"
+                }).cloned().collect();
+                
+                if !candidates.is_empty() {
+                    // First candidate is Title
+                    data.title = candidates[0].to_string();
+                    
+                    // Rest are tags
+                    for tag in candidates.iter().skip(1) {
+                        data.external_tags.push(tag.to_string());
+                    }
+                }
+            }
+        }
+    }
+
+    // 3. FIRST MESSAGE
+    // Pattern: Greeting -> [Message Lines] -> (Next Header: SHOW LESS, Personality, Scenario, or end)
+    if let Some(start) = idx_greeting_header {
+        let mut end = lines.len();
+        
+        // Find nearest next section/stopper
+        let stoppers = [idx_show_less, idx_personality, idx_scenario];
+        for &stop in stoppers.iter().flatten() {
+            if stop > start && stop < end {
+                end = stop;
+            }
+        }
+        
+        for i in (start + 1)..end {
+            data.first_message.push_str(lines[i]);
+            data.first_message.push('\n');
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Strategy 2: Scan for Blocks (Personality, Scenario) & Key-Values
+    // -------------------------------------------------------------------------
     
+    let mut current_section = "";
+    
+    for line in &lines {
+        let lower = line.to_lowercase();
+        
+        // Key-Value Detection (High priority overrides)
+        if lower.starts_with("name:") && data.name.is_empty() {
+             if let Some((_, val)) = line.split_once(':') {
+                 data.name = val.trim().to_string();
+             }
+        }
+        
+        // Section Headers
+        if lower == "personality" { current_section = "personality"; continue; }
+        if lower == "scenario" { current_section = "scenario"; continue; }
+        if lower == "greeting" || lower == "first message" { current_section = "ignore"; continue; } // Handled structurally
+        if lower == "show less" { current_section = "ignore"; continue; }
+        
+        // Footer Detection (Stop parsing)
+        if lower == "spicychat" || lower.starts_with("owned & operated by") {
+            current_section = "ignore";
+            continue;
+        }
+        
+        // Append to sections
+        match current_section {
+            "personality" => {
+                // Avoid capturing other headers if they accidentally triggered
+                 if lower != "scenario" {
+                    data.personality.push_str(line);
+                    data.personality.push('\n');
+                 }
+            },
+            "scenario" => {
+                 data.scenario.push_str(line);
+                 data.scenario.push('\n');
+            },
+            _ => {}
+        }
+    }
+
+    // Cleanup
     data.personality = data.personality.trim().to_string();
     data.scenario = data.scenario.trim().to_string();
     data.first_message = data.first_message.trim().to_string();
@@ -921,5 +919,11 @@ fn render_lorebook_editor(app: &mut CrapApp, ui: &mut egui::Ui) {
                     ui.label("Select a lorebook.");
                 }
             }
+
+
+
+
+
+
 
 
