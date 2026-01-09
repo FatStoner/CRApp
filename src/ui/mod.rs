@@ -137,9 +137,7 @@ pub struct CrapApp {
     pub parsed_data: Option<ParsedCharacterData>,
 
     pub viewing_all_characters: bool,
-    
-    // Hidden internal for double-click/expand preservation if needed
-    // We rely on egui id for collapsing headers.
+    pub pending_action: Option<AppAction>,
 }
 
 impl CrapApp {
@@ -181,6 +179,7 @@ impl CrapApp {
             parsed_data: None,
 
             viewing_all_characters: false,
+            pending_action: None,
             theme: ThemeMode::System,
             ui_scale: 1.0,
         };
@@ -632,6 +631,7 @@ impl CrapApp {
             self.selected_collection_id = id;
             self.mode = AppMode::Characters;
             self.central_view = CentralView::Browser;
+            self.selected_character = None;
             self.reload_collections();
         }
     }
@@ -657,6 +657,7 @@ impl CrapApp {
                 self.selected_collection_id = id;
                 self.mode = AppMode::Characters;
                 self.central_view = CentralView::Browser;
+                self.selected_character = None;
                 self.reload_collections();
             },
             AppAction::SwitchToAll => {
@@ -894,8 +895,16 @@ impl eframe::App for CrapApp {
                         Ok(c) => {
                             self.selected_character = Some(c);
                             self.set_status("Character Saved!".to_string(), egui::Color32::GREEN);
+                            
+                            // Handle pending action if any
+                            if let Some(action) = self.pending_action.take() {
+                                self.perform_action(action, &ctx);
+                            }
                         },
-                        Err(e) => self.set_status(format!("Save Error: {}", e), egui::Color32::RED),
+                        Err(e) => {
+                            self.set_status(format!("Save Error: {}", e), egui::Color32::RED);
+                            self.pending_action = None;
+                        },
                     }
                 },
                 UiEvent::LorebookSaved(res) => {
@@ -1092,20 +1101,8 @@ impl eframe::App for CrapApp {
                     ui.horizontal(|ui| {
                         if ui.button("Save & Continue").clicked() {
                             if let Some(c) = self.selected_character.clone() {
+                                self.pending_action = Some(target.clone());
                                 self.save_character(c); 
-                                // We can't immediately perform action because save is async.
-                                // We need to defer the action until save completes?
-                                // OR: Just save (async) and let user manually continue? 
-                                // Better: Perform clean switch if save started? 
-                                // Actually, async save means we don't know when it finishes here.
-                                // Complex. Simplified: Just save. The user stays on page but sees "Saving...".
-                                // Then they can click again? No, that's annoying.
-                                // Workaround: We just trigger save, and close popup. 
-                                // If they click exit again, it might still represent old state if not fast enough?
-                                // "dirty" check will be cleared when `CharacterSaved` event returns.
-                                // So we should just trigger save and close popup. The user will see save status.
-                                // They have to click the action again after save.
-                                // OR: We implement a "pending action" queue.
                             }
                             self.popup_state = PopupState::None;
                         }
@@ -1113,13 +1110,13 @@ impl eframe::App for CrapApp {
                         if ui.button("Discard Changes").clicked() {
                             // Revert changes
                             if let Some(selected) = &self.selected_character {
-                                if selected.id != 0 {
+                                if selected.id == 0 {
+                                    self.selected_character = None;
+                                } else {
                                     if let Some(original) = self.characters.iter().find(|c| c.id == selected.id) {
                                         self.selected_character = Some(original.clone());
                                     }
                                 }
-                                // If new character (id 0), discard means what? 
-                                // If switching away, we just don't save. 
                             }
                             self.perform_action(target.clone(), ctx);
                             self.popup_state = PopupState::None;
