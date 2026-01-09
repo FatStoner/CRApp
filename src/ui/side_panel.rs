@@ -122,9 +122,17 @@ pub fn render_side_panel(app: &mut CrapApp, ctx: &egui::Context) {
                              ui.separator();
                              
                              let is_uncategorized = app.selected_collection_id.is_none() && !app.viewing_all_characters && app.selected_character.is_none();
-                             if ui.selectable_label(is_uncategorized, "📁 Uncategorized").clicked() {
-                                 actions.push(TreeAction::DeselectCollection);
-                             }
+                            let response = ui.selectable_label(is_uncategorized, "📁 Uncategorized");
+                            if response.clicked() {
+                                actions.push(TreeAction::DeselectCollection);
+                            }
+                            
+                            if let Some(_) = response.dnd_hover_payload::<i64>() {
+                                ui.painter().rect_stroke(response.rect, 2.0, egui::Stroke::new(2.0, egui::Color32::GREEN));
+                            }
+                            if let Some(dropped_id) = response.dnd_release_payload::<i64>() {
+                                actions.push(TreeAction::MoveCharacter(*dropped_id, None));
+                            }
 
                              // Root Characters & Collections
                              // We start with parent_id: None
@@ -305,6 +313,22 @@ pub fn render_tree(
                  toggle = true;
              }
              
+             // Drag and Drop Target
+             if let Some(_) = response.dnd_hover_payload::<i64>() {
+                 ui.painter().rect_stroke(response.rect, 2.0, egui::Stroke::new(2.0, egui::Color32::GREEN));
+             }
+             
+             if let Some(dropped_id) = response.dnd_release_payload::<i64>() {
+                 actions.push(TreeAction::MoveCharacter(*dropped_id, Some(col.id)));
+                 // If dropped, we might want to make sure we don't accidentally toggle if we clicked?
+                 // But dnd release usually doesn't trigger clicked.
+                 // However, we set toggle = true above if clicked.
+                 // Let's ensure toggle logic is safe. 
+                 // If dnd release happens, clicked() should be false for standard buttons, 
+                 // but selectable_label might be tricky.
+                 toggle = false; 
+             }
+             
              response.context_menu(|ui| {
                  if ui.button("Rename").clicked() {
                      actions.push(TreeAction::RenameCollection(col.id, col.name.clone()));
@@ -367,11 +391,22 @@ pub fn render_tree(
         let item_height = 48.0;
         let (rect, response) = ui.allocate_exact_size(
              egui::vec2(ui.available_width(), item_height), 
-             egui::Sense::click()
+             egui::Sense::click_and_drag()
         );
 
         if response.clicked() {
              actions.push(TreeAction::SelectChar(char.clone()));
+        }
+        
+        if response.hovered() {
+            ui.ctx().set_cursor_icon(egui::CursorIcon::Grab);
+        }
+        
+        if response.dragged() {
+            ui.ctx().set_cursor_icon(egui::CursorIcon::Grabbing);
+            response.dnd_set_drag_payload(char.id);
+            
+            // Tooltip removed to fix compilation error. Cursor icon provides feedback.
         }
         
         if is_selected {
