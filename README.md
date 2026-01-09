@@ -7,7 +7,7 @@
 
 ## Overview
 
-C.R.App moves away from web-based or Electron-heavy managers to provide a snappy, native experience. It leverages the power of a local SQLite database to handle thousands of characters instantly, with advanced search capabilities that go beyond simple filename matching.
+C.R.App leverages the power of a local SQLite database to handle thousands of characters instantly, with advanced search capabilities that go beyond simple filename matching.
 
 ## Key Features
 
