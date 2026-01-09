@@ -121,7 +121,7 @@ pub fn render_side_panel(app: &mut CrapApp, ctx: &egui::Context) {
                              
                              ui.separator();
                              
-                             let is_uncategorized = app.selected_collection_id.is_none() && !app.viewing_all_characters && app.selected_character.is_none();
+                             let is_uncategorized = app.selected_collection_id.is_none() && !app.viewing_all_characters;
                             let response = ui.selectable_label(is_uncategorized, "📁 Uncategorized");
                             if response.clicked() {
                                 actions.push(TreeAction::DeselectCollection);
@@ -309,12 +309,25 @@ pub fn render_tree(
         };
         
         let is_selected = Some(col.id) == selected_coll_id;
-        let id_str = ui.make_persistent_id(col.id);
         
+        // Auto-expand if this collection is an ancestor of the selected one
+        let mut is_ancestor = false;
+        if let Some(sid) = selected_coll_id {
+            let mut curr = sid;
+            while let Some(parent) = collections.iter().find(|c| c.id == curr).and_then(|c| c.parent_id) {
+                if parent == col.id {
+                    is_ancestor = true;
+                    break;
+                }
+                curr = parent;
+            }
+        }
+
+        let id_str = ui.make_persistent_id(col.id);
         let mut state = egui::collapsing_header::CollapsingState::load_with_default_open(ui.ctx(), id_str, false);
         let was_open = state.is_open();
         
-        if is_search_active && has_visible_descendants {
+        if (is_search_active && has_visible_descendants) || is_ancestor {
              state.set_open(true);
         }
 
