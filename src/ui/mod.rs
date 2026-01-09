@@ -1217,19 +1217,23 @@ impl eframe::App for CrapApp {
         }
 
         // Watermark: The Library of Snailexandria
-        egui::Area::new("watermark_area".into())
-            .anchor(egui::Align2::RIGHT_BOTTOM, egui::vec2(-10.0, -5.0))
-            .order(egui::Order::Foreground)
-            .interactable(false)
-            .show(ctx, |ui| {
-                ui.style_mut().interaction.selectable_labels = false;
-                ui.label(
-                    egui::RichText::new("The Library of Snailexandria")
-                        .size(11.0)
-                        .color(egui::Color32::from_white_alpha(100))
-                        .italics()
-                );
-            });
+        if ctx.screen_rect().width() > 300.0 {
+            egui::Area::new("watermark_area".into())
+                .anchor(egui::Align2::RIGHT_BOTTOM, egui::vec2(-10.0, -5.0))
+                .order(egui::Order::Foreground)
+                .interactable(false)
+                .show(ctx, |ui| {
+                    ui.style_mut().interaction.selectable_labels = false;
+                    ui.horizontal(|ui| {
+                        ui.label(
+                            egui::RichText::new("The Library of Snailexandria")
+                                .size(11.0)
+                                .color(egui::Color32::from_white_alpha(100))
+                                .italics()
+                        );
+                    });
+                });
+        }
     }
 }
 
