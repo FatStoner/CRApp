@@ -311,6 +311,8 @@ enum BrowserAction {
     DeleteCharacter(i64),
     RenameCollection(i64, String),
     DeleteCollection(i64),
+    CreateCharacter(Option<i64>),
+    CreateCollection(Option<i64>),
 }
 
 fn render_collection_move_menu(
@@ -403,7 +405,7 @@ fn render_browser_view(app: &mut CrapApp, ui: &mut egui::Ui) {
     if chars.is_empty() && subfolders.is_empty() {
         ui.vertical_centered(|ui| {
             ui.add_space(50.0);
-            ui.label(egui::RichText::new("No characters or subfolders in this collection").size(18.0).color(egui::Color32::GRAY));
+            let response = ui.label(egui::RichText::new("No characters or subfolders in this collection").size(18.0).color(egui::Color32::GRAY));
             ui.add_space(10.0);
             if ui.button(egui::RichText::new("➕ Add New Character here").size(16.0)).clicked() {
                  app.selected_character = Some(crate::models::Character::default());
@@ -411,7 +413,37 @@ fn render_browser_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                  app.mode = AppMode::Characters;
                  app.central_view = crate::ui::CentralView::Editor;
             }
+            
+            // Add context menu to the whole empty area
+            let (rect, resp) = ui.allocate_at_least(ui.available_size(), egui::Sense::click());
+            resp.context_menu(|ui| {
+                if ui.button("➕ New Character").clicked() {
+                    actions.push(BrowserAction::CreateCharacter(collection_id));
+                    ui.close_menu();
+                }
+                if ui.button("📁 New Folder").clicked() {
+                    actions.push(BrowserAction::CreateCollection(collection_id));
+                    ui.close_menu();
+                }
+            });
         });
+        
+        // Process actions if any (though empty state might not trigger many)
+        for action in actions {
+            match action {
+                BrowserAction::CreateCharacter(cid) => {
+                    app.selected_character = Some(crate::models::Character::default());
+                    app.selected_character.as_mut().unwrap().collection_id = cid;
+                    app.mode = AppMode::Characters;
+                    app.central_view = crate::ui::CentralView::Editor;
+                },
+                BrowserAction::CreateCollection(cid) => {
+                    app.save_collection(0, "New Folder".to_string(), cid);
+                }
+                _ => {}
+            }
+        }
+        
         return;
     }
 
@@ -611,6 +643,20 @@ fn render_browser_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                 }
             }
         });
+        
+        // Context menu for empty space
+        let available = ui.available_size();
+        let (_rect, response) = ui.allocate_at_least(available, egui::Sense::click());
+        response.context_menu(|ui| {
+            if ui.button("➕ New Character").clicked() {
+                actions.push(BrowserAction::CreateCharacter(collection_id));
+                ui.close_menu();
+            }
+            if ui.button("📁 New Folder").clicked() {
+                actions.push(BrowserAction::CreateCollection(collection_id));
+                ui.close_menu();
+            }
+        });
     });
     
     // Handle Actions
@@ -626,7 +672,7 @@ fn render_browser_view(app: &mut CrapApp, ui: &mut egui::Ui) {
             BrowserAction::RenameCollection(id, name) => {
                 app.popup_state = crate::ui::PopupState::Renaming { id, name };
             },
-            BrowserAction::DeleteCollection(id) => {
+             BrowserAction::DeleteCollection(id) => {
                 // Calculate count for warning
                  let count = app.collections.iter().filter(|c| c.parent_id == Some(id)).count() + 
                              app.characters.iter().filter(|c| c.collection_id == Some(id)).count();
@@ -636,9 +682,17 @@ fn render_browser_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                  } else {
                      app.delete_collection(id);
                  }
-            }
-        }
-    }
+             },
+             BrowserAction::CreateCharacter(cid) => {
+                 app.selected_character = Some(crate::models::Character::default());
+                 app.selected_character.as_mut().unwrap().collection_id = cid;
+                 app.central_view = crate::ui::CentralView::Editor;
+             },
+             BrowserAction::CreateCollection(cid) => {
+                 app.save_collection(0, "New Folder".to_string(), cid);
+             }
+         }
+     }
 }
 
 fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {

@@ -158,10 +158,9 @@ pub fn render_side_panel(app: &mut CrapApp, ctx: &egui::Context) {
                                  egui::Sense::click()
                              );
                              
-                             // Allow deselecting by clicking empty space
-                             if response.clicked() {
-                                 actions.push(TreeAction::DeselectCollection);
-                             }
+                             // Context menu handled below
+                             // response.clicked() logic removed per user request to avoid accidental deselection
+                             // actions.push(TreeAction::DeselectCollection);
                              
                              response.context_menu(|ui| {
                                  if ui.button("➕ New Character").clicked() {
