@@ -140,10 +140,10 @@ pub fn render_side_panel(app: &mut CrapApp, ctx: &egui::Context) {
                              }
                         },
                         TreeAction::CreateSubfolder(parent_id) => {
-                             app.save_collection("New Folder".to_string(), Some(parent_id));
+                             app.save_collection(0, "New Folder".to_string(), Some(parent_id));
                         },
                         TreeAction::CreateRootFolder => {
-                             app.save_collection("New Folder".to_string(), None);
+                             app.save_collection(0, "New Folder".to_string(), None);
                         },
                         TreeAction::SwitchToAll => {
                             app.request_view_all();
@@ -169,7 +169,7 @@ pub fn render_side_panel(app: &mut CrapApp, ctx: &egui::Context) {
                      });
                      if app.mode == AppMode::Characters {
                           if ui.button("📁 New Root Folder").clicked() {
-                               app.save_collection("New Folder".to_string(), None);
+                               app.save_collection(0, "New Folder".to_string(), None);
                           }
                      }
                  });

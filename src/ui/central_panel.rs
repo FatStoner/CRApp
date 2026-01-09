@@ -331,6 +331,18 @@ fn render_browser_view(app: &mut CrapApp, ui: &mut egui::Ui) {
              }
         }
         ui.heading(format!("Browsing: {}", collection_name));
+
+        // Rename Button (Far Right)
+        if !viewing_all {
+            if let Some(id) = collection_id {
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if ui.button("✏ Rename").clicked() {
+                        let current_name = app.collections.iter().find(|c| c.id == id).map(|c| c.name.clone()).unwrap_or_default();
+                        app.popup_state = crate::ui::PopupState::Renaming { id, name: current_name };
+                    }
+                });
+            }
+        }
     });
     ui.add_space(10.0);
     

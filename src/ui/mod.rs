@@ -325,11 +325,11 @@ impl CrapApp {
         });
     }
 
-    pub fn save_collection(&mut self, name: String, parent_id: Option<i64>) {
+    pub fn save_collection(&mut self, id: i64, name: String, parent_id: Option<i64>) {
         self.is_saving = true;
         let tx = self.tx.clone();
         let db = self.db.clone();
-        let col = crate::models::Collection { id: 0, name, parent_id };
+        let col = crate::models::Collection { id, name, parent_id };
         tokio::spawn(async move {
             let result = db.upsert_collection(&col).await.map_err(|e| e.to_string());
              let _ = tx.send(UiEvent::CollectionSaved(result)).await;
@@ -802,6 +802,39 @@ impl eframe::App for CrapApp {
                         }
                     });
                 });
+        }
+
+        let mut rename_request = None;
+        if let PopupState::Renaming { id, name } = &mut self.popup_state {
+            let coll_id = *id;
+            let mut close = false;
+            egui::Window::new("Rename Folder")
+                .collapsible(false)
+                .resizable(false)
+                .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
+                .show(ctx, |ui| {
+                    ui.label("Enter new folder name:");
+                    ui.text_edit_singleline(name);
+                    ui.add_space(10.0);
+                    
+                    ui.horizontal(|ui| {
+                        if ui.button("Save").clicked() {
+                            rename_request = Some((coll_id, name.clone()));
+                            close = true;
+                        }
+                        if ui.button("Cancel").clicked() {
+                            close = true;
+                        }
+                    });
+                });
+            if close {
+                self.popup_state = PopupState::None;
+            }
+        }
+
+        if let Some((id, new_name)) = rename_request {
+            let parent_id = self.collections.iter().find(|c| c.id == id).and_then(|c| c.parent_id);
+            self.save_collection(id, new_name, parent_id);
         }
     }
 }
