@@ -148,6 +148,31 @@ pub fn render_side_panel(app: &mut CrapApp, ctx: &egui::Context) {
                                  app.sort_direction,
                                  &app.search_query
                              );
+
+                             // Fill empty space for context menu
+                             let available = ui.available_height();
+                             let height = if available.is_finite() && available > 0.0 { available } else { 150.0 };
+                             
+                             let (rect, response) = ui.allocate_exact_size(
+                                 egui::vec2(ui.available_width(), height.max(50.0)),
+                                 egui::Sense::click()
+                             );
+                             
+                             // Allow deselecting by clicking empty space
+                             if response.clicked() {
+                                 actions.push(TreeAction::DeselectCollection);
+                             }
+                             
+                             response.context_menu(|ui| {
+                                 if ui.button("➕ New Character").clicked() {
+                                     actions.push(TreeAction::CreateNewCharacter(None));
+                                     ui.close_menu();
+                                 }
+                                 if ui.button("📁 New Folder").clicked() {
+                                     actions.push(TreeAction::CreateRootFolder);
+                                     ui.close_menu();
+                                 }
+                             });
                          },
                          AppMode::Lorebooks => {
                              // Simple list for Lorebooks for now (no implementation in original for tree)
@@ -216,6 +241,13 @@ pub fn render_side_panel(app: &mut CrapApp, ctx: &egui::Context) {
                         },
                         TreeAction::SwitchToAll => {
                             app.request_view_all();
+                        },
+                        TreeAction::CreateNewCharacter(target_coll_id) => {
+                            app.selected_character = Some(Character::default());
+                            let start_col = target_coll_id.or(app.selected_collection_id);
+                            app.selected_character.as_mut().unwrap().collection_id = start_col;
+                            app.mode = AppMode::Characters;
+                            app.central_view = crate::ui::CentralView::Editor;
                         }
                     }
                 }
@@ -257,6 +289,7 @@ pub enum TreeAction {
     SwitchToAll,
     MoveCharacter(i64, Option<i64>),
     RequestDeleteCharacter(i64),
+    CreateNewCharacter(Option<i64>),
 }
 
 // Move render_tree here
@@ -338,6 +371,10 @@ pub fn render_tree(
                      actions.push(TreeAction::CreateSubfolder(col.id));
                      ui.close_menu();
                  }
+                 if ui.button("➕ New Character").clicked() {
+                     actions.push(TreeAction::CreateNewCharacter(Some(col.id)));
+                     ui.close_menu();
+                 }
                  ui.separator();
                  if ui.button("Delete").clicked() {
                      actions.push(TreeAction::RequestDeleteCollection(col.id));
@@ -398,9 +435,10 @@ pub fn render_tree(
              actions.push(TreeAction::SelectChar(char.clone()));
         }
         
-        if response.hovered() {
-            ui.ctx().set_cursor_icon(egui::CursorIcon::Grab);
-        }
+        // Cursor change on hover removed per user request.
+        // if response.hovered() {
+        //    ui.ctx().set_cursor_icon(egui::CursorIcon::Grab);
+        // }
         
         if response.dragged() {
             ui.ctx().set_cursor_icon(egui::CursorIcon::Grabbing);
