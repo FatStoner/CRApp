@@ -303,7 +303,6 @@ pub fn render_central_panel(app: &mut CrapApp, ctx: &egui::Context) {
             }
         }
     });
-
 }
 
 enum BrowserAction {
@@ -581,7 +580,14 @@ fn render_browser_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                 let tag_font = egui::FontId::proportional(10.0);
                 let mut tag_x = content_rect.min.x;
                 
-                for tag in char.app_tags.iter().take(3) {
+                let mut tags_to_show: Vec<&Tag> = char.app_tags.iter().collect();
+                let mut is_external = false;
+                if tags_to_show.is_empty() {
+                    tags_to_show = char.external_tags.iter().collect();
+                    is_external = true;
+                }
+
+                for tag in tags_to_show.iter().take(3) {
                     let tag_galley = ui.painter().layout_no_wrap(tag.name.clone(), tag_font.clone(), egui::Color32::WHITE);
                     let pad = 4.0;
                     let chip_w = tag_galley.rect.width() + pad * 2.0;
@@ -589,7 +595,15 @@ fn render_browser_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                     if tag_x + chip_w > content_rect.max.x { break; }
                     
                     let chip_rect = egui::Rect::from_min_size(egui::pos2(tag_x, cursor_y), egui::vec2(chip_w, 16.0));
-                    ui.painter().rect_filled(chip_rect, 8.0, egui::Color32::from_rgb(50, 80, 150));
+                    
+                    // Different color for external tags (Grayish vs Blueish)
+                    let bg_color = if is_external {
+                        egui::Color32::from_rgb(100, 100, 100)
+                    } else {
+                        egui::Color32::from_rgb(50, 80, 150)
+                    };
+                    
+                    ui.painter().rect_filled(chip_rect, 8.0, bg_color);
                     ui.painter().galley(egui::pos2(tag_x + pad, cursor_y + 2.0), tag_galley, egui::Color32::WHITE);
                     
                     tag_x += chip_w + 4.0;
@@ -631,9 +645,9 @@ fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
 
                 let mut save_req = None;
                 let mut toggle_requests = Vec::new();
-                let mut status_update = None;  
+                let mut status_update = None;
+                let mut back_req = None;
 
-                
                 // Check Dirty State
                 let is_dirty = if let Some(selected) = &app.selected_character {
                     if selected.id == 0 {
@@ -663,6 +677,9 @@ fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                      let _db_clone = app.db.clone();
                      
                      ui.horizontal(|ui| {
+                        if ui.button("⬅ Back").clicked() {
+                            back_req = Some(character.collection_id);
+                        }
                         ui.heading("Edit Character");
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                             ui.menu_button("EXPORT", |ui| {
@@ -1086,9 +1103,13 @@ fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                 }
                 
                 if let Some(c) = save_req {
-                    app.save_character(c);
-                }
+        app.save_character(c);
     }
+    
+    if let Some(target) = back_req {
+        app.request_collection_switch(target);
+    }
+}
 
 
 fn render_lorebook_editor(app: &mut CrapApp, ui: &mut egui::Ui) {

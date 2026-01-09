@@ -239,9 +239,42 @@ impl CrapApp {
         let db = self.db.clone();
         let ctx = self.ctx.clone();
         tokio::spawn(async move {
-            let result = db.get_all_characters().await.map_err(|e| e.to_string());
-            let _ = tx.send(UiEvent::CharactersLoaded(result)).await;
-            ctx.request_repaint();
+            match db.get_all_characters().await {
+                Ok(mut chars) => {
+                    // Load Tags (Bulk) - Same logic as refresh_all to ensure tags persist
+                    let app_tags_res = db.get_all_tags_flat(false).await;
+                    let ext_tags_res = db.get_all_tags_flat(true).await;
+                    
+                    if let (Ok(app_flat), Ok(ext_flat)) = (app_tags_res, ext_tags_res) {
+                         let mut app_map: HashMap<i64, Vec<Tag>> = HashMap::new();
+                         for (cid, tag) in app_flat {
+                             app_map.entry(cid).or_default().push(tag);
+                         }
+                         
+                         let mut ext_map: HashMap<i64, Vec<Tag>> = HashMap::new();
+                         for (cid, tag) in ext_flat {
+                             ext_map.entry(cid).or_default().push(tag);
+                         }
+                         
+                         // Merge into characters
+                         for c in &mut chars {
+                             if let Some(tags) = app_map.remove(&c.id) {
+                                 c.app_tags = tags;
+                             }
+                             if let Some(tags) = ext_map.remove(&c.id) {
+                                 c.external_tags = tags;
+                             }
+                         }
+                    }
+                    
+                    let _ = tx.send(UiEvent::CharactersLoaded(Ok(chars))).await;
+                    ctx.request_repaint();
+                },
+                Err(e) => { 
+                    let _ = tx.send(UiEvent::CharactersLoaded(Err(e.to_string()))).await;
+                    ctx.request_repaint();
+                }
+            }
         });
     }
 
@@ -365,8 +398,34 @@ impl CrapApp {
 
                 let _ = tx.send(UiEvent::CharacterSaved(Ok(character))).await;
                 ctx.request_repaint();
-                let list = db.get_all_characters().await.map_err(|e| e.to_string());
-                let _ = tx.send(UiEvent::CharactersLoaded(list)).await;
+                let mut chars = db.get_all_characters().await.map_err(|e| e.to_string());
+                if let Ok(ref mut characters) = chars {
+                    let app_tags_res = db.get_all_tags_flat(false).await;
+                    let ext_tags_res = db.get_all_tags_flat(true).await;
+                    
+                    if let (Ok(app_flat), Ok(ext_flat)) = (app_tags_res, ext_tags_res) {
+                         let mut app_map: HashMap<i64, Vec<Tag>> = HashMap::new();
+                         for (cid, tag) in app_flat {
+                             app_map.entry(cid).or_default().push(tag);
+                         }
+                         
+                         let mut ext_map: HashMap<i64, Vec<Tag>> = HashMap::new();
+                         for (cid, tag) in ext_flat {
+                             ext_map.entry(cid).or_default().push(tag);
+                         }
+                         
+                         for c in characters {
+                             if let Some(tags) = app_map.remove(&c.id) {
+                                 c.app_tags = tags;
+                             }
+                             if let Some(tags) = ext_map.remove(&c.id) {
+                                 c.external_tags = tags;
+                             }
+                         }
+                    }
+                }
+
+                let _ = tx.send(UiEvent::CharactersLoaded(chars)).await;
                 ctx.request_repaint();
             }
         });
