@@ -321,6 +321,17 @@ impl CrapApp {
     pub fn save_character(&mut self, mut character: Character) {
         self.is_saving = true;
         self.status_message = None;
+        
+        // Check for avatar change to cleanup old file
+        let mut old_avatar_to_delete = None;
+        if character.id != 0 {
+             if let Some(old) = self.characters.iter().find(|c| c.id == character.id) {
+                 if old.avatar_path != character.avatar_path {
+                     old_avatar_to_delete = old.avatar_path.clone();
+                 }
+             }
+        }
+
         let tx = self.tx.clone();
         let db = self.db.clone();
         let ctx = self.ctx.clone();
@@ -336,6 +347,11 @@ impl CrapApp {
                     }
                     for tag in &character.app_tags {
                         let _ = db.add_tag_to_character(character.id, &tag.name, false).await;
+                    }
+                } else {
+                    // Cleanup old avatar if changed
+                    if let Some(path) = old_avatar_to_delete {
+                        cleanup_avatar(&path);
                     }
                 }
 
@@ -369,11 +385,21 @@ impl CrapApp {
     }
 
     pub fn delete_character(&self, id: i64) {
+        // Capture avatar path for cleanup
+        let avatar_to_delete = self.characters.iter().find(|c| c.id == id).and_then(|c| c.avatar_path.clone());
+
         let tx = self.tx.clone();
         let db = self.db.clone();
         let ctx = self.ctx.clone();
         tokio::spawn(async move {
              let res = db.delete_character(id).await;
+             
+             if res.is_ok() {
+                  if let Some(path) = avatar_to_delete {
+                      cleanup_avatar(&path);
+                  }
+             }
+
              let _ = tx.send(UiEvent::CharacterDeleted(res.map(|_| id).map_err(|e| e.to_string()))).await;
              ctx.request_repaint();
         });
@@ -1010,6 +1036,21 @@ impl eframe::App for CrapApp {
         if let Some((id, new_name)) = rename_request {
             let parent_id = self.collections.iter().find(|c| c.id == id).and_then(|c| c.parent_id);
             self.save_collection(id, new_name, parent_id);
+        }
+    }
+}
+
+fn cleanup_avatar(path_str: &str) {
+    let path = std::path::Path::new(path_str);
+    // Security check: Only delete if inside "data/avatars"
+    // Normalize logic loosely by checking components or starts_with
+    if path_str.replace("\\", "/").contains("data/avatars/") {
+        if path.exists() {
+            if let Err(e) = std::fs::remove_file(path) {
+                eprintln!("Failed to delete old avatar {}: {}", path_str, e);
+            } else {
+                println!("Deleted old avatar: {}", path_str);
+            }
         }
     }
 }

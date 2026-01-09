@@ -4,3 +4,10 @@
 *.db-wal
 *.exe
 data/
+Docs/
+*.crapp
+*.json
+*.png
+.agent/
+deploy.sh
+exports/
