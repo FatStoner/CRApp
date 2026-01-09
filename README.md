@@ -26,7 +26,12 @@ The latest version for Windows is available on the [Releases Page](https://githu
 1.  Go to the **Releases** page.
 2.  Expand the **Assets** section of the latest release.
 3.  Download `crap.exe`.
-4.  Run it! (No installation required, portable executable).
+4.  **Create a new folder** (e.g., `C.R.App`) and move `crap.exe` into it.
+5.  Run it!
+
+> [!TIP]
+> **Why a separate folder?**
+> The application creates a local database file (`crap.exe`) and other data files in the same directory where it's run. Keeping it in its own folder ensures your desktop or downloads folder stays clean!
 
 ## Building from Source
 
