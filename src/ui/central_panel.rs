@@ -303,11 +303,47 @@ pub fn render_central_panel(app: &mut CrapApp, ctx: &egui::Context) {
             }
         }
     });
+
+}
+
+enum BrowserAction {
+    MoveCharacter(i64, Option<i64>),
+    DeleteCharacter(i64),
+    RenameCollection(i64, String),
+    DeleteCollection(i64),
+}
+
+fn render_collection_move_menu(
+    ui: &mut egui::Ui,
+    collections: &Vec<crate::models::Collection>,
+    parent_id: Option<i64>,
+    target_char_id: i64,
+    actions: &mut Vec<BrowserAction>,
+) {
+    let current_level: Vec<&crate::models::Collection> = collections
+        .iter()
+        .filter(|c| c.parent_id == parent_id)
+        .collect();
+
+    for col in current_level {
+        ui.menu_button(&col.name, |ui| {
+            if ui.button("Move Here").clicked() {
+                actions.push(BrowserAction::MoveCharacter(target_char_id, Some(col.id)));
+                ui.close_menu();
+            }
+            render_collection_move_menu(ui, collections, Some(col.id), target_char_id, actions);
+        });
+    }
 }
 
 fn render_browser_view(app: &mut CrapApp, ui: &mut egui::Ui) {
     let viewing_all = app.viewing_all_characters;
     let collection_id = app.selected_collection_id;
+    let mut actions = Vec::new();
+
+    // Clone collections for context menu usage
+    let all_collections = app.collections.clone();
+
     
     let collection_name = if viewing_all {
         "All Characters (Flat View)".to_string()
@@ -405,6 +441,17 @@ fn render_browser_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                     app.selected_collection_id = Some(folder.id);
                 }
                 
+                response.context_menu(|ui| {
+                    if ui.button("✏ Rename").clicked() {
+                        actions.push(BrowserAction::RenameCollection(folder.id, folder.name.clone()));
+                        ui.close_menu();
+                    }
+                    if ui.button("🗑 Delete").clicked() {
+                        actions.push(BrowserAction::DeleteCollection(folder.id));
+                        ui.close_menu();
+                    }
+                });
+                
                 // Content
                 let content_rect = rect.shrink(8.0);
                 
@@ -456,6 +503,22 @@ fn render_browser_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                     app.load_tags(char.id);
                     app.load_links(char.id);
                 }
+                
+                response.context_menu(|ui| {
+                     ui.menu_button("Move to...", |ui| {
+                         if ui.button("Root (Uncategorized)").clicked() {
+                             actions.push(BrowserAction::MoveCharacter(char.id, None));
+                             ui.close_menu();
+                         }
+                         ui.separator();
+                         render_collection_move_menu(ui, &all_collections, None, char.id, &mut actions);
+                     });
+                     
+                     if ui.button("🗑 Delete").clicked() {
+                         actions.push(BrowserAction::DeleteCharacter(char.id));
+                         ui.close_menu();
+                     }
+                });
                 
                 // Content
                 let content_rect = rect.shrink(8.0);
@@ -534,6 +597,33 @@ fn render_browser_view(app: &mut CrapApp, ui: &mut egui::Ui) {
             }
         });
     });
+    
+    // Handle Actions
+    for action in actions {
+        match action {
+            BrowserAction::MoveCharacter(char_id, target_id) => {
+                app.move_character(char_id, target_id);
+            },
+            BrowserAction::DeleteCharacter(id) => {
+                let name = app.characters.iter().find(|c| c.id == id).map(|c| c.name.clone()).unwrap_or_default();
+                app.popup_state = crate::ui::PopupState::DeleteCharacterConfirmation { id, name };
+            },
+            BrowserAction::RenameCollection(id, name) => {
+                app.popup_state = crate::ui::PopupState::Renaming { id, name };
+            },
+            BrowserAction::DeleteCollection(id) => {
+                // Calculate count for warning
+                 let count = app.collections.iter().filter(|c| c.parent_id == Some(id)).count() + 
+                             app.characters.iter().filter(|c| c.collection_id == Some(id)).count();
+                 
+                 if count > 0 {
+                     app.popup_state = crate::ui::PopupState::DeleteWarning { id, count };
+                 } else {
+                     app.delete_collection(id);
+                 }
+            }
+        }
+    }
 }
 
 fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
