@@ -702,11 +702,11 @@ fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                                     ui.close_menu();
                                 }
                                 
-                                if ui.button("Platform V2 (.json)").clicked() {
+                                if ui.button("Character Card - spicychat.ai (.json)").clicked() {
                                     let v2 = CharacterCardV2::new(
                                         character.char_name.clone(),
-                                        character.char_title.clone(),
                                         character.personality.clone(),
+                                        character.char_title.clone(),
                                         character.scenario.clone(),
                                         character.first_message.clone(),
                                         character.example_dialogue.clone(),
@@ -749,8 +749,8 @@ fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                                         // Logic to export PNG
                                         let v2 = CharacterCardV2::new(
                                             character.char_name.clone(),
-                                            character.char_title.clone(),
                                             character.personality.clone(),
+                                            character.char_title.clone(),
                                             character.scenario.clone(),
                                             character.first_message.clone(),
                                             character.example_dialogue.clone(),
