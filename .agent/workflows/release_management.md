@@ -10,62 +10,45 @@ This document serves as a guide for AI agents interacting with the `CRApp` repos
 
 -   **Main Branch**: `main`
     -   Address of truth. All stable code resides here.
-    -   Direct commits are allowed for small fixes/features suitable for a single session.
-    -   For complex features, create short-lived feature branches, then merge to `main`.
+    -   Feature branches are merged into `main`.
 
-## 2. Release Process
+## 2. Release Process (Local Automation)
 
-Releases are automated via GitHub Actions using the `.github/workflows/release.yml` workflow.
+Releases are now managed **locally** via the `deploy.sh` script, which uses the GitHub CLI (`gh`). GitHub Actions have been disabled.
 
 ### Triggering a Release
 
-To publish a new release:
+To publish a new stable version (updates the `latest` tag):
 
-1.  **Ensure `main` is stable** and all changes are committed.
-2.  **Create a semantic version tag** (e.g., `v0.1.0`, `v1.2.3`).
-3.  **Push the tag** to the remote repository.
+1.  **Ensure you are authenticated**: Run `gh auth status`. If not, run `gh auth login`.
+2.  **Run the deployment script**:
 
 ```bash
-# Verify status
-git status
-
-# Create tag
-git tag v0.1.0
-
-# Push tag to trigger CI/CD
-git push origin v0.1.0
+./deploy.sh
 ```
 
-### What Happens Next (CI/CD)
--   The GitHub Action `Build & Release (Windows)` is triggered.
--   It spins up a `windows-latest` runner.
--   Compiles the project using `cargo build --release --target x86_64-pc-windows-msvc`.
--   Creates a **Draft Release** on GitHub.
--   Attaches the compiled `crap.exe` as an asset.
+### What `deploy.sh` Does
+1.  **Builds** the project for Windows (`x86_64-pc-windows-gnu`).
+2.  **Commits & Pushes** all current changes to `main`.
+3.  **Deletes** the existing `latest` release on GitHub.
+4.  **Creates** a new `latest` release and uploads `crap.exe`.
 
-## 3. Local Development & Building
+## 3. Local Development
 
-The project is configured for **cross-compilation from Linux to Windows** using MinGW.
-
-### Build Command (Windows Target)
+### Build Command
 To build the `.exe` locally on Linux:
 
 ```bash
 cargo build --release --target x86_64-pc-windows-gnu
 ```
 
--   **Output**: `target/x86_64-pc-windows-gnu/release/crap.exe`
--   **Note**: This uses the `gnu` toolchain (MinGW), whereas the GitHub Action uses `msvc`. They are compatible for end-users, but `gnu` is easier to set up on Linux.
-
-### standard Git Workflow
-1.  `git pull origin main` - Get latest changes.
-2.  Make changes.
-3.  `cargo check` / `cargo build` - Verify.
-4.  `git add .`
-5.  `git commit -m "feat: description"`
-6.  `git push origin main`
+### Git Workflow
+Since `deploy.sh` handles committing and pushing, you can simply work and then run `./deploy.sh` to save and publish. For intermediate saves:
+1.  `git add .`
+2.  `git commit -m "feat: description"`
+3.  `./deploy.sh` (when ready to release)
 
 ## 4. Documentation
 
--   **README.md**: User-facing documentation. Update this when features change significantly.
--   **LICENSE**: MIT License.
+-   **README.md**: User-facing documentation.
+-   **deploy.sh**: The source of truth for the release process.
