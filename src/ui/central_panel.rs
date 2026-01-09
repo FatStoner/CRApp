@@ -1,6 +1,6 @@
 use eframe::egui;
 use crate::models::{Tag, count_tokens};
-use crate::ui::{CrapApp, AppMode, CharacterTab, UiEvent};
+use crate::ui::{CrapApp, AppMode, CharacterTab, UiEvent, SortMode, SortDirection};
 use crate::card_v2::CharacterCardV2;
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 
@@ -370,22 +370,57 @@ fn render_browser_view(app: &mut CrapApp, ui: &mut egui::Ui) {
         }
         ui.heading(format!("Browsing: {}", collection_name));
 
-        // Rename Button (Far Right)
-        if !viewing_all {
-            if let Some(id) = collection_id {
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    if ui.button("✏ Rename").clicked() {
+        // Browser Controls (Far Right)
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            // 2. Sorting Controls (Far Right)
+            let sort_btn = |ui: &mut egui::Ui, app: &mut CrapApp, mode: SortMode, label: &str| {
+                let is_selected = app.browser_sort_mode == mode;
+                let mut display_label = label.to_string();
+                if is_selected {
+                    match app.browser_sort_direction {
+                        SortDirection::Ascending => display_label.push_str(" v"),
+                        SortDirection::Descending => display_label.push_str(" ^"),
+                    }
+                }
+                
+                if ui.selectable_label(is_selected, display_label).clicked() {
+                    if is_selected {
+                        app.browser_sort_direction = match app.browser_sort_direction {
+                            SortDirection::Ascending => SortDirection::Descending,
+                            SortDirection::Descending => SortDirection::Ascending,
+                        };
+                    } else {
+                        app.browser_sort_mode = mode;
+                        app.browser_sort_direction = SortDirection::Ascending;
+                    }
+                }
+            };
+
+            sort_btn(ui, app, SortMode::RecentlyUpdated, "Upd");
+            sort_btn(ui, app, SortMode::NewestFirst, "New");
+            sort_btn(ui, app, SortMode::Alphabetical, "A-Z");
+            
+            ui.label("Sort:");
+
+            ui.add_space(8.0);
+            ui.separator();
+            ui.add_space(8.0);
+
+            // 1. Rename Button (To the left of Sorting)
+            if !viewing_all {
+                if let Some(id) = collection_id {
+                    if ui.button("✏ Rename Folder").clicked() {
                         let current_name = app.collections.iter().find(|c| c.id == id).map(|c| c.name.clone()).unwrap_or_default();
                         app.popup_state = crate::ui::PopupState::Renaming { id, name: current_name };
                     }
-                });
+                }
             }
-        }
+        });
     });
     ui.add_space(10.0);
     
-    let subfolders: Vec<crate::models::Collection> = if viewing_all {
-        Vec::new() // "All" view is flat, no folders shown typically? Or maybe we just show all chars.
+    let mut subfolders: Vec<crate::models::Collection> = if viewing_all {
+        Vec::new() 
     } else {
         app.collections.iter()
             .filter(|c| c.parent_id == collection_id)
@@ -393,7 +428,16 @@ fn render_browser_view(app: &mut CrapApp, ui: &mut egui::Ui) {
             .collect()
     };
 
-    let chars: Vec<crate::models::Character> = if viewing_all {
+    // Sort subfolders
+    match app.browser_sort_mode {
+        SortMode::Alphabetical => subfolders.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase())),
+        SortMode::NewestFirst | SortMode::RecentlyUpdated => subfolders.sort_by(|a, b| b.id.cmp(&a.id)), // Fallback for folders
+    }
+    if app.browser_sort_direction == SortDirection::Descending {
+        subfolders.reverse();
+    }
+
+    let mut chars: Vec<crate::models::Character> = if viewing_all {
         app.characters.clone()
     } else {
         app.characters.iter()
@@ -401,6 +445,16 @@ fn render_browser_view(app: &mut CrapApp, ui: &mut egui::Ui) {
             .cloned()
             .collect()
     };
+
+    // Sort characters
+    match app.browser_sort_mode {
+        SortMode::Alphabetical => chars.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase())),
+        SortMode::NewestFirst => chars.sort_by(|a, b| b.created_at.cmp(&a.created_at)),
+        SortMode::RecentlyUpdated => chars.sort_by(|a, b| b.updated_at.cmp(&a.updated_at)),
+    }
+    if app.browser_sort_direction == SortDirection::Descending {
+        chars.reverse();
+    }
 
     if chars.is_empty() && subfolders.is_empty() {
         ui.vertical_centered(|ui| {
