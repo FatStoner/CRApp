@@ -32,6 +32,22 @@ pub fn render_side_panel(app: &mut CrapApp, ctx: &egui::Context) {
                     };
                     app.set_theme(new_theme);
                 }
+                
+                ui.separator();
+                
+                ui.label("Scale:");
+                let current_scale = (app.ui_scale * 100.0).round() as i32;
+                let mut selected = current_scale;
+                
+                egui::ComboBox::from_id_source("scale_combo")
+                    .selected_text(format!("{}%", current_scale))
+                    .show_ui(ui, |ui| {
+                        for p in (80..=150).step_by(10) {
+                            if ui.selectable_value(&mut selected, p, format!("{}%", p)).clicked() {
+                                app.set_scale(selected as f32 / 100.0);
+                            }
+                        }
+                    });
             });
 
             if let Some(err) = &app.loading_error {

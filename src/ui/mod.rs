@@ -87,6 +87,7 @@ pub enum UiEvent {
 
     ImportFileLoaded(Result<String, String>),
     ThemeLoaded(Result<ThemeMode, String>),
+    ScaleLoaded(Result<f32, String>),
 }
 
 
@@ -112,6 +113,7 @@ pub struct CrapApp {
     pub sort_direction: SortDirection,
     pub selected_collection_id: Option<i64>,
     pub theme: ThemeMode,
+    pub ui_scale: f32,
     
     pub popup_state: PopupState,
     pub is_saving: bool,
@@ -180,7 +182,25 @@ impl CrapApp {
 
             viewing_all_characters: false,
             theme: ThemeMode::System,
+            ui_scale: 1.0,
         };
+        
+        // Initial Scale Load
+        let tx = app.tx.clone();
+        let db = app.db.clone();
+        let ctx = app.ctx.clone();
+        tokio::spawn(async move {
+             match db.get_setting("ui_scale").await {
+                  Ok(Some(val)) => {
+                      if let Ok(scale) = val.parse::<f32>() {
+                           let _ = tx.send(UiEvent::ScaleLoaded(Ok(scale))).await;
+                           ctx.request_repaint();
+                      }
+                  },
+                  Ok(None) => {}, // Default 1.0
+                  Err(e) => eprintln!("Failed to load scale: {}", e),
+             }
+        });
         
         // Initial Theme Load
         let tx = app.tx.clone();
@@ -799,6 +819,18 @@ impl CrapApp {
             }
         }
     }
+    
+    pub fn set_scale(&mut self, scale: f32) {
+        self.ui_scale = scale;
+        self.ctx.set_pixels_per_point(scale);
+        
+        let db = self.db.clone();
+        let val = scale.to_string();
+        tokio::spawn(async move {
+            let _ = db.set_setting("ui_scale", &val).await;
+        });
+    }
+
 }
 
 impl eframe::App for CrapApp {
@@ -828,6 +860,12 @@ impl eframe::App for CrapApp {
                      if let Ok(mode) = res {
                           self.theme = mode;
                           self.apply_theme();
+                     }
+                },
+                UiEvent::ScaleLoaded(res) => {
+                     if let Ok(scale) = res {
+                          self.ui_scale = scale;
+                          self.ctx.set_pixels_per_point(scale);
                      }
                 },
                 UiEvent::LoreLinksLoaded(res) => {
