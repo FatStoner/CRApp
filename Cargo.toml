@@ -17,3 +17,4 @@ rfd = "0.17.1"
 base64 = "0.21"
 png = "0.17"
 arboard = "3.4"
+rusqlite = { version = "0.32", features = ["bundled"] }

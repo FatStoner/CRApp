@@ -1,0 +1,39 @@
+name: Release Build
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-windows:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-gnu
+      
+      - name: Install MinGW
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y mingw-w64
+      
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: windows-gnu
+      
+      - name: Build for Windows
+        run: cargo build --release --target x86_64-pc-windows-gnu
+      
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: crap-windows-${{ github.ref_name }}
+          path: target/x86_64-pc-windows-gnu/release/crap.exe
+          if-no-files-found: error
