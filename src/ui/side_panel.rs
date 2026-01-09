@@ -1,6 +1,6 @@
 use eframe::egui;
 use crate::models::{Character, Collection};
-use crate::ui::{CrapApp, AppMode, SortMode};
+use crate::ui::{CrapApp, AppMode, SortMode, SortDirection};
 
 pub fn render_side_panel(app: &mut CrapApp, ctx: &egui::Context) {
     egui::SidePanel::left("side_panel")
@@ -23,9 +23,33 @@ pub fn render_side_panel(app: &mut CrapApp, ctx: &egui::Context) {
                  if app.mode == AppMode::Characters {
                      ui.horizontal(|ui| {
                          ui.label("Sort:");
-                         ui.selectable_value(&mut app.sort_mode, SortMode::Alphabetical, "A-Z");
-                         ui.selectable_value(&mut app.sort_mode, SortMode::NewestFirst, "New");
-                         ui.selectable_value(&mut app.sort_mode, SortMode::RecentlyUpdated, "Upd");
+                         
+                         let mut sort_btn = |mode: SortMode, label: &str| {
+                             let is_selected = app.sort_mode == mode;
+                             let mut display_label = label.to_string();
+                             if is_selected {
+                                 match app.sort_direction {
+                                     SortDirection::Ascending => display_label.push_str(" v"),
+                                     SortDirection::Descending => display_label.push_str(" ^"),
+                                 }
+                             }
+                             
+                             if ui.selectable_label(is_selected, display_label).clicked() {
+                                 if is_selected {
+                                     app.sort_direction = match app.sort_direction {
+                                         SortDirection::Ascending => SortDirection::Descending,
+                                         SortDirection::Descending => SortDirection::Ascending,
+                                     };
+                                 } else {
+                                     app.sort_mode = mode;
+                                     app.sort_direction = SortDirection::Ascending;
+                                 }
+                             }
+                         };
+
+                         sort_btn(SortMode::Alphabetical, "A-Z");
+                         sort_btn(SortMode::NewestFirst, "New");
+                         sort_btn(SortMode::RecentlyUpdated, "Upd");
                      });
                      ui.separator();
                  }
@@ -78,6 +102,7 @@ pub fn render_side_panel(app: &mut CrapApp, ctx: &egui::Context) {
                                  app.selected_collection_id, 
                                  &mut actions,
                                  app.sort_mode,
+                                 app.sort_direction,
                                  &app.search_query
                              );
                          },
@@ -201,6 +226,7 @@ pub fn render_tree(
     selected_coll_id: Option<i64>,
     actions: &mut Vec<TreeAction>,
     sort_mode: SortMode,
+    sort_direction: SortDirection,
     search_query: &str,
 ) {
     let query_lower = search_query.to_lowercase();
@@ -262,7 +288,7 @@ pub fn render_tree(
         });
         
         header_res.body(|ui| {
-            render_tree(ui, collections, characters, Some(col.id), selected_char_id, selected_coll_id, actions, sort_mode, search_query);
+            render_tree(ui, collections, characters, Some(col.id), selected_char_id, selected_coll_id, actions, sort_mode, sort_direction, search_query);
         });
 
         if toggle {
@@ -294,6 +320,10 @@ pub fn render_tree(
         SortMode::Alphabetical => node_chars.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase())),
         SortMode::NewestFirst => node_chars.sort_by(|a, b| b.created_at.cmp(&a.created_at)),
         SortMode::RecentlyUpdated => node_chars.sort_by(|a, b| b.updated_at.cmp(&a.updated_at)),
+    }
+    
+    if sort_direction == SortDirection::Descending {
+        node_chars.reverse();
     }
 
     for char in node_chars {

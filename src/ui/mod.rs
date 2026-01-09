@@ -41,6 +41,12 @@ pub enum SortMode {
     RecentlyUpdated,
 }
 
+#[derive(PartialEq, Eq, Clone, Copy, Debug)]
+pub enum SortDirection {
+    Ascending,
+    Descending,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum AppAction {
     SwitchCharacter(i64),
@@ -97,6 +103,7 @@ pub struct CrapApp {
     pub active_char_tab: CharacterTab,
     pub central_view: CentralView,
     pub sort_mode: SortMode,
+    pub sort_direction: SortDirection,
     pub selected_collection_id: Option<i64>,
     
     pub popup_state: PopupState,
@@ -146,6 +153,7 @@ impl CrapApp {
             active_char_tab: CharacterTab::MainData,
             central_view: CentralView::Editor,
             sort_mode: SortMode::Alphabetical,
+            sort_direction: SortDirection::Ascending,
             selected_collection_id: None,
             popup_state: PopupState::None,
             is_saving: false,
