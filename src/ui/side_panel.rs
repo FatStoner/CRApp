@@ -1,5 +1,5 @@
 use eframe::egui;
-use crate::models::{Character, Collection};
+use crate::models::{Character, Collection, ThemeMode};
 use crate::ui::{CrapApp, AppMode, SortMode, SortDirection};
 
 pub fn render_side_panel(app: &mut CrapApp, ctx: &egui::Context) {
@@ -14,6 +14,25 @@ pub fn render_side_panel(app: &mut CrapApp, ctx: &egui::Context) {
                 ui.selectable_value(&mut app.mode, AppMode::Lorebooks, "Lorebooks");
             });
             ui.separator();
+            ui.separator();
+
+            // Theme Toggle
+            ui.horizontal(|ui| {
+                ui.label("Theme:");
+                let theme_txt = match app.theme {
+                    ThemeMode::System => "🌗 Auto",
+                    ThemeMode::Light => "☀️ Light",
+                    ThemeMode::Dark => "🌙 Dark",
+                };
+                if ui.button(theme_txt).clicked() {
+                    let new_theme = match app.theme {
+                        ThemeMode::System => ThemeMode::Light,
+                        ThemeMode::Light => ThemeMode::Dark,
+                        ThemeMode::Dark => ThemeMode::System,
+                    };
+                    app.set_theme(new_theme);
+                }
+            });
 
             if let Some(err) = &app.loading_error {
                 ui.colored_label(egui::Color32::RED, format!("Error: {}", err));

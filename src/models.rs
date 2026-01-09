@@ -17,6 +17,35 @@ pub struct DeepSearchResult {
     pub matches: Vec<(String, String)>, // (Field Name, Snippet)
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ThemeMode {
+    System,
+    Light,
+    Dark,
+}
+
+impl std::fmt::Display for ThemeMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ThemeMode::System => write!(f, "System"),
+            ThemeMode::Light => write!(f, "Light"),
+            ThemeMode::Dark => write!(f, "Dark"),
+        }
+    }
+}
+
+impl std::str::FromStr for ThemeMode {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "Light" => Ok(ThemeMode::Light),
+            "Dark" => Ok(ThemeMode::Dark),
+            _ => Ok(ThemeMode::System),
+        }
+    }
+}
+
 #[derive(Debug, Clone, FromRow, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Tag {
     pub id: i64,

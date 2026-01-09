@@ -1,8 +1,11 @@
 use eframe::egui;
 use crate::db::Database;
-use crate::models::{Character, Lorebook, Collection, Tag, DeepSearchResult, count_tokens, SearchResultKind};
+
+use crate::models::{Character, Lorebook, Collection, Tag, DeepSearchResult, count_tokens, SearchResultKind, ThemeMode};
 
 use tokio::sync::mpsc;
+
+
 use std::collections::{HashSet, HashMap};
 use std::time::{Duration, Instant};
 
@@ -81,8 +84,11 @@ pub enum UiEvent {
     LinkUpdated(Result<(), String>),
     TagsLoaded(Result<(i64, Vec<Tag>, Vec<Tag>), String>),
     TagOperationFinished(Result<(), String>),
+
     ImportFileLoaded(Result<String, String>),
+    ThemeLoaded(Result<ThemeMode, String>),
 }
+
 
 pub struct CrapApp {
     db: Database,
@@ -105,6 +111,7 @@ pub struct CrapApp {
     pub sort_mode: SortMode,
     pub sort_direction: SortDirection,
     pub selected_collection_id: Option<i64>,
+    pub theme: ThemeMode,
     
     pub popup_state: PopupState,
     pub is_saving: bool,
@@ -170,8 +177,27 @@ impl CrapApp {
             show_import_modal: false,
             import_text: String::new(),
             parsed_data: None,
+
             viewing_all_characters: false,
+            theme: ThemeMode::System,
         };
+        
+        // Initial Theme Load
+        let tx = app.tx.clone();
+        let db = app.db.clone();
+        let ctx = app.ctx.clone();
+        tokio::spawn(async move {
+             match db.get_setting("theme").await {
+                  Ok(Some(val)) => {
+                      if let Ok(mode) = val.parse::<ThemeMode>() {
+                           let _ = tx.send(UiEvent::ThemeLoaded(Ok(mode))).await;
+                           ctx.request_repaint();
+                      }
+                  },
+                  Ok(None) => {},
+                  Err(e) => eprintln!("Failed to load theme: {}", e),
+             }
+        });
         
         app.refresh_all();
         app
@@ -747,6 +773,32 @@ impl CrapApp {
             ctx.request_repaint();
         });
     }
+
+
+    pub fn set_theme(&mut self, theme: ThemeMode) {
+        self.theme = theme;
+        self.apply_theme();
+        
+        let db = self.db.clone();
+        let val = theme.to_string();
+        tokio::spawn(async move {
+            let _ = db.set_setting("theme", &val).await;
+        });
+    }
+
+    pub fn apply_theme(&self) {
+        match self.theme {
+            ThemeMode::System => {
+                self.ctx.set_style(egui::Style::default());
+            },
+            ThemeMode::Light => {
+                self.ctx.set_visuals(egui::Visuals::light());
+            },
+            ThemeMode::Dark => {
+                 self.ctx.set_visuals(egui::Visuals::dark());
+            }
+        }
+    }
 }
 
 impl eframe::App for CrapApp {
@@ -770,6 +822,12 @@ impl eframe::App for CrapApp {
                      match res {
                         Ok(collections) => self.collections = collections,
                         Err(e) => { self.loading_error = Some(e); }
+                     }
+                },
+                UiEvent::ThemeLoaded(res) => {
+                     if let Ok(mode) = res {
+                          self.theme = mode;
+                          self.apply_theme();
                      }
                 },
                 UiEvent::LoreLinksLoaded(res) => {

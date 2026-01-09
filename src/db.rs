@@ -130,6 +130,16 @@ impl Database {
         .execute(&pool)
         .await?;
 
+        // Create settings table
+        sqlx::query(
+            "CREATE TABLE IF NOT EXISTS settings (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            )"
+        )
+        .execute(&pool)
+        .await?;
+
         Ok(Database { pool })
     }
 
@@ -506,6 +516,27 @@ impl Database {
         .bind(lore_id)
         .execute(&self.pool)
         .await?;
+        Ok(())
+    }
+
+
+    // Settings
+    pub async fn get_setting(&self, key: &str) -> Result<Option<String>, sqlx::Error> {
+        let row: Option<(String,)> = sqlx::query_as("SELECT value FROM settings WHERE key = ?")
+            .bind(key)
+            .fetch_optional(&self.pool)
+            .await?;
+        
+        Ok(row.map(|r| r.0))
+    }
+
+    pub async fn set_setting(&self, key: &str, value: &str) -> Result<(), sqlx::Error> {
+        sqlx::query("INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = ?")
+            .bind(key)
+            .bind(value)
+            .bind(value)
+            .execute(&self.pool)
+            .await?;
         Ok(())
     }
 }
