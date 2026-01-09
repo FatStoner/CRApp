@@ -270,6 +270,7 @@ impl CrapApp {
             self.load_links(id);
             self.load_tags(id);
             self.mode = AppMode::Characters;
+            self.central_view = CentralView::Editor;
         }
     }
 
