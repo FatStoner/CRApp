@@ -1,39 +1,34 @@
-name: Release Build
+name: Release
 
 on:
   push:
     tags:
       - 'v*'
 
+permissions:
+  contents: write
+
 jobs:
-  build-windows:
-    runs-on: ubuntu-latest
+  build-and-release:
+    name: Build & Release (Windows)
+    runs-on: windows-latest
     
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v4
-      
+
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: x86_64-pc-windows-gnu
-      
-      - name: Install MinGW
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y mingw-w64
-      
-      - name: Setup Rust cache
-        uses: Swatinem/rust-cache@v2
+          targets: x86_64-pc-windows-msvc
+
+      - name: Build Release
+        run: cargo build --release --target x86_64-pc-windows-msvc
+
+      - name: Create Release & Upload Asset
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
         with:
-          key: windows-gnu
-      
-      - name: Build for Windows
-        run: cargo build --release --target x86_64-pc-windows-gnu
-      
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: crap-windows-${{ github.ref_name }}
-          path: target/x86_64-pc-windows-gnu/release/crap.exe
-          if-no-files-found: error
+          files: target/x86_64-pc-windows-msvc/release/crap.exe
+          draft: true
+          generate_release_notes: true
