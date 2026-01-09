@@ -1001,6 +1001,90 @@ fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                                                  .max_width(preview_width));
                                               
                                              ui.label(path_str);
+                                             
+                                             ui.horizontal(|ui| {
+                                                 if ui.button("Copy to Clipboard").clicked() {
+                                                     match std::fs::read(path_str) {
+                                                         Ok(bytes) => {
+                                                             match image::load_from_memory(&bytes) {
+                                                                 Ok(dynamic_img) => {
+                                                                     let rgba = dynamic_img.to_rgba8();
+                                                                     let img_data = arboard::ImageData {
+                                                                         width: rgba.width() as usize,
+                                                                         height: rgba.height() as usize,
+                                                                         bytes: std::borrow::Cow::from(rgba.into_raw()),
+                                                                     };
+                                                                     
+                                                                     match arboard::Clipboard::new() {
+                                                                         Ok(mut clipboard) => {
+                                                                             if let Err(e) = clipboard.set_image(img_data) {
+                                                                                 status_update = Some((format!("Failed to copy to clipboard: {}", e), egui::Color32::RED));
+                                                                             } else {
+                                                                                 status_update = Some(("Avatar copied to clipboard!".to_string(), egui::Color32::GREEN));
+                                                                             }
+                                                                         },
+                                                                         Err(e) => {
+                                                                             status_update = Some((format!("Clipboard access failed: {}", e), egui::Color32::RED));
+                                                                         }
+                                                                     }
+                                                                 },
+                                                                 Err(e) => {
+                                                                     status_update = Some((format!("Failed to load image: {}", e), egui::Color32::RED));
+                                                                 }
+                                                             }
+                                                         },
+                                                         Err(e) => {
+                                                             status_update = Some((format!("Failed to read avatar file: {}", e), egui::Color32::RED));
+                                                         }
+                                                     }
+                                                 }
+
+                                                 if ui.button("Open Folder").clicked() {
+                                                     #[cfg(target_os = "windows")]
+                                                     {
+                                                         let _ = std::process::Command::new("explorer")
+                                                             .arg("/select,")
+                                                             .arg(path_str.replace("/", "\\"))
+                                                             .spawn();
+                                                     }
+
+                                                     #[cfg(target_os = "linux")]
+                                                     {
+                                                         if let Ok(abs_path) = std::fs::canonicalize(path_str) {
+                                                             let file_uri = format!("file://{}", abs_path.to_string_lossy());
+                                                             // Try D-Bus for selection first (standard modern Linux)
+                                                             let status = std::process::Command::new("dbus-send")
+                                                                 .args(&[
+                                                                     "--session",
+                                                                     "--dest=org.freedesktop.FileManager1",
+                                                                     "--type=method_call",
+                                                                     " /org/freedesktop/FileManager1",
+                                                                     "org.freedesktop.FileManager1.ShowItems",
+                                                                     &format!("array:string:{}", file_uri),
+                                                                     "string:\"\"",
+                                                                 ])
+                                                                 .status();
+                                                             
+                                                             if status.is_err() || !status.unwrap().success() {
+                                                                 // Fallback to just opening the parent directory
+                                                                 if let Some(parent) = abs_path.parent() {
+                                                                     let _ = std::process::Command::new("xdg-open")
+                                                                         .arg(parent)
+                                                                         .spawn();
+                                                                 }
+                                                             }
+                                                         }
+                                                     }
+
+                                                     #[cfg(target_os = "macos")]
+                                                     {
+                                                         let _ = std::process::Command::new("open")
+                                                             .arg("-R")
+                                                             .arg(path_str)
+                                                             .spawn();
+                                                     }
+                                                 }
+                                             });
                                          } else {
                                              ui.label(egui::RichText::new("No avatar selected").italics());
                                          }
