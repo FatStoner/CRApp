@@ -1058,7 +1058,7 @@ fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                                                                      "--session",
                                                                      "--dest=org.freedesktop.FileManager1",
                                                                      "--type=method_call",
-                                                                     " /org/freedesktop/FileManager1",
+                                                                     "/org/freedesktop/FileManager1",
                                                                      "org.freedesktop.FileManager1.ShowItems",
                                                                      &format!("array:string:{}", file_uri),
                                                                      "string:\"\"",
