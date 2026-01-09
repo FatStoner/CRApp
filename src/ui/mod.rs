@@ -158,7 +158,7 @@ impl CrapApp {
             selected_character: None,
             selected_lorebook: None,
             active_char_tab: CharacterTab::MainData,
-            central_view: CentralView::Editor,
+            central_view: CentralView::Browser,
             sort_mode: SortMode::Alphabetical,
             sort_direction: SortDirection::Ascending,
             selected_collection_id: None,
