@@ -408,10 +408,7 @@ fn render_browser_view(app: &mut CrapApp, ui: &mut egui::Ui) {
             let response = ui.label(egui::RichText::new("No characters or subfolders in this collection").size(18.0).color(egui::Color32::GRAY));
             ui.add_space(10.0);
             if ui.button(egui::RichText::new("➕ Add New Character here").size(16.0)).clicked() {
-                 app.selected_character = Some(crate::models::Character::default());
-                 app.selected_character.as_mut().unwrap().collection_id = collection_id;
-                 app.mode = AppMode::Characters;
-                 app.central_view = crate::ui::CentralView::Editor;
+                 app.create_new_character(collection_id);
             }
             
             // Add context menu to the whole empty area
@@ -432,10 +429,7 @@ fn render_browser_view(app: &mut CrapApp, ui: &mut egui::Ui) {
         for action in actions {
             match action {
                 BrowserAction::CreateCharacter(cid) => {
-                    app.selected_character = Some(crate::models::Character::default());
-                    app.selected_character.as_mut().unwrap().collection_id = cid;
-                    app.mode = AppMode::Characters;
-                    app.central_view = crate::ui::CentralView::Editor;
+                    app.create_new_character(cid);
                 },
                 BrowserAction::CreateCollection(cid) => {
                     app.save_collection(0, "New Folder".to_string(), cid);
@@ -684,9 +678,7 @@ fn render_browser_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                  }
              },
              BrowserAction::CreateCharacter(cid) => {
-                 app.selected_character = Some(crate::models::Character::default());
-                 app.selected_character.as_mut().unwrap().collection_id = cid;
-                 app.central_view = crate::ui::CentralView::Editor;
+                 app.create_new_character(cid);
              },
              BrowserAction::CreateCollection(cid) => {
                  app.save_collection(0, "New Folder".to_string(), cid);

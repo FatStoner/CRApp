@@ -242,11 +242,7 @@ pub fn render_side_panel(app: &mut CrapApp, ctx: &egui::Context) {
                             app.request_view_all();
                         },
                         TreeAction::CreateNewCharacter(target_coll_id) => {
-                            app.selected_character = Some(Character::default());
-                            let start_col = target_coll_id.or(app.selected_collection_id);
-                            app.selected_character.as_mut().unwrap().collection_id = start_col;
-                            app.mode = AppMode::Characters;
-                            app.central_view = crate::ui::CentralView::Editor;
+                            app.create_new_character(target_coll_id.or(app.selected_collection_id));
                         }
                     }
                 }
@@ -256,11 +252,7 @@ pub fn render_side_panel(app: &mut CrapApp, ctx: &egui::Context) {
                      ui.add_space(5.0);
                      ui.horizontal(|ui| {
                          if ui.button("➕ New Character").clicked() {
-                              app.selected_character = Some(Character::default());
-                              app.selected_character.as_mut().unwrap().collection_id = app.selected_collection_id;
-                              app.selected_character.as_mut().unwrap().collection_id = app.selected_collection_id;
-                              app.mode = AppMode::Characters;
-                              app.central_view = crate::ui::CentralView::Editor;
+                              app.create_new_character(app.selected_collection_id);
                          }
                          if ui.button("➕ New Lorebook").clicked() {
                               app.selected_lorebook = Some(crate::models::Lorebook::default());

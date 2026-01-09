@@ -602,6 +602,20 @@ impl CrapApp {
         }
     }
 
+    pub fn create_new_character(&mut self, collection_id: Option<i64>) {
+        let mut character = Character::default();
+        character.collection_id = collection_id;
+        
+        // Immediate save
+        self.save_character(character);
+        
+        // UI Navigation handled by event loop when CharacterSaved(Ok(c)) returns,
+        // but we can set mode here for immediate visual switch if desired.
+        // Actually, let's let the event loop handle selection, but switch mode now.
+        self.mode = AppMode::Characters;
+        self.central_view = CentralView::Editor;
+    }
+
     pub fn request_character_switch(&mut self, id: i64) {
         if self.has_unsaved_changes() {
             self.popup_state = PopupState::UnsavedChanges { target: AppAction::SwitchCharacter(id) };
