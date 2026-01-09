@@ -673,7 +673,11 @@ fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                                         let task_name = format!("{}.crapp", name_slug);
                                         let task_json = json.clone();
                                         tokio::spawn(async move {
-                                            if let Some(path) = rfd::FileDialog::new().set_file_name(task_name).save_file() {
+                                            if let Some(path) = rfd::FileDialog::new()
+                                                .set_directory("exports")
+                                                .set_file_name(task_name)
+                                                .save_file() 
+                                            {
                                                 let _ = std::fs::write(path, task_json);
                                             }
                                         });
@@ -693,7 +697,11 @@ fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                                     if let Ok(json) = serde_json::to_string_pretty(&v2) {
                                         let task_name = format!("{}.json", name_slug);
                                         tokio::spawn(async move {
-                                            if let Some(path) = rfd::FileDialog::new().set_file_name(task_name).save_file() {
+                                            if let Some(path) = rfd::FileDialog::new()
+                                                .set_directory("exports")
+                                                .set_file_name(task_name)
+                                                .save_file() 
+                                            {
                                                 let _ = std::fs::write(path, json);
                                             }
                                         });
@@ -708,7 +716,11 @@ fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                                     );
                                     let task_name = format!("{}.md", name_slug);
                                     tokio::spawn(async move {
-                                        if let Some(path) = rfd::FileDialog::new().set_file_name(task_name).save_file() {
+                                        if let Some(path) = rfd::FileDialog::new()
+                                            .set_directory("exports")
+                                            .set_file_name(task_name)
+                                            .save_file() 
+                                        {
                                             let _ = std::fs::write(path, md);
                                         }
                                     });
@@ -741,7 +753,11 @@ fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                                             tokio::spawn(async move {
                                                 // 1. Read Valid Image
                                                 if let Ok(img_bytes) = std::fs::read(&path_clone) {
-                                                    if let Some(save_path) = rfd::FileDialog::new().set_file_name(task_name).save_file() {
+                                                    if let Some(save_path) = rfd::FileDialog::new()
+                                                        .set_directory("exports")
+                                                        .set_file_name(task_name)
+                                                        .save_file() 
+                                                    {
                                                         // 2. Decode to get raw pixels (via image crate) to ensure clean state or just append?
                                                         // Appending to existing PNG is risky if it has other chunks.
                                                         // Best is: Decode -> Encode with new chunk.
