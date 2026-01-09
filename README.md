@@ -16,7 +16,6 @@ C.R.App leverages the power of a local SQLite database to handle thousands of ch
 -   **🔍 Deep Search**: Search through character names, descriptions, and tags instantly.
 -   **📂 Nested Collections**: Organize your library with a robust, hierarchical folder system.
 -   **🔄 Import/Export**: Supports PNG, JSON, and native formats. Quick clipboard importing from spicychat.ai profiles.
--   **⚡ Native Windows Experience**: Optimized specifically for Windows desktop environments.
 
 ## Download
 
