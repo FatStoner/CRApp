@@ -19,7 +19,16 @@ C.R.App ("CRAP" for short, but affectionately) moves away from web-based or Elec
     -   **Import/Export**: Full support for `.crapp` (native), `.png` (embedded metadata), and JSON V2 standards.
 -   **⚡ Native Windows Experience**: Optimized specifically for Windows desktop environments.
 
-## Installation
+## Download
+
+The latest version for Windows is available on the [Releases Page](https://github.com/JustJam-Dev/CRApp/releases/latest).
+
+1.  Go to the **Releases** page.
+2.  Expand the **Assets** section of the latest release.
+3.  Download `crap.exe`.
+4.  Run it! (No installation required, portable executable).
+
+## Building from Source
 
 ### For Developers
 
