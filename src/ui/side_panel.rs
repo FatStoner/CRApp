@@ -56,6 +56,19 @@ pub fn render_side_panel(app: &mut CrapApp, ctx: &egui::Context) {
                          AppMode::Characters => {
                              // Root Characters & Collections
                              // We start with parent_id: None
+                             if ui.selectable_label(app.viewing_all_characters, "📁 All Characters").clicked() {
+                                 actions.push(TreeAction::SwitchToAll);
+                             }
+                             
+                             ui.separator();
+                             
+                             let is_uncategorized = app.selected_collection_id.is_none() && !app.viewing_all_characters && app.selected_character.is_none();
+                             if ui.selectable_label(is_uncategorized, "📁 Uncategorized").clicked() {
+                                 actions.push(TreeAction::DeselectCollection);
+                             }
+
+                             // Root Characters & Collections
+                             // We start with parent_id: None
                              super::side_panel::render_tree(
                                  ui, 
                                  &app.collections, 
@@ -131,6 +144,9 @@ pub fn render_side_panel(app: &mut CrapApp, ctx: &egui::Context) {
                         },
                         TreeAction::CreateRootFolder => {
                              app.save_collection("New Folder".to_string(), None);
+                        },
+                        TreeAction::SwitchToAll => {
+                            app.request_view_all();
                         }
                     }
                 }
@@ -169,6 +185,7 @@ pub enum TreeAction {
     RequestDeleteCollection(i64),
     CreateSubfolder(i64),
     CreateRootFolder,
+    SwitchToAll,
 }
 
 // Move render_tree here

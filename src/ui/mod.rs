@@ -45,6 +45,7 @@ pub enum SortMode {
 pub enum AppAction {
     SwitchCharacter(i64),
     SwitchCollection(Option<i64>),
+    SwitchToAll,
     Exit,
 }
 
@@ -114,6 +115,8 @@ pub struct CrapApp {
     pub show_import_modal: bool,
     pub import_text: String,
     pub parsed_data: Option<ParsedCharacterData>,
+
+    pub viewing_all_characters: bool,
     
     // Hidden internal for double-click/expand preservation if needed
     // We rely on egui id for collapsing headers.
@@ -154,6 +157,7 @@ impl CrapApp {
             show_import_modal: false,
             import_text: String::new(),
             parsed_data: None,
+            viewing_all_characters: false,
         };
         
         app.refresh_all();
@@ -401,10 +405,24 @@ impl CrapApp {
         if self.has_unsaved_changes() {
             self.popup_state = PopupState::UnsavedChanges { target: AppAction::SwitchCollection(id) };
         } else {
+            self.viewing_all_characters = false;
             self.selected_collection_id = id;
             self.mode = AppMode::Characters;
             self.central_view = CentralView::Browser;
-            self.reload_collections(); // Ensure freshness
+            self.reload_collections();
+        }
+    }
+
+    pub fn request_view_all(&mut self) {
+        if self.has_unsaved_changes() {
+            self.popup_state = PopupState::UnsavedChanges { target: AppAction::SwitchToAll };
+        } else {
+            self.viewing_all_characters = true;
+            self.selected_collection_id = None;
+            self.mode = AppMode::Characters;
+            self.central_view = CentralView::Browser;
+            self.selected_character = None;
+            self.reload_characters();
         }
     }
     
@@ -412,10 +430,19 @@ impl CrapApp {
         match action {
             AppAction::SwitchCharacter(id) => self.load_character(id),
             AppAction::SwitchCollection(id) => {
+                self.viewing_all_characters = false;
                 self.selected_collection_id = id;
                 self.mode = AppMode::Characters;
                 self.central_view = CentralView::Browser;
                 self.reload_collections();
+            },
+            AppAction::SwitchToAll => {
+                self.viewing_all_characters = true;
+                self.selected_collection_id = None;
+                self.mode = AppMode::Characters;
+                self.central_view = CentralView::Browser;
+                self.selected_character = None;
+                self.reload_characters();
             },
             AppAction::Exit => {
                 ctx.send_viewport_cmd(egui::ViewportCommand::Close);

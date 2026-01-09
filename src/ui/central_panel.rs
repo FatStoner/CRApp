@@ -306,11 +306,15 @@ pub fn render_central_panel(app: &mut CrapApp, ctx: &egui::Context) {
 }
 
 fn render_browser_view(app: &mut CrapApp, ui: &mut egui::Ui) {
+    let viewing_all = app.viewing_all_characters;
     let collection_id = app.selected_collection_id;
-    let collection_name = if let Some(id) = collection_id {
+    
+    let collection_name = if viewing_all {
+        "All Characters (Flat View)".to_string()
+    } else if let Some(id) = collection_id {
         app.collections.iter().find(|c| c.id == id).map(|c| c.name.clone()).unwrap_or("Unknown".to_string())
     } else {
-        "All Characters".to_string()
+        "Uncategorized (Root)".to_string()
     };
     
     let parent_id = if let Some(id) = collection_id {
@@ -320,42 +324,33 @@ fn render_browser_view(app: &mut CrapApp, ui: &mut egui::Ui) {
     };
 
     ui.horizontal(|ui| {
-        if collection_id.is_some() {
+        // Back only if in a collection, not in "All" mode which is top level.
+        if !viewing_all && collection_id.is_some() {
              if ui.button("⬅ Back").clicked() {
-                 app.selected_collection_id = parent_id;
+                 app.request_collection_switch(parent_id);
              }
         }
         ui.heading(format!("Browsing: {}", collection_name));
     });
     ui.add_space(10.0);
     
-    // Filter characters
-    // Note: We are filtering by direct parent currently.
-    // If "All Characters", show all? Or show root?
-    // Side panel logic implies "No selection" = "All/Root". 
-    // Let's assume Root means parent_id == None if we strictly follow folder logic.
-    // But typically "All Characters" view shows everything flat.
-    // User requested "Browser View... activates when selecting a collection".
-    // If selected_collection_id is None, let's show ALL characters for now, or Root? 
-    // SidePanel uses "None" for Root in tree view.
-    // Let's filter: if Some(id) -> c.collection_id == Some(id).
-    // If None -> Show ALL (Flat view) is usually more useful for a "Browser".
-    // Or if None -> c.collection_id == None (Root items only).
-    // Let's go with: If collection selected, show content. If None, show nothing/instruction? 
-    // Wait, side panel sets Browser view on "Deselect".
-    // Let's show "Uncategorized" (Root) if None? Or All?
-    // Let's show matching `collection_id` exactly for now. 
-    // If None, show those with None (Uncategorized).
-    
-    let subfolders: Vec<crate::models::Collection> = app.collections.iter()
-        .filter(|c| c.parent_id == collection_id)
-        .cloned()
-        .collect();
+    let subfolders: Vec<crate::models::Collection> = if viewing_all {
+        Vec::new() // "All" view is flat, no folders shown typically? Or maybe we just show all chars.
+    } else {
+        app.collections.iter()
+            .filter(|c| c.parent_id == collection_id)
+            .cloned()
+            .collect()
+    };
 
-    let chars: Vec<crate::models::Character> = app.characters.iter()
-        .filter(|c| c.collection_id == collection_id)
-        .cloned()
-        .collect();
+    let chars: Vec<crate::models::Character> = if viewing_all {
+        app.characters.clone()
+    } else {
+        app.characters.iter()
+            .filter(|c| c.collection_id == collection_id)
+            .cloned()
+            .collect()
+    };
 
     if chars.is_empty() && subfolders.is_empty() {
         ui.vertical_centered(|ui| {
