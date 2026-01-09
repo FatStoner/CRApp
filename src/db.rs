@@ -188,6 +188,23 @@ impl Database {
         Ok(())
     }
 
+    pub async fn delete_character(&self, id: i64) -> Result<(), sqlx::Error> {
+        sqlx::query("DELETE FROM characters WHERE id = ?")
+            .bind(id)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
+    pub async fn move_character(&self, char_id: i64, collection_id: Option<i64>) -> Result<(), sqlx::Error> {
+        sqlx::query("UPDATE characters SET collection_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+            .bind(collection_id)
+            .bind(char_id)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
     // Collections
     pub async fn get_all_collections(&self) -> Result<Vec<crate::models::Collection>, sqlx::Error> {
         sqlx::query_as::<_, crate::models::Collection>("SELECT * FROM collections")

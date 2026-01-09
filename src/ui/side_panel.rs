@@ -138,6 +138,14 @@ pub fn render_side_panel(app: &mut CrapApp, ctx: &egui::Context) {
                         TreeAction::CreateRootFolder => {
                              app.save_collection(0, "New Folder".to_string(), None);
                         },
+                        TreeAction::MoveCharacter(char_id, target_id) => {
+                             app.move_character(char_id, target_id);
+                        },
+                        TreeAction::RequestDeleteCharacter(char_id) => {
+                             if let Some(c) = app.characters.iter().find(|c| c.id == char_id) {
+                                  app.popup_state = crate::ui::PopupState::DeleteCharacterConfirmation { id: char_id, name: c.name.clone() };
+                             }
+                        },
                         TreeAction::SwitchToAll => {
                             app.request_view_all();
                         }
@@ -179,6 +187,8 @@ pub enum TreeAction {
     CreateSubfolder(i64),
     CreateRootFolder,
     SwitchToAll,
+    MoveCharacter(i64, Option<i64>),
+    RequestDeleteCharacter(i64),
 }
 
 // Move render_tree here
@@ -354,6 +364,36 @@ pub fn render_tree(
              
              ui.painter().with_clip_rect(rect).galley(title_pos, title_galley, egui::Color32::WHITE);
         }
+        
+        response.context_menu(|ui| {
+             ui.menu_button("Move to...", |ui| {
+                  if ui.button("📁 Uncategorized").clicked() {
+                       actions.push(TreeAction::MoveCharacter(char.id, None));
+                       ui.close_menu();
+                  }
+                  ui.separator();
+                  // Recursive helper to render collection options
+                  fn render_collection_options(ui: &mut egui::Ui, collections: &[Collection], parent_id: Option<i64>, actions: &mut Vec<TreeAction>, char_id: i64) {
+                       for col in collections.iter().filter(|c| c.parent_id == parent_id) {
+                            ui.menu_button(format!("📁 {}", col.name), |ui| {
+                                 if ui.button("Move Here").clicked() {
+                                      actions.push(TreeAction::MoveCharacter(char_id, Some(col.id)));
+                                      ui.close_menu();
+                                 }
+                                 render_collection_options(ui, collections, Some(col.id), actions, char_id);
+                            });
+                       }
+                  }
+                  render_collection_options(ui, collections, None, actions, char.id);
+             });
+             
+             ui.separator();
+             
+             if ui.button("Delete").clicked() {
+                  actions.push(TreeAction::RequestDeleteCharacter(char.id));
+                  ui.close_menu();
+             }
+        });
     }
 }
 

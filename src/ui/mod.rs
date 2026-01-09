@@ -55,11 +55,15 @@ pub enum PopupState {
     Renaming { id: i64, name: String },
     DeleteConfirmation { id: i64 },
     DeleteWarning { id: i64, count: usize },
+    DeleteCharacterConfirmation { id: i64, name: String },
     UnsavedChanges { target: AppAction },
 }
 
-
 pub enum UiEvent {
+    UiRepaint, // Generic repaint signal
+    DeepSearchCompleted(Result<Vec<DeepSearchResult>, String>),
+    CharacterDeleted(Result<i64, String>),
+    CharacterMoved(Result<(i64, Option<i64>), String>),
     CharactersLoaded(Result<Vec<Character>, String>),
     LorebooksLoaded(Result<Vec<Lorebook>, String>),
     CollectionsLoaded(Result<Vec<Collection>, String>),
@@ -71,7 +75,6 @@ pub enum UiEvent {
     LinkUpdated(Result<(), String>),
     TagsLoaded(Result<(i64, Vec<Tag>, Vec<Tag>), String>),
     TagOperationFinished(Result<(), String>),
-    DeepSearchCompleted(Result<Vec<DeepSearchResult>, String>),
     ImportFileLoaded(Result<String, String>),
 }
 
@@ -364,6 +367,28 @@ impl CrapApp {
             }
         });
     }
+
+    pub fn delete_character(&self, id: i64) {
+        let tx = self.tx.clone();
+        let db = self.db.clone();
+        let ctx = self.ctx.clone();
+        tokio::spawn(async move {
+             let res = db.delete_character(id).await;
+             let _ = tx.send(UiEvent::CharacterDeleted(res.map(|_| id).map_err(|e| e.to_string()))).await;
+             ctx.request_repaint();
+        });
+   }
+
+   pub fn move_character(&self, char_id: i64, target_coll_id: Option<i64>) {
+        let tx = self.tx.clone();
+        let db = self.db.clone();
+        let ctx = self.ctx.clone();
+        tokio::spawn(async move {
+             let res = db.move_character(char_id, target_coll_id).await;
+             let _ = tx.send(UiEvent::CharacterMoved(res.map(|_| (char_id, target_coll_id)).map_err(|e| e.to_string()))).await;
+             ctx.request_repaint();
+        });
+   }
 
     pub fn save_collection(&mut self, id: i64, name: String, parent_id: Option<i64>) {
         self.is_saving = true;
@@ -743,6 +768,47 @@ impl eframe::App for CrapApp {
                         Err(e) => self.set_status(format!("Search failed: {}", e), egui::Color32::RED),
                     }
                 },
+                UiEvent::UiRepaint => {
+                     // Just wakes the loop, nothing to do
+                },
+                UiEvent::CharacterDeleted(res) => {
+                     match res {
+                          Ok(id) => {
+                               // Optimistic update
+                               self.characters.retain(|c| c.id != id);
+                               if let Some(selected) = &self.selected_character {
+                                   if selected.id == id {
+                                       self.selected_character = None;
+                                       self.central_view = CentralView::Browser;
+                                   }
+                               }
+                               self.set_status("Character Deleted".to_string(), egui::Color32::GREEN);
+                          },
+                          Err(e) => self.set_status(format!("Delete Error: {}", e), egui::Color32::RED),
+                     }
+                },
+                UiEvent::CharacterMoved(res) => {
+                     match res {
+                          Ok((char_id, new_coll_id)) => {
+                               self.set_status("Character Moved".to_string(), egui::Color32::GREEN);
+                               
+                               // 1. Sync Selected Character (Fix for editor desync)
+                               if let Some(selected) = &mut self.selected_character {
+                                   if selected.id == char_id {
+                                       selected.collection_id = new_coll_id;
+                                   }
+                               }
+                               
+                               // 2. Optimistic List Update
+                               if let Some(c) = self.characters.iter_mut().find(|c| c.id == char_id) {
+                                   c.collection_id = new_coll_id;
+                               }
+                               
+                               self.reload_characters(); 
+                          },
+                          Err(e) => self.set_status(format!("Move Error: {}", e), egui::Color32::RED),
+                     }
+                },
                 UiEvent::ImportFileLoaded(res) => {
                     match res {
                          Ok(json_content) => {
@@ -885,6 +951,32 @@ impl eframe::App for CrapApp {
             if close {
                 self.popup_state = PopupState::None;
             }
+        }
+
+        if let PopupState::DeleteCharacterConfirmation { id, name } = self.popup_state.clone() {
+             let mut close = false;
+             egui::Window::new("Delete Character?")
+                 .collapsible(false)
+                 .resizable(false)
+                 .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
+                 .show(ctx, |ui| {
+                      ui.label(format!("Are you sure you want to delete '{}'?", name));
+                      ui.colored_label(egui::Color32::RED, "This action cannot be undone.");
+                      ui.add_space(10.0);
+                      
+                      ui.horizontal(|ui| {
+                          if ui.button("Yes, Delete").clicked() {
+                              self.delete_character(id);
+                              close = true;
+                          }
+                          if ui.button("Cancel").clicked() {
+                              close = true;
+                          }
+                      });
+                 });
+             if close {
+                 self.popup_state = PopupState::None;
+             }
         }
 
         let mut rename_request = None;
