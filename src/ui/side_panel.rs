@@ -128,15 +128,8 @@ pub fn render_side_panel(app: &mut CrapApp, ctx: &egui::Context) {
                              if child_colls + child_chars > 0 {
                                   app.popup_state = crate::ui::PopupState::DeleteWarning { id, count: child_colls + child_chars };
                              } else {
-                                  // Direct delete attempt (no children) - requires async DB call.
-                                  // We can spawn it here? Access to DB is inside App.
-                                  // Yes:
-                                   let tx = app.tx.clone();
-                                   let db = app.db.clone();
-                                   tokio::spawn(async move {
-                                        let res = db.delete_collection(id).await;
-                                        let _ = tx.send(crate::ui::UiEvent::CollectionDeleted(res.map(|_| id).map_err(|e| e.to_string())));
-                                   });
+                                  app.delete_collection(id);
+                                  ctx.request_repaint();
                              }
                         },
                         TreeAction::CreateSubfolder(parent_id) => {

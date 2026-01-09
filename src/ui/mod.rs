@@ -79,6 +79,7 @@ pub struct CrapApp {
     db: Database,
     tx: mpsc::Sender<UiEvent>,
     rx: mpsc::Receiver<UiEvent>,
+    pub ctx: egui::Context,
     
     // Data (Cached)
     pub characters: Vec<Character>,
@@ -131,6 +132,7 @@ impl CrapApp {
             db,
             tx,
             rx,
+            ctx: cc.egui_ctx.clone(),
             characters: Vec::new(),
             lorebooks: Vec::new(),
             collections: Vec::new(),
@@ -167,6 +169,7 @@ impl CrapApp {
     pub fn refresh_all(&self) {
         let tx = self.tx.clone();
         let db = self.db.clone();
+        let ctx = self.ctx.clone();
         tokio::spawn(async move {
             // Load characters
             match db.get_all_characters().await {
@@ -200,35 +203,45 @@ impl CrapApp {
                     }
                     
                     let _ = tx.send(UiEvent::CharactersLoaded(Ok(chars))).await;
+                    ctx.request_repaint();
                 },
-                Err(e) => { let _ = tx.send(UiEvent::CharactersLoaded(Err(e.to_string()))).await; }
+                Err(e) => { 
+                    let _ = tx.send(UiEvent::CharactersLoaded(Err(e.to_string()))).await;
+                    ctx.request_repaint();
+                }
             }
             
             // Load collections
             let collections_res = db.get_all_collections().await.map_err(|e| e.to_string());
             let _ = tx.send(UiEvent::CollectionsLoaded(collections_res)).await;
+            ctx.request_repaint();
             
             // Load Lorebooks
             let books_res = db.get_all_lorebooks().await.map_err(|e| e.to_string());
             let _ = tx.send(UiEvent::LorebooksLoaded(books_res)).await;
+            ctx.request_repaint();
         });
     }
 
     pub fn reload_characters(&self) {
         let tx = self.tx.clone();
         let db = self.db.clone();
+        let ctx = self.ctx.clone();
         tokio::spawn(async move {
             let result = db.get_all_characters().await.map_err(|e| e.to_string());
             let _ = tx.send(UiEvent::CharactersLoaded(result)).await;
+            ctx.request_repaint();
         });
     }
 
     pub fn reload_lorebooks(&self) {
         let tx = self.tx.clone();
         let db = self.db.clone();
+        let ctx = self.ctx.clone();
         tokio::spawn(async move {
             let result = db.get_all_lorebooks().await.map_err(|e| e.to_string());
             let _ = tx.send(UiEvent::LorebooksLoaded(result)).await;
+            ctx.request_repaint();
         });
     }
 
@@ -236,9 +249,11 @@ impl CrapApp {
         if char_id == 0 { return; } 
         let tx = self.tx.clone();
         let db = self.db.clone();
+        let ctx = self.ctx.clone();
         tokio::spawn(async move {
             let result = db.get_lore_links(char_id).await.map_err(|e| e.to_string());
             let _ = tx.send(UiEvent::LoreLinksLoaded(result)).await;
+            ctx.request_repaint();
         });
     }
     
@@ -247,6 +262,7 @@ impl CrapApp {
         if char_id == 0 { return; }
         let tx = self.tx.clone();
         let db = self.db.clone();
+        let ctx = self.ctx.clone();
         tokio::spawn(async move {
             let app_tags = db.get_tags_for_character(char_id, false).await;
             let ext_tags = db.get_tags_for_character(char_id, true).await;
@@ -254,9 +270,11 @@ impl CrapApp {
             match (app_tags, ext_tags) {
                 (Ok(app), Ok(ext)) => {
                     let _ = tx.send(UiEvent::TagsLoaded(Ok((char_id, app, ext)))).await;
+                    ctx.request_repaint();
                 },
                 (Err(e), _) | (_, Err(e)) => {
                     let _ = tx.send(UiEvent::TagsLoaded(Err(e.to_string()))).await;
+                    ctx.request_repaint();
                 }
             }
         });
@@ -277,10 +295,24 @@ impl CrapApp {
     pub fn reload_collections(&self) {
         let tx = self.tx.clone();
         let db = self.db.clone();
+        let ctx = self.ctx.clone();
         tokio::spawn(async move {
             let result = db.get_all_collections().await.map_err(|e| e.to_string());
             let _ = tx.send(UiEvent::CollectionsLoaded(result)).await;
+            ctx.request_repaint();
         });
+    }
+
+    pub fn delete_collection(&self, id: i64) {
+         let tx = self.tx.clone();
+         let db = self.db.clone();
+         let ctx = self.ctx.clone();
+         let ctx = self.ctx.clone();
+         tokio::spawn(async move {
+              let res = db.delete_collection(id).await;
+              let _ = tx.send(UiEvent::CollectionDeleted(res.map(|_| id).map_err(|e| e.to_string()))).await;
+              ctx.request_repaint();
+         });
     }
 
     pub fn save_character(&mut self, mut character: Character) {
@@ -288,10 +320,12 @@ impl CrapApp {
         self.status_message = None;
         let tx = self.tx.clone();
         let db = self.db.clone();
+        let ctx = self.ctx.clone();
         tokio::spawn(async move {
             let is_new = character.id == 0;
             if let Err(e) = db.upsert_character(&mut character).await {
                 let _ = tx.send(UiEvent::CharacterSaved(Err(e.to_string()))).await;
+                ctx.request_repaint();
             } else {
                 if is_new {
                     for tag in &character.external_tags {
@@ -303,8 +337,10 @@ impl CrapApp {
                 }
 
                 let _ = tx.send(UiEvent::CharacterSaved(Ok(character))).await;
+                ctx.request_repaint();
                 let list = db.get_all_characters().await.map_err(|e| e.to_string());
                 let _ = tx.send(UiEvent::CharactersLoaded(list)).await;
+                ctx.request_repaint();
             }
         });
     }
@@ -314,13 +350,17 @@ impl CrapApp {
         self.status_message = None;
         let tx = self.tx.clone();
         let db = self.db.clone();
+        let ctx = self.ctx.clone();
         tokio::spawn(async move {
             if let Err(e) = db.upsert_lorebook(&mut lorebook).await {
                 let _ = tx.send(UiEvent::LorebookSaved(Err(e.to_string()))).await;
+                ctx.request_repaint();
             } else {
                 let _ = tx.send(UiEvent::LorebookSaved(Ok(lorebook))).await;
+                ctx.request_repaint();
                 let list = db.get_all_lorebooks().await.map_err(|e| e.to_string());
                 let _ = tx.send(UiEvent::LorebooksLoaded(list)).await;
+                ctx.request_repaint();
             }
         });
     }
@@ -330,9 +370,11 @@ impl CrapApp {
         let tx = self.tx.clone();
         let db = self.db.clone();
         let col = crate::models::Collection { id, name, parent_id };
+        let ctx = self.ctx.clone();
         tokio::spawn(async move {
             let result = db.upsert_collection(&col).await.map_err(|e| e.to_string());
              let _ = tx.send(UiEvent::CollectionSaved(result)).await;
+             ctx.request_repaint();
         });
     }
     
@@ -366,6 +408,7 @@ impl CrapApp {
 
         let tx = self.tx.clone();
         let db = self.db.clone();
+        let ctx = self.ctx.clone();
         tokio::spawn(async move {
             let res = if link {
                 db.link_lore(char_id, lore_id).await
@@ -373,6 +416,7 @@ impl CrapApp {
                 db.unlink_lore(char_id, lore_id).await
             };
             let _ = tx.send(UiEvent::LinkUpdated(res.map_err(|e| e.to_string()))).await;
+            ctx.request_repaint();
         });
     }
 
@@ -464,18 +508,22 @@ impl CrapApp {
     pub fn add_tag(&self, char_id: i64, name: String, is_external: bool) {
         let tx = self.tx.clone();
         let db = self.db.clone();
+        let ctx = self.ctx.clone();
         tokio::spawn(async move {
             let res = db.add_tag_to_character(char_id, &name, is_external).await.map_err(|e| e.to_string());
             let _ = tx.send(UiEvent::TagOperationFinished(res)).await;
+            ctx.request_repaint();
         });
     }
 
     pub fn remove_tag(&self, char_id: i64, tag_id: i64, is_external: bool) {
         let tx = self.tx.clone();
         let db = self.db.clone();
+        let ctx = self.ctx.clone();
         tokio::spawn(async move {
             let res = db.remove_tag_from_character(char_id, tag_id, is_external).await.map_err(|e| e.to_string());
             let _ = tx.send(UiEvent::TagOperationFinished(res)).await;
+            ctx.request_repaint();
         });
     }
     
@@ -498,6 +546,7 @@ impl CrapApp {
         let tx = self.tx.clone();
         let db = self.db.clone();
         
+        let ctx = self.ctx.clone();
         tokio::spawn(async move {
             let mut results = Vec::new();
             
@@ -577,6 +626,7 @@ impl CrapApp {
             }
             
             let _ = tx.send(UiEvent::DeepSearchCompleted(Ok(results))).await;
+            ctx.request_repaint();
         });
     }
 }
@@ -584,7 +634,9 @@ impl CrapApp {
 impl eframe::App for CrapApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         // Event Loop
+        let mut received_event = false;
         while let Ok(event) = self.rx.try_recv() {
+            received_event = true;
             match event {
                 UiEvent::CharactersLoaded(res) => match res {
                     Ok(list) => { self.characters = list; self.loading_error = None; }
@@ -644,6 +696,8 @@ impl eframe::App for CrapApp {
                      match res {
                         Ok(id) => { 
                             self.set_status("Collection Deleted".to_string(), egui::Color32::GREEN);
+                            // Optimistic update
+                            self.collections.retain(|c| c.id != id);
                             self.reload_collections();
                             self.reload_characters();
                             if self.selected_collection_id == Some(id) {
@@ -726,6 +780,11 @@ impl eframe::App for CrapApp {
             }
         }
 
+
+        if received_event {
+             ctx.request_repaint();
+        }
+
         // Timer
         if let Some(deadline) = self.status_clear_time {
             if Instant::now() > deadline {
@@ -802,6 +861,30 @@ impl eframe::App for CrapApp {
                         }
                     });
                 });
+        }
+
+        if let PopupState::DeleteWarning { id: _, count } = self.popup_state {
+            let mut close = false;
+            egui::Window::new("Cannot Delete Folder")
+                .collapsible(false)
+                .resizable(false)
+                .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
+                .show(ctx, |ui| {
+                     ui.colored_label(egui::Color32::RED, "Warning: Folder is not empty.");
+                     ui.add_space(5.0);
+                     ui.label(format!("This folder contains {} character(s) or subfolder(s).", count));
+                     ui.label("You must move or delete all contents before deleting this folder.");
+                     ui.add_space(10.0);
+                     
+                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
+                         if ui.button("OK").clicked() {
+                             close = true;
+                         }
+                     });
+                });
+            if close {
+                self.popup_state = PopupState::None;
+            }
         }
 
         let mut rename_request = None;
