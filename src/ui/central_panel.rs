@@ -467,9 +467,7 @@ fn render_browser_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                               path_str.clone() 
                          }
                      };
-                     egui::Image::new(uri)
-                         .rounding(egui::Rounding::same(4.0))
-                         .paint_at(ui, avatar_rect);
+                     crate::ui::widgets::paint_avatar_crop(ui, avatar_rect, &uri, 4.0);
                 } else {
                      ui.painter().rect_filled(avatar_rect, 4.0, egui::Color32::from_gray(60));
                      let initial = char.name.chars().next().unwrap_or('?').to_uppercase().to_string();
@@ -539,6 +537,24 @@ fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                 let mut status_update = None;  
 
                 
+                // Check Dirty State
+                let is_dirty = if let Some(selected) = &app.selected_character {
+                    if selected.id == 0 {
+                        true
+                    } else {
+                        // Compare with DB version in app.characters
+                        // Note: This relies on app.characters being up to date.
+                        // Ideally we should have a separate "original" but app.characters is the cache.
+                        if let Some(original) = app.characters.iter().find(|c| c.id == selected.id) {
+                            !selected.content_eq(original)
+                        } else {
+                            true // Should not happen if data is consistent
+                        }
+                    }
+                } else {
+                    false
+                };
+
                  // Prepare collection options to avoid borrow checker issues inside the closure where we mutate char.
                  let collection_options: Vec<(i64, String)> = app.collections.iter().map(|c| {
                     (c.id, app.get_collection_path(c.id))
@@ -698,7 +714,13 @@ fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                                 ui.spinner();
                                 ui.label("Saving...");
                             } else {
-                                if ui.button("SAVE").clicked() {
+                                // Actually, we need to construct the button logic *before* adding.
+                                let mut save_color = ui.visuals().widgets.inactive.bg_fill;
+                                if is_dirty {
+                                     save_color = egui::Color32::from_rgb(200, 100, 50); // Orange/Red
+                                }
+                                
+                                if ui.add(egui::Button::new(egui::RichText::new("SAVE").strong()).fill(save_color)).clicked() {
                                     save_req = Some(character.clone());
                                 }
                                 if let Some((msg, color)) = &app.status_message {

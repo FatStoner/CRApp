@@ -86,24 +86,13 @@ pub fn render_side_panel(app: &mut CrapApp, ctx: &egui::Context) {
                 for action in actions {
                     match action {
                         TreeAction::SelectChar(c) => {
-                            app.selected_character = Some(c);
-                            app.selected_lorebook = None;
-                            app.mode = AppMode::Characters;
-                            // Trigger loading details (tags, links)
-                            if let Some(c) = &app.selected_character {
-                                app.load_tags(c.id);
-                                app.load_links(c.id);
-                            }
-                            app.central_view = crate::ui::CentralView::Editor;
+                            app.request_character_switch(c.id);
                         },
                         TreeAction::SelectCollection(id) => {
-                             app.selected_collection_id = Some(id);
-                             app.selected_character = None;
-                             app.central_view = crate::ui::CentralView::Browser;
+                             app.request_collection_switch(Some(id));
                         },
                         TreeAction::DeselectCollection => {
-                            app.selected_collection_id = None;
-                            app.central_view = crate::ui::CentralView::Browser;
+                            app.request_collection_switch(None);
                         },
                         TreeAction::RenameCollection(id, current_name) => {
                              app.popup_state = crate::ui::PopupState::Renaming { id, name: current_name };
@@ -320,9 +309,7 @@ pub fn render_tree(
                  }
              };
              
-             egui::Image::new(uri)
-                 .rounding(4.0)
-                 .paint_at(ui, thumb_rect);
+             crate::ui::widgets::paint_avatar_crop(ui, thumb_rect, &uri, 4.0);
         } else {
              ui.painter().rect_filled(thumb_rect, 4.0, egui::Color32::from_gray(70));
              let initial = char.name.chars().next().unwrap_or('?').to_uppercase().to_string();

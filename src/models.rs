@@ -29,7 +29,7 @@ pub struct TagPair {
     pub is_external: bool,
 }
 
-#[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
+#[derive(Debug, Clone, FromRow, PartialEq, Serialize, Deserialize)]
 pub struct Character {
     pub id: i64,
     pub name: String,
@@ -72,6 +72,21 @@ impl Default for Character {
     }
 }
 
+impl Character {
+    pub fn content_eq(&self, other: &Character) -> bool {
+        self.name == other.name &&
+        self.char_name == other.char_name &&
+        self.char_title == other.char_title &&
+        self.personality == other.personality &&
+        self.scenario == other.scenario &&
+        self.example_dialogue == other.example_dialogue &&
+        self.first_message == other.first_message &&
+        self.author_notes == other.author_notes &&
+        self.avatar_path == other.avatar_path &&
+        self.collection_id == other.collection_id
+    }
+}
+
 pub fn count_tokens(text: &str) -> usize {
     use std::sync::OnceLock;
     use tiktoken_rs::CoreBPE;
@@ -85,7 +100,7 @@ pub fn count_tokens(text: &str) -> usize {
     bpe.encode_with_special_tokens(text).len()
 }
 
-#[derive(Debug, Clone, FromRow)]
+#[derive(Debug, Clone, FromRow, PartialEq)]
 pub struct Lorebook {
     pub id: i64,
     pub title: String,
@@ -93,7 +108,7 @@ pub struct Lorebook {
     pub cover_path: Option<String>,
 }
 
-#[derive(Debug, Clone, FromRow)]
+#[derive(Debug, Clone, FromRow, PartialEq)]
 pub struct Collection {
     pub id: i64,
     pub name: String,
