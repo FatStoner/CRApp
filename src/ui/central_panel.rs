@@ -456,17 +456,42 @@ fn render_browser_view(app: &mut CrapApp, ui: &mut egui::Ui) {
         chars.reverse();
     }
 
+    // --- Character Counter Calculations ---
+    let direct_count = chars.len();
+    
+    fn count_recursive(collection_id: Option<i64>, collections: &[crate::models::Collection], characters: &[crate::models::Character]) -> usize {
+        let direct = characters.iter().filter(|c| c.collection_id == collection_id).count();
+        let sub_folders = collections.iter().filter(|c| c.parent_id == collection_id);
+        let mut total = direct;
+        for sub in sub_folders {
+            total += count_recursive(Some(sub.id), collections, characters);
+        }
+        total
+    }
+
+    let total_count = if viewing_all {
+        app.characters.len()
+    } else {
+        count_recursive(collection_id, &app.collections, &app.characters)
+    };
+
+    let counter_text = if direct_count == total_count {
+        format!("Characters: {}", direct_count)
+    } else {
+        format!("Characters: {} ({})", direct_count, total_count)
+    };
+
     if chars.is_empty() && subfolders.is_empty() {
         ui.vertical_centered(|ui| {
             ui.add_space(50.0);
-            let response = ui.label(egui::RichText::new("No characters or subfolders in this collection").size(18.0).color(egui::Color32::GRAY));
+            let _response = ui.label(egui::RichText::new("No characters or subfolders in this collection").size(18.0).color(egui::Color32::GRAY));
             ui.add_space(10.0);
             if ui.button(egui::RichText::new("➕ Add New Character here").size(16.0)).clicked() {
                  app.create_new_character(collection_id);
             }
             
             // Add context menu to the whole empty area
-            let (rect, resp) = ui.allocate_at_least(ui.available_size(), egui::Sense::click());
+            let (_rect, resp) = ui.allocate_at_least(ui.available_size(), egui::Sense::click());
             resp.context_menu(|ui| {
                 if ui.button("➕ New Character").clicked() {
                     actions.push(BrowserAction::CreateCharacter(collection_id));
@@ -492,6 +517,17 @@ fn render_browser_view(app: &mut CrapApp, ui: &mut egui::Ui) {
             }
         }
         
+        // Render counter even when empty
+        ui.with_layout(egui::Layout::bottom_up(egui::Align::Min), |ui| {
+            ui.add_space(4.0);
+            ui.horizontal(|ui| {
+                ui.add_space(8.0);
+                ui.label(egui::RichText::new(counter_text.clone())
+                    .size(12.0)
+                    .color(egui::Color32::GRAY));
+            });
+        });
+
         return;
     }
 
@@ -739,40 +775,48 @@ fn render_browser_view(app: &mut CrapApp, ui: &mut egui::Ui) {
              }
          }
      }
+
+    ui.with_layout(egui::Layout::bottom_up(egui::Align::Min), |ui| {
+        ui.add_space(4.0);
+        ui.horizontal(|ui| {
+            ui.add_space(8.0);
+            ui.label(egui::RichText::new(counter_text)
+                .size(12.0)
+                .color(egui::Color32::GRAY));
+        });
+    });
 }
 
 fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
     let mut trigger_import = false;
 
-                let mut save_req = None;
-                let mut toggle_requests = Vec::new();
-                let mut status_update = None;
-                let mut back_req = None;
+    let mut save_req = None;
+    let mut toggle_requests = Vec::new();
+    let mut status_update = None;
+    let mut back_req = None;
 
-                // Check Dirty State
-                let is_dirty = if let Some(selected) = &app.selected_character {
-                    if selected.id == 0 {
-                        true
-                    } else {
-                        // Compare with DB version in app.characters
-                        // Note: This relies on app.characters being up to date.
-                        // Ideally we should have a separate "original" but app.characters is the cache.
-                        if let Some(original) = app.characters.iter().find(|c| c.id == selected.id) {
-                            !selected.content_eq(original)
-                        } else {
-                            true // Should not happen if data is consistent
-                        }
-                    }
-                } else {
-                    false
-                };
+    // Check Dirty State
+    let is_dirty = if let Some(selected) = &app.selected_character {
+        if selected.id == 0 {
+            true
+        } else {
+            // Compare with DB version in app.characters
+            if let Some(original) = app.characters.iter().find(|c| c.id == selected.id) {
+                !selected.content_eq(original)
+            } else {
+                true // Should not happen if data is consistent
+            }
+        }
+    } else {
+        false
+    };
 
-                 // Prepare collection options to avoid borrow checker issues inside the closure where we mutate char.
-                 let collection_options: Vec<(i64, String)> = app.collections.iter().map(|c| {
-                    (c.id, app.get_collection_path(c.id))
-                 }).collect();
-                
-                if let Some(character) = &mut app.selected_character {
+    // Prepare collection options
+    let collection_options: Vec<(i64, String)> = app.collections.iter().map(|c| {
+       (c.id, app.get_collection_path(c.id))
+    }).collect();
+   
+    if let Some(character) = &mut app.selected_character {
                      // Clone for closures
                      let _tx_clone = app.tx.clone();
                      let _db_clone = app.db.clone();
