@@ -47,7 +47,9 @@ cargo install --git https://github.com/JustJam-Dev/CRApp
 
 **Current Status: Early Beta**
 
-The project is currently in active development. Features may change, and while the database schema is stable, always backup your `crap_data.db` before updating.
+The project is currently in active development. Features may change.
+> [!NOTE]
+> The application **automatically creates a backup** (`crap_data.db.bak`) of your database every time it starts, before applying any updates. However, for critical data, manual backups are always recommended.
 
 ## License
 

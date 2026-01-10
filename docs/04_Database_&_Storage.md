@@ -2,8 +2,36 @@
 
 ## Technology
 -   **Database**: SQLite
--   **Driver**: `rusqlite` (via `sqlx`)
--   **Schema Management**: Hardcoded `CREATE TABLE IF NOT EXISTS` queries in `db.rs` (init function).
+-   **Driver**: `sqlx` (Rust) with `migrate` feature.
+-   **Schema Management**: Versioned SQL migrations embedded in the binary.
+-   **Safety**: Automatic startup backups.
+
+## Migration System
+
+The application uses `sqlx::migrate!` to manage database schema evolution.
+
+-   **Location**: `migrations/` directory in the project root.
+-   **Format**: Plain SQL files named with a timestamp prefix (e.g., `20260101000000_initial_schema.sql`).
+-   **Behavior**:
+    -   Migrations are compiled strictly into the `.exe`.
+    -   On startup, the app checks the `_sqlx_migrations` table.
+    -   Any missing migrations are applied atomically (inside a transaction).
+
+### Adding a Migration
+To modify the database (e.g., add a column):
+1.  Create a new file in `migrations/`: `YYYYMMDDHHMMSS_description.sql`.
+2.  Write the `ALTER TABLE` or `CREATE TABLE` statements.
+3.  Run the app.
+
+## Safety & Backups
+
+To prevent data loss during updates, the application performs a **Safety Backup** during initialization (`src/db.rs`):
+
+1.  **Check**: Does `crap_data.db` exist?
+2.  **Backup**: If yes, copy it to `crap_data.db.bak` immediately.
+3.  **Migrate**: Only *after* the backup is secured does the migration runner start.
+
+If a migration fails, the application will panic/crash to prevent partial data corruption, and the user can restore `crap_data.db.bak`.
 
 ## Schema
 
