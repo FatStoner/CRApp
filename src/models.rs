@@ -14,6 +14,7 @@ pub struct DeepSearchResult {
     pub id: i64,
     pub kind: SearchResultKind,
     pub display_name: String,
+    pub collection_id: Option<i64>,     // For filtering by folder
     pub matches: Vec<(String, String)>, // (Field Name, Snippet)
 }
 

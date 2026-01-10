@@ -41,7 +41,10 @@ The left-hand navigation bar.
     -   App Mode switching (Characters / Lorebooks / Settings).
     -   Collection Tree (recursive rendering of folders).
     -   Global Search input.
-    -   Deep Search toggle.
+    -   **Deep Search**:
+        -   **Query**: Full-text search across all character and lorebook fields.
+        -   **Folder Filter**: Ability to limit search to a specific Collection and all its descendants.
+        -   **Safe Snippets**: Heuristic snippet extraction with UTF-8 boundary protection and result limiting for performance.
 
 ## UI Event Loop & State
 The `CrapApp` struct (in `ui/mod.rs`) holds all the transient UI state:

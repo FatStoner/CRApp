@@ -133,8 +133,9 @@ pub struct CrapApp {
     pub loading_error: Option<String>,
 
     // Search
-    pub search_query: String,      // Side panel filter
-    pub deep_search_query: String, // Global
+    pub search_query: String,                       // Side panel filter
+    pub deep_search_query: String,                  // Global
+    pub deep_search_filter_collection: Option<i64>, // None = All Folders
     pub deep_search_results: Vec<DeepSearchResult>,
     pub is_deep_searching: bool,
 
@@ -183,6 +184,7 @@ impl CrapApp {
             loading_error: None,
             search_query: String::new(),
             deep_search_query: String::new(),
+            deep_search_filter_collection: None,
             deep_search_results: Vec::new(),
             is_deep_searching: false,
             app_tag_input: String::new(),
@@ -655,6 +657,29 @@ impl CrapApp {
         path.join(" / ")
     }
 
+    pub fn get_descendant_collections(&self, parent_id: Option<i64>) -> Vec<i64> {
+        let mut result = Vec::new();
+
+        if let Some(pid) = parent_id {
+            result.push(pid);
+
+            // Find all direct children
+            let children: Vec<i64> = self
+                .collections
+                .iter()
+                .filter(|c| c.parent_id == Some(pid))
+                .map(|c| c.id)
+                .collect();
+
+            // Recursively get descendants
+            for child_id in children {
+                result.extend(self.get_descendant_collections(Some(child_id)));
+            }
+        }
+
+        result
+    }
+
     pub fn toggle_lore_link(&mut self, char_id: i64, lore_id: i64, link: bool) {
         if char_id == 0 {
             return;
@@ -840,6 +865,8 @@ impl CrapApp {
         self.deep_search_results.clear();
 
         let query = self.deep_search_query.clone();
+        let filter_collection = self.deep_search_filter_collection;
+        let all_collections = self.collections.clone();
         let tx = self.tx.clone();
         let db = self.db.clone();
 
@@ -936,6 +963,7 @@ impl CrapApp {
                         id: c.id,
                         kind: SearchResultKind::Character,
                         display_name: c.name,
+                        collection_id: c.collection_id,
                         matches,
                     });
                 }
@@ -955,10 +983,47 @@ impl CrapApp {
                             id: b.id,
                             kind: SearchResultKind::Lorebook,
                             display_name: b.title,
+                            collection_id: None, // Lorebooks don't have collections
                             matches,
                         });
                     }
                 }
+            }
+
+            // Filter by collection if specified
+            if let Some(filter_coll_id) = filter_collection {
+                // Get all allowed collection IDs (parent + all descendants)
+                let allowed_collections = {
+                    let mut allowed = vec![filter_coll_id];
+
+                    // Recursively find all children
+                    let mut to_process = vec![filter_coll_id];
+                    while let Some(parent_id) = to_process.pop() {
+                        let children: Vec<i64> = all_collections
+                            .iter()
+                            .filter(|c| c.parent_id == Some(parent_id))
+                            .map(|c| c.id)
+                            .collect();
+
+                        allowed.extend(&children);
+                        to_process.extend(children);
+                    }
+
+                    allowed
+                };
+
+                // Filter results to only include characters from allowed collections
+                results.retain(|res| {
+                    if res.kind == SearchResultKind::Character {
+                        if let Some(cid) = res.collection_id {
+                            allowed_collections.contains(&cid)
+                        } else {
+                            false // Exclude uncategorized characters when filtering
+                        }
+                    } else {
+                        true // Keep lorebooks regardless of filter
+                    }
+                });
             }
 
             let _ = tx.send(UiEvent::DeepSearchCompleted(Ok(results))).await;

@@ -59,6 +59,18 @@ Defines the current main view state of the application.
 -   `Settings`: Application settings.
 -   `DeepSearch`: Global search results.
 
+### DeepSearchResult
+Represents a match in the Deep Global Search.
+-   **Fields**:
+    -   `id`: `i64`.
+    -   `kind`: `SearchResultKind` (Character or Lorebook).
+    -   `display_name`: `String`.
+    -   `collection_id`: `Option<i64>` (Stored for folder-based filtering).
+    -   `matches`: `Vec<(String, String)>` (Pairs of field name and a snippet of the matching text).
+
+### SearchResultKind
+-   `Character`, `Lorebook`.
+
 ### ThemeMode
 -   `System`, `Light`, `Dark`.
 
