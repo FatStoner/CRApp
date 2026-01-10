@@ -294,6 +294,9 @@ pub fn render_side_panel(app: &mut CrapApp, ctx: &egui::Context) {
                         TreeAction::CreateNewCharacter(target_coll_id) => {
                             app.create_new_character(target_coll_id.or(app.selected_collection_id));
                         }
+                        TreeAction::MoveCollection(id, move_up) => {
+                            app.reorder_collection(id, move_up);
+                        }
                     }
                 }
 
@@ -331,6 +334,7 @@ pub enum TreeAction {
     MoveCharacter(i64, Option<i64>),
     RequestDeleteCharacter(i64),
     CreateNewCharacter(Option<i64>),
+    MoveCollection(i64, bool), // id, move_up
 }
 
 // Move render_tree here
@@ -354,7 +358,7 @@ pub fn render_tree(
         .iter()
         .filter(|c| c.parent_id == parent_id)
         .collect();
-    for col in node_colls {
+    for col in &node_colls {
         let has_visible_descendants = if is_search_active {
             has_matches(col.id, collections, characters, &query_lower)
         } else {
@@ -442,6 +446,25 @@ pub fn render_tree(
                     actions.push(TreeAction::RenameCollection(col.id, col.name.clone()));
                     ui.close_menu();
                 }
+
+                // Sorting Buttons
+                // Only show if possible
+                let index = node_colls.iter().position(|c| c.id == col.id).unwrap_or(0);
+                if index > 0 {
+                    if ui.button("⬆ Move Up").clicked() {
+                        actions.push(TreeAction::MoveCollection(col.id, true));
+                        ui.close_menu();
+                    }
+                }
+                if index < node_colls.len() - 1 {
+                    if ui.button("⬇ Move Down").clicked() {
+                        actions.push(TreeAction::MoveCollection(col.id, false));
+                        ui.close_menu();
+                    }
+                }
+
+                ui.separator();
+
                 if ui.button("New Subfolder").clicked() {
                     actions.push(TreeAction::CreateSubfolder(col.id));
                     ui.close_menu();

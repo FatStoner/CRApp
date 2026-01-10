@@ -103,16 +103,16 @@ impl Default for Character {
 
 impl Character {
     pub fn content_eq(&self, other: &Character) -> bool {
-        self.name == other.name &&
-        self.char_name == other.char_name &&
-        self.char_title == other.char_title &&
-        self.personality == other.personality &&
-        self.scenario == other.scenario &&
-        self.example_dialogue == other.example_dialogue &&
-        self.first_message == other.first_message &&
-        self.author_notes == other.author_notes &&
-        self.avatar_path == other.avatar_path &&
-        self.collection_id == other.collection_id
+        self.name == other.name
+            && self.char_name == other.char_name
+            && self.char_title == other.char_title
+            && self.personality == other.personality
+            && self.scenario == other.scenario
+            && self.example_dialogue == other.example_dialogue
+            && self.first_message == other.first_message
+            && self.author_notes == other.author_notes
+            && self.avatar_path == other.avatar_path
+            && self.collection_id == other.collection_id
     }
 }
 
@@ -121,11 +121,10 @@ pub fn count_tokens(text: &str) -> usize {
     use tiktoken_rs::CoreBPE;
 
     static BPE: OnceLock<CoreBPE> = OnceLock::new();
-    
-    let bpe = BPE.get_or_init(|| {
-        tiktoken_rs::cl100k_base().expect("Failed to load cl100k_base tokenizer")
-    });
-    
+
+    let bpe = BPE
+        .get_or_init(|| tiktoken_rs::cl100k_base().expect("Failed to load cl100k_base tokenizer"));
+
     bpe.encode_with_special_tokens(text).len()
 }
 
@@ -142,6 +141,8 @@ pub struct Collection {
     pub id: i64,
     pub name: String,
     pub parent_id: Option<i64>,
+    #[sqlx(default)]
+    pub display_order: i64,
 }
 
 impl Default for Lorebook {

@@ -568,11 +568,28 @@ impl CrapApp {
             id,
             name,
             parent_id,
+            display_order: 0,
         };
         let ctx = self.ctx.clone();
         tokio::spawn(async move {
             let result = db.upsert_collection(&col).await.map_err(|e| e.to_string());
             let _ = tx.send(UiEvent::CollectionSaved(result)).await;
+            ctx.request_repaint();
+        });
+    }
+
+    pub fn reorder_collection(&self, id: i64, move_up: bool) {
+        let tx = self.tx.clone();
+        let db = self.db.clone();
+        let ctx = self.ctx.clone();
+        tokio::spawn(async move {
+            if let Err(e) = db.reorder_collection(id, move_up).await {
+                let _ = tx.send(UiEvent::CollectionSaved(Err(e.to_string()))).await;
+            } else {
+                let _ = tx
+                    .send(UiEvent::CollectionSaved(Ok(id))) // Reuse Saved event to trigger reload
+                    .await;
+            }
             ctx.request_repaint();
         });
     }

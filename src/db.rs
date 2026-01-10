@@ -131,9 +131,11 @@ impl Database {
 
     // Collections
     pub async fn get_all_collections(&self) -> Result<Vec<crate::models::Collection>, sqlx::Error> {
-        sqlx::query_as::<_, crate::models::Collection>("SELECT * FROM collections")
-            .fetch_all(&self.pool)
-            .await
+        sqlx::query_as::<_, crate::models::Collection>(
+            "SELECT * FROM collections ORDER BY display_order ASC",
+        )
+        .fetch_all(&self.pool)
+        .await
     }
 
     pub async fn upsert_collection(
@@ -141,12 +143,33 @@ impl Database {
         collection: &crate::models::Collection,
     ) -> Result<i64, sqlx::Error> {
         if collection.id == 0 {
-            let id = sqlx::query("INSERT INTO collections (name, parent_id) VALUES (?, ?)")
-                .bind(&collection.name)
-                .bind(collection.parent_id)
-                .execute(&self.pool)
+            // New Collection: Determine display_order (Max in siblings + 1)
+            let max_order: Option<i64> = if let Some(pid) = collection.parent_id {
+                sqlx::query_scalar("SELECT MAX(display_order) FROM collections WHERE parent_id = ?")
+                    .bind(pid)
+                    .fetch_optional(&self.pool)
+                    .await?
+            } else {
+                sqlx::query_scalar(
+                    "SELECT MAX(display_order) FROM collections WHERE parent_id IS NULL",
+                )
+                .fetch_optional(&self.pool)
                 .await?
-                .last_insert_rowid();
+            };
+
+            // If no siblings, start huge or start at id? Better start at current MAX + 1.
+            // If table empty, 0.
+            let next_order = max_order.unwrap_or(0) + 1;
+
+            let id = sqlx::query(
+                "INSERT INTO collections (name, parent_id, display_order) VALUES (?, ?, ?)",
+            )
+            .bind(&collection.name)
+            .bind(collection.parent_id)
+            .bind(next_order)
+            .execute(&self.pool)
+            .await?
+            .last_insert_rowid();
             Ok(id)
         } else {
             sqlx::query("UPDATE collections SET name=?, parent_id=? WHERE id=?")
@@ -176,6 +199,58 @@ impl Database {
             .bind(id)
             .execute(&self.pool)
             .await?;
+
+        Ok(())
+    }
+
+    pub async fn reorder_collection(&self, id: i64, move_up: bool) -> Result<(), sqlx::Error> {
+        // 1. Get current item info
+        let current: crate::models::Collection =
+            sqlx::query_as("SELECT * FROM collections WHERE id = ?")
+                .bind(id)
+                .fetch_one(&self.pool)
+                .await?;
+
+        // 2. Find swap target
+        // If moving UP (smaller order), we want the item with largest order < current.order
+        // If moving DOWN (larger order), we want item with smallest order > current.order
+        let op = if move_up { "<" } else { ">" };
+        let sort = if move_up { "DESC" } else { "ASC" };
+
+        // Handle parent_id null checks
+        let query = if let Some(pid) = current.parent_id {
+            format!("SELECT * FROM collections WHERE parent_id = ? AND display_order {} ? ORDER BY display_order {} LIMIT 1", op, sort)
+        } else {
+            format!("SELECT * FROM collections WHERE parent_id IS NULL AND display_order {} ? ORDER BY display_order {} LIMIT 1", op, sort)
+        };
+
+        let mut q = sqlx::query_as::<_, crate::models::Collection>(&query);
+        if let Some(pid) = current.parent_id {
+            q = q.bind(pid);
+        }
+        q = q.bind(current.display_order);
+
+        let target = q.fetch_optional(&self.pool).await?;
+
+        if let Some(other) = target {
+            // Swap orders
+            // Use transaction for safety
+            let mut tx = self.pool.begin().await?;
+
+            sqlx::query("UPDATE collections SET display_order = ? WHERE id = ?")
+                .bind(other.display_order)
+                .bind(current.id)
+                .execute(&mut *tx)
+                .await?;
+
+            sqlx::query("UPDATE collections SET display_order = ? WHERE id = ?")
+                .bind(current.display_order)
+                .bind(other.id)
+                .execute(&mut *tx)
+                .await?;
+
+            tx.commit().await?;
+        }
 
         Ok(())
     }
