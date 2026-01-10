@@ -65,6 +65,55 @@ pub enum AppAction {
 }
 
 #[derive(Clone, Debug)]
+pub struct SearchFieldFilters {
+    pub name: bool,
+    pub char_title: bool,
+    pub personality: bool,
+    pub scenario: bool,
+    pub first_message: bool,
+    pub example_dialogue: bool,
+    pub author_notes: bool,
+    pub urls: bool,
+    pub tags: bool,
+}
+
+impl Default for SearchFieldFilters {
+    fn default() -> Self {
+        Self {
+            name: true,
+            char_title: true,
+            personality: true,
+            scenario: true,
+            first_message: true,
+            example_dialogue: true,
+            author_notes: true,
+            urls: true,
+            tags: true,
+        }
+    }
+}
+
+impl SearchFieldFilters {
+    pub fn all_enabled() -> Self {
+        Self::default()
+    }
+
+    pub fn all_disabled() -> Self {
+        Self {
+            name: false,
+            char_title: false,
+            personality: false,
+            scenario: false,
+            first_message: false,
+            example_dialogue: false,
+            author_notes: false,
+            urls: false,
+            tags: false,
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
 pub enum PopupState {
     None,
     Renaming { id: i64, name: String },
@@ -133,9 +182,10 @@ pub struct CrapApp {
     pub loading_error: Option<String>,
 
     // Search
-    pub search_query: String,                       // Side panel filter
-    pub deep_search_query: String,                  // Global
-    pub deep_search_filter_collection: Option<i64>, // None = All Folders
+    pub search_query: String,                          // Side panel filter
+    pub deep_search_query: String,                     // Global
+    pub deep_search_filter_collection: Option<i64>,    // None = All Folders
+    pub deep_search_field_filters: SearchFieldFilters, // Field selection
     pub deep_search_results: Vec<DeepSearchResult>,
     pub is_deep_searching: bool,
 
@@ -185,6 +235,7 @@ impl CrapApp {
             search_query: String::new(),
             deep_search_query: String::new(),
             deep_search_filter_collection: None,
+            deep_search_field_filters: SearchFieldFilters::default(),
             deep_search_results: Vec::new(),
             is_deep_searching: false,
             app_tag_input: String::new(),
@@ -866,6 +917,7 @@ impl CrapApp {
 
         let query = self.deep_search_query.clone();
         let filter_collection = self.deep_search_filter_collection;
+        let field_filters = self.deep_search_field_filters.clone();
         let all_collections = self.collections.clone();
         let tx = self.tx.clone();
         let db = self.db.clone();
@@ -886,8 +938,10 @@ impl CrapApp {
 
             // 2. Search Tags
             let mut tag_matches: Vec<(i64, String, bool)> = Vec::new();
-            if let Ok(tags) = db.search_tags_matching(&query).await {
-                tag_matches = tags;
+            if field_filters.tags {
+                if let Ok(tags) = db.search_tags_matching(&query).await {
+                    tag_matches = tags;
+                }
             }
 
             // 3. Fetch missing characters found by tags
@@ -907,7 +961,7 @@ impl CrapApp {
             }
 
             // 3.5. Fetch URLs for result candidates
-            if !char_map.is_empty() {
+            if field_filters.urls && !char_map.is_empty() {
                 if let Ok(urls) = db.get_all_character_urls_flat().await {
                     for u in urls {
                         if let Some(c) = char_map.get_mut(&u.character_id) {
@@ -924,37 +978,61 @@ impl CrapApp {
                 // Use widget helper
                 use crate::ui::widgets::extract_snippets;
 
-                for s in extract_snippets(&c.personality, &query) {
-                    matches.push(("Personality".to_string(), s));
+                if field_filters.name {
+                    for s in extract_snippets(&c.name, &query) {
+                        matches.push(("Name".to_string(), s));
+                    }
                 }
-                for s in extract_snippets(&c.scenario, &query) {
-                    matches.push(("Scenario".to_string(), s));
+                if field_filters.char_title {
+                    for s in extract_snippets(&c.char_title, &query) {
+                        matches.push(("Title".to_string(), s));
+                    }
                 }
-                for s in extract_snippets(&c.example_dialogue, &query) {
-                    matches.push(("Example Dialogue".to_string(), s));
+                if field_filters.personality {
+                    for s in extract_snippets(&c.personality, &query) {
+                        matches.push(("Personality".to_string(), s));
+                    }
                 }
-                for s in extract_snippets(&c.first_message, &query) {
-                    matches.push(("First Message".to_string(), s));
+                if field_filters.scenario {
+                    for s in extract_snippets(&c.scenario, &query) {
+                        matches.push(("Scenario".to_string(), s));
+                    }
                 }
-                for s in extract_snippets(&c.author_notes, &query) {
-                    matches.push(("Notes".to_string(), s));
+                if field_filters.example_dialogue {
+                    for s in extract_snippets(&c.example_dialogue, &query) {
+                        matches.push(("Example Dialogue".to_string(), s));
+                    }
+                }
+                if field_filters.first_message {
+                    for s in extract_snippets(&c.first_message, &query) {
+                        matches.push(("First Message".to_string(), s));
+                    }
+                }
+                if field_filters.author_notes {
+                    for s in extract_snippets(&c.author_notes, &query) {
+                        matches.push(("Notes".to_string(), s));
+                    }
                 }
 
-                for url in &c.urls {
-                    for s in extract_snippets(&url.url, &query) {
-                        matches.push(("URL".to_string(), s));
-                    }
-                    if let Some(label) = &url.label {
-                        for s in extract_snippets(label, &query) {
-                            matches.push(("URL Label".to_string(), s));
+                if field_filters.urls {
+                    for url in &c.urls {
+                        for s in extract_snippets(&url.url, &query) {
+                            matches.push(("URL".to_string(), s));
+                        }
+                        if let Some(label) = &url.label {
+                            for s in extract_snippets(label, &query) {
+                                matches.push(("URL Label".to_string(), s));
+                            }
                         }
                     }
                 }
 
-                for (tid, tname, is_ext) in &tag_matches {
-                    if *tid == c.id {
-                        let label = if *is_ext { "Ext. Tag" } else { "App Tag" };
-                        matches.push((label.to_string(), tname.clone()));
+                if field_filters.tags {
+                    for (tid, tname, is_ext) in &tag_matches {
+                        if *tid == c.id {
+                            let label = if *is_ext { "Ext. Tag" } else { "App Tag" };
+                            matches.push((label.to_string(), tname.clone()));
+                        }
                     }
                 }
 

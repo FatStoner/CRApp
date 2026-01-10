@@ -59,6 +59,72 @@ pub fn render_deep_search(app: &mut CrapApp, ui: &mut egui::Ui) {
             });
     });
 
+    // Field filters
+    ui.separator();
+    ui.horizontal(|ui| {
+        ui.label("Search in:");
+
+        if ui.button("All").clicked() {
+            app.deep_search_field_filters = crate::ui::SearchFieldFilters::all_enabled();
+            if !app.deep_search_query.trim().is_empty() {
+                app.perform_deep_search();
+            }
+        }
+
+        if ui.button("None").clicked() {
+            app.deep_search_field_filters = crate::ui::SearchFieldFilters::all_disabled();
+            if !app.deep_search_query.trim().is_empty() {
+                app.perform_deep_search();
+            }
+        }
+    });
+
+    ui.horizontal_wrapped(|ui| {
+        let mut changed = false;
+
+        changed |= ui
+            .checkbox(&mut app.deep_search_field_filters.name, "Name")
+            .changed();
+        changed |= ui
+            .checkbox(&mut app.deep_search_field_filters.char_title, "Title")
+            .changed();
+        changed |= ui
+            .checkbox(
+                &mut app.deep_search_field_filters.personality,
+                "Personality",
+            )
+            .changed();
+        changed |= ui
+            .checkbox(&mut app.deep_search_field_filters.scenario, "Scenario")
+            .changed();
+        changed |= ui
+            .checkbox(
+                &mut app.deep_search_field_filters.first_message,
+                "First Message",
+            )
+            .changed();
+        changed |= ui
+            .checkbox(
+                &mut app.deep_search_field_filters.example_dialogue,
+                "Example Dialogue",
+            )
+            .changed();
+        changed |= ui
+            .checkbox(&mut app.deep_search_field_filters.author_notes, "Notes")
+            .changed();
+        changed |= ui
+            .checkbox(&mut app.deep_search_field_filters.urls, "URLs")
+            .changed();
+        changed |= ui
+            .checkbox(&mut app.deep_search_field_filters.tags, "Tags")
+            .changed();
+
+        if changed && !app.deep_search_query.trim().is_empty() {
+            app.perform_deep_search();
+        }
+    });
+    ui.separator();
+
     if app.is_deep_searching {
         ui.spinner();
         ui.label("Searching database...");
