@@ -994,6 +994,7 @@ dependencies = [
  "sqlx",
  "tiktoken-rs",
  "tokio",
+ "url",
 ]
 
 [[package]]

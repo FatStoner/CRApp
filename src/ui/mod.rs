@@ -243,7 +243,12 @@ impl CrapApp {
                     let app_tags_res = db.get_all_tags_flat(false).await;
                     let ext_tags_res = db.get_all_tags_flat(true).await;
 
-                    if let (Ok(app_flat), Ok(ext_flat)) = (app_tags_res, ext_tags_res) {
+                    // Load URLs (Bulk)
+                    let urls_res = db.get_all_character_urls_flat().await;
+
+                    if let (Ok(app_flat), Ok(ext_flat), Ok(urls_flat)) =
+                        (app_tags_res, ext_tags_res, urls_res)
+                    {
                         let mut app_map: HashMap<i64, Vec<Tag>> = HashMap::new();
                         for (cid, tag) in app_flat {
                             app_map.entry(cid).or_default().push(tag);
@@ -254,6 +259,12 @@ impl CrapApp {
                             ext_map.entry(cid).or_default().push(tag);
                         }
 
+                        let mut url_map: HashMap<i64, Vec<crate::models::CharacterUrl>> =
+                            HashMap::new();
+                        for url in urls_flat {
+                            url_map.entry(url.character_id).or_default().push(url);
+                        }
+
                         // Merge into characters
                         for c in &mut chars {
                             if let Some(tags) = app_map.remove(&c.id) {
@@ -262,9 +273,12 @@ impl CrapApp {
                             if let Some(tags) = ext_map.remove(&c.id) {
                                 c.external_tags = tags;
                             }
+                            if let Some(urls) = url_map.remove(&c.id) {
+                                c.urls = urls;
+                            }
                         }
                     } else {
-                        eprintln!("Failed to load specific tags bulk");
+                        eprintln!("Failed to load specific tags/urls bulk");
                     }
 
                     let _ = tx.send(UiEvent::CharactersLoaded(Ok(chars))).await;
@@ -298,8 +312,11 @@ impl CrapApp {
                     // Load Tags (Bulk) - Same logic as refresh_all to ensure tags persist
                     let app_tags_res = db.get_all_tags_flat(false).await;
                     let ext_tags_res = db.get_all_tags_flat(true).await;
+                    let urls_res = db.get_all_character_urls_flat().await;
 
-                    if let (Ok(app_flat), Ok(ext_flat)) = (app_tags_res, ext_tags_res) {
+                    if let (Ok(app_flat), Ok(ext_flat), Ok(urls_flat)) =
+                        (app_tags_res, ext_tags_res, urls_res)
+                    {
                         let mut app_map: HashMap<i64, Vec<Tag>> = HashMap::new();
                         for (cid, tag) in app_flat {
                             app_map.entry(cid).or_default().push(tag);
@@ -310,6 +327,12 @@ impl CrapApp {
                             ext_map.entry(cid).or_default().push(tag);
                         }
 
+                        let mut url_map: HashMap<i64, Vec<crate::models::CharacterUrl>> =
+                            HashMap::new();
+                        for url in urls_flat {
+                            url_map.entry(url.character_id).or_default().push(url);
+                        }
+
                         // Merge into characters
                         for c in &mut chars {
                             if let Some(tags) = app_map.remove(&c.id) {
@@ -317,6 +340,9 @@ impl CrapApp {
                             }
                             if let Some(tags) = ext_map.remove(&c.id) {
                                 c.external_tags = tags;
+                            }
+                            if let Some(urls) = url_map.remove(&c.id) {
+                                c.urls = urls;
                             }
                         }
                     }
@@ -466,8 +492,11 @@ impl CrapApp {
                 if let Ok(ref mut characters) = chars {
                     let app_tags_res = db.get_all_tags_flat(false).await;
                     let ext_tags_res = db.get_all_tags_flat(true).await;
+                    let urls_res = db.get_all_character_urls_flat().await;
 
-                    if let (Ok(app_flat), Ok(ext_flat)) = (app_tags_res, ext_tags_res) {
+                    if let (Ok(app_flat), Ok(ext_flat), Ok(urls_flat)) =
+                        (app_tags_res, ext_tags_res, urls_res)
+                    {
                         let mut app_map: HashMap<i64, Vec<Tag>> = HashMap::new();
                         for (cid, tag) in app_flat {
                             app_map.entry(cid).or_default().push(tag);
@@ -478,12 +507,21 @@ impl CrapApp {
                             ext_map.entry(cid).or_default().push(tag);
                         }
 
+                        let mut url_map: HashMap<i64, Vec<crate::models::CharacterUrl>> =
+                            HashMap::new();
+                        for url in urls_flat {
+                            url_map.entry(url.character_id).or_default().push(url);
+                        }
+
                         for c in characters {
                             if let Some(tags) = app_map.remove(&c.id) {
                                 c.app_tags = tags;
                             }
                             if let Some(tags) = ext_map.remove(&c.id) {
                                 c.external_tags = tags;
+                            }
+                            if let Some(urls) = url_map.remove(&c.id) {
+                                c.urls = urls;
                             }
                         }
                     }

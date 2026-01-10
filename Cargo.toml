@@ -18,3 +18,4 @@ base64 = "0.21"
 png = "0.17"
 arboard = "3.4"
 rusqlite = { version = "0.32", features = ["bundled"] }
+url = "2.5.8"

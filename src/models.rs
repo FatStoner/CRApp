@@ -58,6 +58,14 @@ pub struct TagPair {
     pub is_external: bool,
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, FromRow)]
+pub struct CharacterUrl {
+    pub id: i64,
+    pub character_id: i64,
+    pub url: String,
+    pub label: Option<String>,
+}
+
 #[derive(Debug, Clone, FromRow, PartialEq, Serialize, Deserialize)]
 pub struct Character {
     pub id: i64,
@@ -77,6 +85,8 @@ pub struct Character {
     pub app_tags: Vec<Tag>,
     #[sqlx(skip)]
     pub external_tags: Vec<Tag>,
+    #[sqlx(skip)]
+    pub urls: Vec<CharacterUrl>,
 }
 
 impl Default for Character {
@@ -97,6 +107,7 @@ impl Default for Character {
             collection_id: None,
             app_tags: Vec::new(),
             external_tags: Vec::new(),
+            urls: Vec::new(),
         }
     }
 }
@@ -113,6 +124,11 @@ impl Character {
             && self.author_notes == other.author_notes
             && self.avatar_path == other.avatar_path
             && self.collection_id == other.collection_id
+            && self
+                .urls
+                .iter()
+                .filter(|u| !u.url.trim().is_empty())
+                .eq(other.urls.iter().filter(|u| !u.url.trim().is_empty()))
     }
 }
 

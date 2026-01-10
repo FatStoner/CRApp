@@ -103,6 +103,39 @@ impl Database {
             .execute(&self.pool)
             .await?;
         }
+
+        // Handle URLs
+        // Simple approach: Delete all for this character and re-insert.
+        // Since we don't have URL IDs in the UI usually (unless we want to preserve specific ones),
+        // replacing all is safest for maintaining order if we added that, or just synchronization.
+        // But CharacterUrl has an ID.
+        // If the UI passes IDs, we could update, but deleting all is much simpler.
+        if character.id != 0 {
+            sqlx::query("DELETE FROM character_urls WHERE character_id = ?")
+                .bind(character.id)
+                .execute(&self.pool)
+                .await?;
+
+            for url in &mut character.urls {
+                // Skip empty URLs
+                if url.url.trim().is_empty() {
+                    continue;
+                }
+
+                let uid = sqlx::query(
+                    "INSERT INTO character_urls (character_id, url, label) VALUES (?, ?, ?)",
+                )
+                .bind(character.id)
+                .bind(&url.url)
+                .bind(&url.label)
+                .execute(&self.pool)
+                .await?
+                .last_insert_rowid();
+                url.id = uid;
+                url.character_id = character.id;
+            }
+        }
+
         Ok(())
     }
 
@@ -378,6 +411,14 @@ impl Database {
         }
 
         Ok(results)
+    }
+
+    pub async fn get_all_character_urls_flat(
+        &self,
+    ) -> Result<Vec<crate::models::CharacterUrl>, sqlx::Error> {
+        sqlx::query_as::<_, crate::models::CharacterUrl>("SELECT * FROM character_urls")
+            .fetch_all(&self.pool)
+            .await
     }
 
     // Deep Search
