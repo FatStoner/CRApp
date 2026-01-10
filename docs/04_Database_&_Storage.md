@@ -53,6 +53,15 @@ Stores the main character data.
 | `created_at` | DATETIME | |
 | `updated_at` | DATETIME | |
 
+### Character URLs Table (`character_urls`)
+Stores multiple source links per character.
+| Column | Type | Description |
+| --- | --- | --- |
+| `id` | INTEGER PK | |
+| `character_id` | INTEGER FK | Links to `characters`. |
+| `url` | TEXT | |
+| `label` | TEXT | Optional service name. |
+
 ### Collections Table (`collections`)
 Hierarchical folder structure.
 | Column | Type | Description |

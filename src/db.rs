@@ -429,14 +429,20 @@ impl Database {
         let pattern = format!("%{}%", query);
         // We search in all text fields
         sqlx::query_as::<_, crate::models::Character>(
-            "SELECT * FROM characters WHERE 
-             name LIKE ? OR 
-             personality LIKE ? OR 
-             scenario LIKE ? OR 
-             example_dialogue LIKE ? OR 
-             first_message LIKE ? OR 
-             author_notes LIKE ?",
+            "SELECT DISTINCT c.* FROM characters c
+             LEFT JOIN character_urls u ON c.id = u.character_id
+             WHERE 
+             c.name LIKE ? OR 
+             c.personality LIKE ? OR 
+             c.scenario LIKE ? OR 
+             c.example_dialogue LIKE ? OR 
+             c.first_message LIKE ? OR 
+             c.author_notes LIKE ? OR
+             u.url LIKE ? OR
+             u.label LIKE ?",
         )
+        .bind(&pattern)
+        .bind(&pattern)
         .bind(&pattern)
         .bind(&pattern)
         .bind(&pattern)

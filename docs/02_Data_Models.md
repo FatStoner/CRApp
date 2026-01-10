@@ -19,6 +19,15 @@ Represents an AI character definition.
     -   `collection_id`: `Option<i64>` (Foreign Key to Collection).
     -   `app_tags`: `Vec<Tag>` (Internal organization tags).
     -   `external_tags`: `Vec<Tag>` (Tags imported from source, e.g., spicychat).
+    -   `urls`: `Vec<CharacterUrl>` (Source URLs for the character).
+
+### CharacterUrl
+Represents a source link for a character.
+-   **Fields**:
+    -   `id`: `i64`.
+    -   `character_id`: `i64`.
+    -   `url`: `String`.
+    -   `label`: `Option<String>` (Service name).
 
 ### Lorebook
 Represents a collection of lore entries (World Info).
