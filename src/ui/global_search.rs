@@ -175,6 +175,44 @@ pub fn render_deep_search(app: &mut CrapApp, ui: &mut egui::Ui) {
         if let Some((kind, id)) = nav_action {
             match kind {
                 SearchResultKind::Character => {
+                    // Transfer search query to editor search for immediate highlighting
+                    app.editor_search_query = app.deep_search_query.clone();
+
+                    // Smart tab selection based on match location
+                    if !app.editor_search_query.is_empty() {
+                        if let Some(character) = app.characters.iter().find(|c| c.id == id) {
+                            let query_lower = app.editor_search_query.to_lowercase();
+
+                            // Check if query matches in main fields
+                            let in_main_fields = character
+                                .first_message
+                                .to_lowercase()
+                                .contains(&query_lower)
+                                || character.personality.to_lowercase().contains(&query_lower)
+                                || character.scenario.to_lowercase().contains(&query_lower)
+                                || character
+                                    .example_dialogue
+                                    .to_lowercase()
+                                    .contains(&query_lower);
+
+                            // Check if query matches in notes fields
+                            let in_notes_fields =
+                                character.author_notes.to_lowercase().contains(&query_lower)
+                                    || character
+                                        .urls
+                                        .iter()
+                                        .any(|u| u.url.to_lowercase().contains(&query_lower));
+
+                            // If match is ONLY in notes, open Notes tab
+                            if !in_main_fields && in_notes_fields {
+                                app.active_char_tab = crate::ui::CharacterTab::Notes;
+                            } else {
+                                // Default to MainData tab
+                                app.active_char_tab = crate::ui::CharacterTab::MainData;
+                            }
+                        }
+                    }
+
                     app.load_character(id);
                 }
                 SearchResultKind::Lorebook => {
