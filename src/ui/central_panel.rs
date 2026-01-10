@@ -88,11 +88,61 @@ pub fn render_central_panel(app: &mut CrapApp, ctx: &egui::Context) {
                                 ui.end_row();
                                 
                                 ui.label("External Tags:");
-                                ui.label(data.external_tags.join(", "));
+                                ui.vertical(|ui| {
+                                    ui.horizontal_wrapped(|ui| {
+                                        let mut tags_to_remove = Vec::new();
+                                        for (i, tag) in data.external_tags.iter().enumerate() {
+                                            egui::Frame::none().fill(egui::Color32::from_gray(80)).rounding(12.0).inner_margin(4.0).show(ui, |ui| {
+                                                ui.horizontal(|ui| {
+                                                    ui.label(egui::RichText::new(tag).color(egui::Color32::WHITE).size(12.0));
+                                                    if ui.small_button("x").clicked() {
+                                                        tags_to_remove.push(i);
+                                                    }
+                                                });
+                                            });
+                                        }
+                                        for i in tags_to_remove.iter().rev() {
+                                            data.external_tags.remove(*i);
+                                        }
+                                    });
+                                    ui.horizontal(|ui| {
+                                        let response = ui.text_edit_singleline(&mut app.ext_tag_input);
+                                        if (ui.button("Add").clicked() || (response.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)))) && !app.ext_tag_input.is_empty() {
+                                            data.external_tags.push(app.ext_tag_input.clone());
+                                            app.ext_tag_input.clear();
+                                            response.request_focus();
+                                        }
+                                    });
+                                });
                                 ui.end_row();
 
                                 ui.label("App Tags:");
-                                ui.label(data.app_tags.join(", "));
+                                ui.vertical(|ui| {
+                                    ui.horizontal_wrapped(|ui| {
+                                        let mut tags_to_remove = Vec::new();
+                                        for (i, tag) in data.app_tags.iter().enumerate() {
+                                            egui::Frame::none().fill(egui::Color32::from_rgb(50, 80, 150)).rounding(12.0).inner_margin(4.0).show(ui, |ui| {
+                                                ui.horizontal(|ui| {
+                                                    ui.label(egui::RichText::new(tag).color(egui::Color32::WHITE).size(12.0));
+                                                    if ui.small_button("x").clicked() {
+                                                        tags_to_remove.push(i);
+                                                    }
+                                                });
+                                            });
+                                        }
+                                        for i in tags_to_remove.iter().rev() {
+                                            data.app_tags.remove(*i);
+                                        }
+                                    });
+                                    ui.horizontal(|ui| {
+                                        let response = ui.text_edit_singleline(&mut app.app_tag_input);
+                                        if (ui.button("Add").clicked() || (response.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)))) && !app.app_tag_input.is_empty() {
+                                            data.app_tags.push(app.app_tag_input.clone());
+                                            app.app_tag_input.clear();
+                                            response.request_focus();
+                                        }
+                                    });
+                                });
                                 ui.end_row();
 
                                 ui.label("URLs:");

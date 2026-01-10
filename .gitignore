@@ -12,3 +12,4 @@ Docs/
 .agent/
 deploy.sh
 exports/
+docs/tmp
