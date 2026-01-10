@@ -981,8 +981,8 @@ fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                      // Tabs
                     ui.horizontal(|ui| {
                         ui.selectable_value(&mut app.active_char_tab, CharacterTab::MainData, "Main Data");
-                        ui.selectable_value(&mut app.active_char_tab, CharacterTab::AuthorNotes, "Author Notes");
-                        ui.selectable_value(&mut app.active_char_tab, CharacterTab::AssociatedLore, "Associated Lore");
+                        ui.selectable_value(&mut app.active_char_tab, CharacterTab::Notes, "Notes");
+                        ui.selectable_value(&mut app.active_char_tab, CharacterTab::Lorebooks, "Lorebooks");
                     });
                     ui.separator();
                     
@@ -1244,11 +1244,12 @@ fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                                      });
                                  });
                              },
-                             CharacterTab::AuthorNotes => {
-                                 ui.label("Author Notes");
-                                 ui.text_edit_multiline(&mut character.author_notes);
+                             CharacterTab::Notes => {
+                                 ui.label("Notes");
+                                 let width = ui.ctx().screen_rect().width() * 2.0 / 3.0;
+                                 ui.add(egui::TextEdit::multiline(&mut character.author_notes).desired_width(width));
                              },
-                             CharacterTab::AssociatedLore => {
+                             CharacterTab::Lorebooks => {
                                  ui.label("Select relevant lorebooks:");
                                  for lore in &app.lorebooks {
                                      let mut is_linked = app.lore_links.contains(&lore.id);

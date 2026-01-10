@@ -27,8 +27,8 @@ pub enum AppMode {
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
 pub enum CharacterTab {
     MainData,
-    AuthorNotes,
-    AssociatedLore,
+    Notes,
+    Lorebooks,
 }
 
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
