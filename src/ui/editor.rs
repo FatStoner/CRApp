@@ -247,6 +247,28 @@ pub fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                                 }
                             });
                     });
+                    
+                    // In-editor search
+                    ui.horizontal(|ui| {
+                        ui.label("🔍 Search:");
+                        ui.add(
+                            egui::TextEdit::singleline(&mut app.editor_search_query)
+                                .hint_text("Type 3+ chars to highlight...")
+                                .desired_width(200.0)
+                        );
+                        
+                        if !app.editor_search_query.is_empty() {
+                            if ui.small_button("✖").clicked() {
+                                app.editor_search_query.clear();
+                            }
+                            
+                            ui.label(
+                                egui::RichText::new(format!("Highlighting: '{}'", app.editor_search_query))
+                                    .size(11.0)
+                                    .color(egui::Color32::GRAY)
+                            );
+                        }
+                    });
                     ui.separator();
 
                      // Tabs
@@ -280,7 +302,44 @@ pub fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                                          egui::CollapsingHeader::new("First Message")
                                              .default_open(true)
                                              .show(ui, |ui| {
-                                                 ui.add(egui::TextEdit::multiline(&mut character.first_message).desired_width(f32::INFINITY));
+                                                 let mut text_edit = egui::TextEdit::multiline(&mut character.first_message).desired_width(f32::INFINITY);
+                                                  if app.editor_search_query.len() >= 3 {
+                                                      let search_query = app.editor_search_query.clone();
+                                                      let mut my_layouter = move |ui: &egui::Ui, text: &str, wrap_width: f32| {
+                                                          let mut layout_job = egui::text::LayoutJob::default();
+                                                          let search_lower = search_query.to_lowercase();
+                                                          let text_lower = text.to_lowercase();
+                                                          let mut last_end = 0;
+                                                          
+                                                          let font_id = egui::TextStyle::Body.resolve(ui.style());
+                                                          let default_format = egui::TextFormat {
+                                                              font_id: font_id.clone(),
+                                                              ..Default::default()
+                                                          };
+                                                          
+                                                          for (start, _) in text_lower.match_indices(&search_lower) {
+                                                              let end = start + search_query.len();
+                                                              if start > last_end {
+                                                                  layout_job.append(&text[last_end..start], 0.0, default_format.clone());
+                                                              }
+                                                              layout_job.append(&text[start..end], 0.0, egui::TextFormat {
+                                                                  font_id: font_id.clone(),
+                                                                  background: egui::Color32::from_rgb(255, 255, 0),
+                                                                  color: egui::Color32::BLACK,
+                                                                  ..Default::default()
+                                                              });
+                                                              last_end = end;
+                                                          }
+                                                          if last_end < text.len() {
+                                                              layout_job.append(&text[last_end..], 0.0, default_format);
+                                                          }
+                                                          layout_job.wrap.max_width = wrap_width;
+                                                          ui.fonts(|f| f.layout_job(layout_job))
+                                                      };
+                                                      ui.add(text_edit.layouter(&mut my_layouter));
+                                                  } else {
+                                                      ui.add(text_edit);
+                                                  }
                                                  ui.horizontal(|ui| {
                                                      ui.label(egui::RichText::new(format!("Tokens: {} | Chars: {}", count_tokens(&character.first_message), character.first_message.chars().count())).size(12.0).color(egui::Color32::GRAY));
                                                      ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -296,7 +355,44 @@ pub fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                                          egui::CollapsingHeader::new("Personality")
                                              .default_open(true)
                                              .show(ui, |ui| {
-                                                 ui.add(egui::TextEdit::multiline(&mut character.personality).desired_width(f32::INFINITY));
+                                                 let mut text_edit = egui::TextEdit::multiline(&mut character.personality).desired_width(f32::INFINITY);
+                                                  if app.editor_search_query.len() >= 3 {
+                                                      let search_query = app.editor_search_query.clone();
+                                                      let mut my_layouter = move |ui: &egui::Ui, text: &str, wrap_width: f32| {
+                                                          let mut layout_job = egui::text::LayoutJob::default();
+                                                          let search_lower = search_query.to_lowercase();
+                                                          let text_lower = text.to_lowercase();
+                                                          let mut last_end = 0;
+                                                          
+                                                          let font_id = egui::TextStyle::Body.resolve(ui.style());
+                                                          let default_format = egui::TextFormat {
+                                                              font_id: font_id.clone(),
+                                                              ..Default::default()
+                                                          };
+                                                          
+                                                          for (start, _) in text_lower.match_indices(&search_lower) {
+                                                              let end = start + search_query.len();
+                                                              if start > last_end {
+                                                                  layout_job.append(&text[last_end..start], 0.0, default_format.clone());
+                                                              }
+                                                              layout_job.append(&text[start..end], 0.0, egui::TextFormat {
+                                                                  font_id: font_id.clone(),
+                                                                  background: egui::Color32::from_rgb(255, 255, 0),
+                                                                  color: egui::Color32::BLACK,
+                                                                  ..Default::default()
+                                                              });
+                                                              last_end = end;
+                                                          }
+                                                          if last_end < text.len() {
+                                                              layout_job.append(&text[last_end..], 0.0, default_format);
+                                                          }
+                                                          layout_job.wrap.max_width = wrap_width;
+                                                          ui.fonts(|f| f.layout_job(layout_job))
+                                                      };
+                                                      ui.add(text_edit.layouter(&mut my_layouter));
+                                                  } else {
+                                                      ui.add(text_edit);
+                                                  }
                                                  ui.horizontal(|ui| {
                                                      ui.label(egui::RichText::new(format!("Tokens: {} | Chars: {}", count_tokens(&character.personality), character.personality.chars().count())).size(12.0).color(egui::Color32::GRAY));
                                                      ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -311,7 +407,44 @@ pub fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                                          egui::CollapsingHeader::new("Scenario")
                                              .default_open(true)
                                              .show(ui, |ui| {
-                                                 ui.add(egui::TextEdit::multiline(&mut character.scenario).desired_width(f32::INFINITY));
+                                                 let mut text_edit = egui::TextEdit::multiline(&mut character.scenario).desired_width(f32::INFINITY);
+                                                  if app.editor_search_query.len() >= 3 {
+                                                      let search_query = app.editor_search_query.clone();
+                                                      let mut my_layouter = move |ui: &egui::Ui, text: &str, wrap_width: f32| {
+                                                          let mut layout_job = egui::text::LayoutJob::default();
+                                                          let search_lower = search_query.to_lowercase();
+                                                          let text_lower = text.to_lowercase();
+                                                          let mut last_end = 0;
+                                                          
+                                                          let font_id = egui::TextStyle::Body.resolve(ui.style());
+                                                          let default_format = egui::TextFormat {
+                                                              font_id: font_id.clone(),
+                                                              ..Default::default()
+                                                          };
+                                                          
+                                                          for (start, _) in text_lower.match_indices(&search_lower) {
+                                                              let end = start + search_query.len();
+                                                              if start > last_end {
+                                                                  layout_job.append(&text[last_end..start], 0.0, default_format.clone());
+                                                              }
+                                                              layout_job.append(&text[start..end], 0.0, egui::TextFormat {
+                                                                  font_id: font_id.clone(),
+                                                                  background: egui::Color32::from_rgb(255, 255, 0),
+                                                                  color: egui::Color32::BLACK,
+                                                                  ..Default::default()
+                                                              });
+                                                              last_end = end;
+                                                          }
+                                                          if last_end < text.len() {
+                                                              layout_job.append(&text[last_end..], 0.0, default_format);
+                                                          }
+                                                          layout_job.wrap.max_width = wrap_width;
+                                                          ui.fonts(|f| f.layout_job(layout_job))
+                                                      };
+                                                      ui.add(text_edit.layouter(&mut my_layouter));
+                                                  } else {
+                                                      ui.add(text_edit);
+                                                  }
                                                  ui.horizontal(|ui| {
                                                      ui.label(egui::RichText::new(format!("Tokens: {} | Chars: {}", count_tokens(&character.scenario), character.scenario.chars().count())).size(12.0).color(egui::Color32::GRAY));
                                                      ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -326,7 +459,44 @@ pub fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                                          egui::CollapsingHeader::new("Example Dialogue")
                                              .default_open(true)
                                              .show(ui, |ui| {
-                                                 ui.add(egui::TextEdit::multiline(&mut character.example_dialogue).desired_width(f32::INFINITY));
+                                                 let mut text_edit = egui::TextEdit::multiline(&mut character.example_dialogue).desired_width(f32::INFINITY);
+                                                  if app.editor_search_query.len() >= 3 {
+                                                      let search_query = app.editor_search_query.clone();
+                                                      let mut my_layouter = move |ui: &egui::Ui, text: &str, wrap_width: f32| {
+                                                          let mut layout_job = egui::text::LayoutJob::default();
+                                                          let search_lower = search_query.to_lowercase();
+                                                          let text_lower = text.to_lowercase();
+                                                          let mut last_end = 0;
+                                                          
+                                                          let font_id = egui::TextStyle::Body.resolve(ui.style());
+                                                          let default_format = egui::TextFormat {
+                                                              font_id: font_id.clone(),
+                                                              ..Default::default()
+                                                          };
+                                                          
+                                                          for (start, _) in text_lower.match_indices(&search_lower) {
+                                                              let end = start + search_query.len();
+                                                              if start > last_end {
+                                                                  layout_job.append(&text[last_end..start], 0.0, default_format.clone());
+                                                              }
+                                                              layout_job.append(&text[start..end], 0.0, egui::TextFormat {
+                                                                  font_id: font_id.clone(),
+                                                                  background: egui::Color32::from_rgb(255, 255, 0),
+                                                                  color: egui::Color32::BLACK,
+                                                                  ..Default::default()
+                                                              });
+                                                              last_end = end;
+                                                          }
+                                                          if last_end < text.len() {
+                                                              layout_job.append(&text[last_end..], 0.0, default_format);
+                                                          }
+                                                          layout_job.wrap.max_width = wrap_width;
+                                                          ui.fonts(|f| f.layout_job(layout_job))
+                                                      };
+                                                      ui.add(text_edit.layouter(&mut my_layouter));
+                                                  } else {
+                                                      ui.add(text_edit);
+                                                  }
                                                  ui.horizontal(|ui| {
                                                      ui.label(egui::RichText::new(format!("Tokens: {} | Chars: {}", count_tokens(&character.example_dialogue), character.example_dialogue.chars().count())).size(12.0).color(egui::Color32::GRAY));
                                                      ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -584,7 +754,43 @@ pub fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                              CharacterTab::Notes => {
                                  ui.label("Notes");
                                  let width = ui.ctx().screen_rect().width() * 2.0 / 3.0;
-                                 ui.add(egui::TextEdit::multiline(&mut character.author_notes).desired_width(width));
+                                 let mut text_edit = egui::TextEdit::multiline(&mut character.author_notes).desired_width(width);
+                                  if app.editor_search_query.len() >= 3 {
+                                      let search_query = app.editor_search_query.clone();
+                                      let mut my_layouter = move |ui: &egui::Ui, text: &str, wrap_width: f32| {
+                                          let mut layout_job = egui::text::LayoutJob::default();
+                                          let search_lower = search_query.to_lowercase();
+                                          let text_lower = text.to_lowercase();
+                                          let mut last_end = 0;
+                                                          
+                                                          let font_id = egui::TextStyle::Body.resolve(ui.style());
+                                                          let default_format = egui::TextFormat {
+                                                              font_id: font_id.clone(),
+                                                              ..Default::default()
+                                                          };
+                                          for (start, _) in text_lower.match_indices(&search_lower) {
+                                              let end = start + search_query.len();
+                                              if start > last_end {
+                                                  layout_job.append(&text[last_end..start], 0.0, default_format.clone());
+                                              }
+                                              layout_job.append(&text[start..end], 0.0, egui::TextFormat {
+                                                  font_id: font_id.clone(),
+                                                  background: egui::Color32::from_rgb(255, 255, 0),
+                                                  color: egui::Color32::BLACK,
+                                                  ..Default::default()
+                                              });
+                                              last_end = end;
+                                          }
+                                          if last_end < text.len() {
+                                              layout_job.append(&text[last_end..], 0.0, default_format);
+                                          }
+                                          layout_job.wrap.max_width = wrap_width;
+                                          ui.fonts(|f| f.layout_job(layout_job))
+                                      };
+                                      ui.add(text_edit.layouter(&mut my_layouter));
+                                  } else {
+                                      ui.add(text_edit);
+                                  }
 
                                  ui.add_space(16.0);
                                  ui.separator();

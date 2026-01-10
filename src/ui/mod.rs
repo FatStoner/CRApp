@@ -19,6 +19,7 @@ pub mod widgets;
 pub mod browser;
 pub mod editor;
 pub mod parsing;
+pub mod text_highlight;
 
 // Re-export specific items if needed
 pub use parsing::ParsedCharacterData;
@@ -188,6 +189,7 @@ pub struct CrapApp {
     pub deep_search_field_filters: SearchFieldFilters, // Field selection
     pub deep_search_results: Vec<DeepSearchResult>,
     pub is_deep_searching: bool,
+    pub editor_search_query: String, // In-editor search
 
     // Tag editor
     pub app_tag_input: String,
@@ -238,6 +240,7 @@ impl CrapApp {
             deep_search_field_filters: SearchFieldFilters::default(),
             deep_search_results: Vec::new(),
             is_deep_searching: false,
+            editor_search_query: String::new(),
             app_tag_input: String::new(),
             ext_tag_input: String::new(),
 
