@@ -90,12 +90,31 @@ pub fn render_central_panel(app: &mut CrapApp, ctx: &egui::Context) {
                                 ui.label("External Tags:");
                                 ui.label(data.external_tags.join(", "));
                                 ui.end_row();
+
+                                ui.label("App Tags:");
+                                ui.label(data.app_tags.join(", "));
+                                ui.end_row();
+
+                                ui.label("URLs:");
+                                ui.vertical(|ui| {
+                                    for url in &data.urls {
+                                        ui.horizontal(|ui| {
+                                            if let Some(lbl) = &url.label {
+                                                ui.label(egui::RichText::new(format!("{}:", lbl)).strong());
+                                            }
+                                            ui.label(&url.url);
+                                        });
+                                    }
+                                });
+                                ui.end_row();
                             });
                         });
                         
                         ui.add_space(10.0);
                         ui.horizontal(|ui| {
                             if ui.button("Apply to Character").clicked() {
+                                let mut status_update = None;
+
                                 if let Some(c) = &mut app.selected_character {
                                     let d = app.parsed_data.take().unwrap();
                                     
@@ -110,28 +129,55 @@ pub fn render_central_panel(app: &mut CrapApp, ctx: &egui::Context) {
                                     if !d.example_dialogue.is_empty() { c.example_dialogue = d.example_dialogue; }
                                     
                                     if c.id != 0 {
+                                        // EXISTING CHARACTER
                                         let tx_clone = app.tx.clone();
                                         let db_clone = app.db.clone();
                                         let cid = c.id;
-                                        let tags = d.external_tags.clone();
+                                        
+                                        // Tags
+                                        let ext_tags = d.external_tags.clone();
+                                        let app_tags = d.app_tags.clone();
                                         
                                         tokio::spawn(async move {
-                                            for tag_name in tags {
+                                            for tag_name in ext_tags {
                                                 let _ = db_clone.add_tag_to_character(cid, &tag_name, true).await;
+                                            }
+                                            for tag_name in app_tags {
+                                                 let _ = db_clone.add_tag_to_character(cid, &tag_name, false).await;
                                             }
                                             let _ = tx_clone.send(UiEvent::TagOperationFinished(Ok(()))).await;
                                         });
-                                        app.set_status("Data updated. Tags being added.".to_string(), egui::Color32::GREEN);
+
+                                        status_update = Some(("Data updated. Tags being added.".to_string(), egui::Color32::GREEN));
+                                        
+                                        // Update URLs
+                                        if !d.urls.is_empty() {
+                                             c.urls = d.urls.clone();
+                                        }
                                     } else {
-                                        // New Character - Tags are added to the list but not saved to DB yet (will be on Save)
-                                        // Wait, the "d.external_tags" strings need to be converted to Tag structs.
-                                        // The original code loop at line 273 was doing this.
+                                        // NEW CHARACTER
                                         for tag_name in d.external_tags {
                                             c.external_tags.push(Tag { id: 0, name: tag_name });
                                         }
-                                        app.set_status("Import applied to New Character (Unsaved).".to_string(), egui::Color32::YELLOW);
+                                        for tag_name in d.app_tags {
+                                            c.app_tags.push(Tag { id: 0, name: tag_name });
+                                        }
+                                        if !d.urls.is_empty() {
+                                            c.urls = d.urls.clone();
+                                            // Reset IDs for new urls
+                                            for u in &mut c.urls {
+                                                u.id = 0;
+                                                u.character_id = 0;
+                                            }
+                                        }
+                                        status_update = Some(("Import applied to New Character (Unsaved).".to_string(), egui::Color32::YELLOW));
                                     }
                                 }
+
+                                if let Some((msg, color)) = status_update {
+                                    app.set_status(msg, color);
+                                }
+
                                 app.show_import_modal = false;
                             }
                             

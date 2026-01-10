@@ -114,6 +114,19 @@ pub fn render_browser_view(app: &mut CrapApp, ui: &mut egui::Ui) {
             ui.separator();
             ui.add_space(8.0);
 
+            ui.add_space(8.0);
+            let label = if app.browser_show_urls {
+                "URLs (On)"
+            } else {
+                "URLs"
+            };
+            if ui.selectable_label(app.browser_show_urls, label).clicked() {
+                app.browser_show_urls = !app.browser_show_urls;
+            }
+            ui.add_space(8.0);
+            ui.separator();
+            ui.add_space(8.0);
+
             // 1. Rename Button (To the left of Sorting)
             if !viewing_all {
                 if let Some(id) = collection_id {
@@ -345,186 +358,276 @@ pub fn render_browser_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                     ui.visuals().text_color(),
                 );
             }
+        });
 
-            // Render Characters
-            for char in chars {
-                let card_width = 180.0;
-                let card_height = 260.0;
+        if app.browser_show_urls {
+            ui.vertical(|ui| {
+                for char in &chars {
+                    ui.add_space(8.0);
+                    egui::Frame::group(ui.style()).show(ui, |ui| {
+                        ui.set_min_width(ui.available_width());
+                        ui.horizontal(|ui| {
+                            // Avatar
+                            let avatar_size = 80.0;
+                            let (rect, response) = ui.allocate_exact_size(
+                                egui::vec2(avatar_size, avatar_size),
+                                egui::Sense::click(),
+                            );
 
-                let (rect, response) = ui
-                    .allocate_exact_size(egui::vec2(card_width, card_height), egui::Sense::click());
+                            if response.clicked() {
+                                app.selected_character = Some(char.clone());
+                                app.central_view = crate::ui::CentralView::Editor;
+                                app.load_tags(char.id);
+                                app.load_links(char.id);
+                            }
 
-                // Hover Effect
-                let bg_color = if response.hovered() {
-                    ui.visuals().widgets.hovered.bg_fill
-                } else {
-                    ui.visuals().widgets.noninteractive.bg_fill
-                };
+                            // Avatar Painting
+                            if let Some(path_str) = &char.avatar_path {
+                                let uri = if path_str.contains("://") {
+                                    path_str.clone()
+                                } else {
+                                    if let Ok(abs_path) = std::fs::canonicalize(path_str) {
+                                        format!("file://{}", abs_path.to_string_lossy())
+                                    } else {
+                                        path_str.clone()
+                                    }
+                                };
+                                crate::ui::widgets::paint_avatar_crop(ui, rect, &uri, 4.0);
+                            } else {
+                                ui.painter()
+                                    .rect_filled(rect, 4.0, egui::Color32::from_gray(60));
+                                let initial = char
+                                    .name
+                                    .chars()
+                                    .next()
+                                    .unwrap_or('?')
+                                    .to_uppercase()
+                                    .to_string();
+                                ui.painter().text(
+                                    rect.center(),
+                                    egui::Align2::CENTER_CENTER,
+                                    initial,
+                                    egui::FontId::proportional(32.0),
+                                    egui::Color32::WHITE,
+                                );
+                            }
 
-                ui.painter().rect_filled(rect, 8.0, bg_color);
-                ui.painter()
-                    .rect_stroke(rect, 8.0, ui.visuals().widgets.noninteractive.bg_stroke);
+                            ui.add_space(10.0);
 
-                // Interaction
-                if response.clicked() {
-                    app.selected_character = Some(char.clone());
-                    app.central_view = crate::ui::CentralView::Editor;
-                    app.load_tags(char.id);
-                    app.load_links(char.id);
+                            // Info Vertical
+                            ui.vertical(|ui| {
+                                ui.heading(&char.name);
+                                ui.add_space(4.0);
+
+                                if char.urls.is_empty() {
+                                    ui.label(
+                                        egui::RichText::new("No URLs")
+                                            .italics()
+                                            .color(egui::Color32::GRAY),
+                                    );
+                                }
+
+                                for url in &char.urls {
+                                    ui.horizontal(|ui| {
+                                        let label = url.label.as_deref().unwrap_or("Link");
+                                        ui.label(
+                                            egui::RichText::new(format!("{}:", label)).strong(),
+                                        );
+                                        ui.hyperlink(&url.url);
+                                    });
+                                }
+                            });
+                        });
+                    });
                 }
+            });
+        } else {
+            ui.horizontal_wrapped(|ui| {
+                // Render Characters
+                for char in &chars {
+                    let card_width = 180.0;
+                    let card_height = 260.0;
 
-                response.context_menu(|ui| {
-                    ui.menu_button("Move to...", |ui| {
-                        if ui.button("Root (Uncategorized)").clicked() {
-                            actions.push(BrowserAction::MoveCharacter(char.id, None));
+                    let (rect, response) = ui.allocate_exact_size(
+                        egui::vec2(card_width, card_height),
+                        egui::Sense::click(),
+                    );
+
+                    // Hover Effect
+                    let bg_color = if response.hovered() {
+                        ui.visuals().widgets.hovered.bg_fill
+                    } else {
+                        ui.visuals().widgets.noninteractive.bg_fill
+                    };
+
+                    ui.painter().rect_filled(rect, 8.0, bg_color);
+                    ui.painter().rect_stroke(
+                        rect,
+                        8.0,
+                        ui.visuals().widgets.noninteractive.bg_stroke,
+                    );
+
+                    // Interaction
+                    if response.clicked() {
+                        app.selected_character = Some(char.clone());
+                        app.central_view = crate::ui::CentralView::Editor;
+                        app.load_tags(char.id);
+                        app.load_links(char.id);
+                    }
+
+                    response.context_menu(|ui| {
+                        ui.menu_button("Move to...", |ui| {
+                            if ui.button("Root (Uncategorized)").clicked() {
+                                actions.push(BrowserAction::MoveCharacter(char.id, None));
+                                ui.close_menu();
+                            }
+                            ui.separator();
+                            render_collection_move_menu(
+                                ui,
+                                &all_collections,
+                                None,
+                                char.id,
+                                &mut actions,
+                            );
+                        });
+
+                        if ui.button("🗑 Delete").clicked() {
+                            actions.push(BrowserAction::DeleteCharacter(char.id));
                             ui.close_menu();
                         }
-                        ui.separator();
-                        render_collection_move_menu(
-                            ui,
-                            &all_collections,
-                            None,
-                            char.id,
-                            &mut actions,
-                        );
                     });
 
-                    if ui.button("🗑 Delete").clicked() {
-                        actions.push(BrowserAction::DeleteCharacter(char.id));
-                        ui.close_menu();
-                    }
-                });
+                    // Content
+                    let content_rect = rect.shrink(8.0);
 
-                // Content
-                let content_rect = rect.shrink(8.0);
+                    // Avatar (Top Square)
+                    let avatar_size = content_rect.width();
+                    let avatar_rect = egui::Rect::from_min_size(
+                        content_rect.min,
+                        egui::vec2(avatar_size, avatar_size),
+                    );
 
-                // Avatar (Top Square)
-                let avatar_size = content_rect.width();
-                let avatar_rect = egui::Rect::from_min_size(
-                    content_rect.min,
-                    egui::vec2(avatar_size, avatar_size),
-                );
-
-                if let Some(path_str) = &char.avatar_path {
-                    let uri = if path_str.contains("://") {
-                        path_str.clone()
-                    } else {
-                        if let Ok(abs_path) = std::fs::canonicalize(path_str) {
-                            format!("file://{}", abs_path.to_string_lossy())
-                        } else {
+                    if let Some(path_str) = &char.avatar_path {
+                        let uri = if path_str.contains("://") {
                             path_str.clone()
-                        }
-                    };
-                    crate::ui::widgets::paint_avatar_crop(ui, avatar_rect, &uri, 4.0);
-                } else {
-                    ui.painter()
-                        .rect_filled(avatar_rect, 4.0, egui::Color32::from_gray(60));
-                    let initial = char
-                        .name
-                        .chars()
-                        .next()
-                        .unwrap_or('?')
-                        .to_uppercase()
-                        .to_string();
-                    ui.painter().text(
-                        avatar_rect.center(),
-                        egui::Align2::CENTER_CENTER,
-                        initial,
-                        egui::FontId::proportional(40.0),
-                        egui::Color32::WHITE,
+                        } else {
+                            if let Ok(abs_path) = std::fs::canonicalize(path_str) {
+                                format!("file://{}", abs_path.to_string_lossy())
+                            } else {
+                                path_str.clone()
+                            }
+                        };
+                        crate::ui::widgets::paint_avatar_crop(ui, avatar_rect, &uri, 4.0);
+                    } else {
+                        ui.painter()
+                            .rect_filled(avatar_rect, 4.0, egui::Color32::from_gray(60));
+                        let initial = char
+                            .name
+                            .chars()
+                            .next()
+                            .unwrap_or('?')
+                            .to_uppercase()
+                            .to_string();
+                        ui.painter().text(
+                            avatar_rect.center(),
+                            egui::Align2::CENTER_CENTER,
+                            initial,
+                            egui::FontId::proportional(40.0),
+                            egui::Color32::WHITE,
+                        );
+                    }
+
+                    // Text Area
+                    let text_top = avatar_rect.max.y + 8.0;
+                    let _text_rect = egui::Rect::from_min_max(
+                        egui::pos2(content_rect.min.x, text_top),
+                        content_rect.max,
                     );
-                }
 
-                // Text Area
-                let text_top = avatar_rect.max.y + 8.0;
-                let _text_rect = egui::Rect::from_min_max(
-                    egui::pos2(content_rect.min.x, text_top),
-                    content_rect.max,
-                );
+                    let mut cursor_y = text_top;
 
-                let mut cursor_y = text_top;
-
-                // Name
-                let name_font = egui::FontId::proportional(16.0);
-                let name_galley = ui.painter().layout_no_wrap(
-                    char.name.clone(),
-                    name_font.clone(),
-                    ui.visuals().text_color(),
-                );
-                ui.painter().galley(
-                    egui::pos2(content_rect.min.x, cursor_y),
-                    name_galley,
-                    ui.visuals().text_color(),
-                );
-                cursor_y += 20.0;
-
-                // Title
-                if !char.char_title.is_empty() {
-                    let title_font = egui::FontId::proportional(12.0);
-                    let title_galley = ui.painter().layout_no_wrap(
-                        char.char_title.clone(),
-                        title_font,
-                        ui.visuals().text_color().linear_multiply(0.7),
-                    );
-                    ui.painter().with_clip_rect(rect).galley(
-                        egui::pos2(content_rect.min.x, cursor_y),
-                        title_galley,
+                    // Name
+                    let name_font = egui::FontId::proportional(16.0);
+                    let name_galley = ui.painter().layout_no_wrap(
+                        char.name.clone(),
+                        name_font.clone(),
                         ui.visuals().text_color(),
                     );
-                    cursor_y += 16.0;
-                } else {
-                    cursor_y += 16.0; // Spacer
-                }
-
-                cursor_y += 4.0;
-
-                // Tags (Chips)
-                let tag_font = egui::FontId::proportional(10.0);
-                let mut tag_x = content_rect.min.x;
-
-                let mut tags_to_show: Vec<&Tag> = char.app_tags.iter().collect();
-                let mut is_external = false;
-                if tags_to_show.is_empty() {
-                    tags_to_show = char.external_tags.iter().collect();
-                    is_external = true;
-                }
-
-                for tag in tags_to_show.iter().take(3) {
-                    let tag_galley = ui.painter().layout_no_wrap(
-                        tag.name.clone(),
-                        tag_font.clone(),
-                        egui::Color32::WHITE,
+                    ui.painter().galley(
+                        egui::pos2(content_rect.min.x, cursor_y),
+                        name_galley,
+                        ui.visuals().text_color(),
                     );
-                    let pad = 4.0;
-                    let chip_w = tag_galley.rect.width() + pad * 2.0;
+                    cursor_y += 20.0;
 
-                    if tag_x + chip_w > content_rect.max.x {
-                        break;
+                    // Title
+                    if !char.char_title.is_empty() {
+                        let title_font = egui::FontId::proportional(12.0);
+                        let title_galley = ui.painter().layout_no_wrap(
+                            char.char_title.clone(),
+                            title_font,
+                            ui.visuals().text_color().linear_multiply(0.7),
+                        );
+                        ui.painter().with_clip_rect(rect).galley(
+                            egui::pos2(content_rect.min.x, cursor_y),
+                            title_galley,
+                            ui.visuals().text_color(),
+                        );
+                        cursor_y += 16.0;
+                    } else {
+                        cursor_y += 16.0; // Spacer
                     }
 
-                    let chip_rect = egui::Rect::from_min_size(
-                        egui::pos2(tag_x, cursor_y),
-                        egui::vec2(chip_w, 16.0),
-                    );
+                    cursor_y += 4.0;
 
-                    // Different color for external tags (Grayish vs Blueish)
-                    let bg_color = if is_external {
-                        egui::Color32::from_rgb(100, 100, 100)
-                    } else {
-                        egui::Color32::from_rgb(50, 80, 150)
-                    };
+                    // Tags (Chips)
+                    let tag_font = egui::FontId::proportional(10.0);
+                    let mut tag_x = content_rect.min.x;
 
-                    ui.painter().rect_filled(chip_rect, 8.0, bg_color);
-                    ui.painter().galley(
-                        egui::pos2(tag_x + pad, cursor_y + 2.0),
-                        tag_galley,
-                        egui::Color32::WHITE,
-                    );
+                    let mut tags_to_show: Vec<&Tag> = char.app_tags.iter().collect();
+                    let mut is_external = false;
+                    if tags_to_show.is_empty() {
+                        tags_to_show = char.external_tags.iter().collect();
+                        is_external = true;
+                    }
 
-                    tag_x += chip_w + 4.0;
+                    for tag in tags_to_show.iter().take(3) {
+                        let tag_galley = ui.painter().layout_no_wrap(
+                            tag.name.clone(),
+                            tag_font.clone(),
+                            egui::Color32::WHITE,
+                        );
+                        let pad = 4.0;
+                        let chip_w = tag_galley.rect.width() + pad * 2.0;
+
+                        if tag_x + chip_w > content_rect.max.x {
+                            break;
+                        }
+
+                        let chip_rect = egui::Rect::from_min_size(
+                            egui::pos2(tag_x, cursor_y),
+                            egui::vec2(chip_w, 16.0),
+                        );
+
+                        // Different color for external tags (Grayish vs Blueish)
+                        let bg_color = if is_external {
+                            egui::Color32::from_rgb(100, 100, 100)
+                        } else {
+                            egui::Color32::from_rgb(50, 80, 150)
+                        };
+
+                        ui.painter().rect_filled(chip_rect, 8.0, bg_color);
+                        ui.painter().galley(
+                            egui::pos2(tag_x + pad, cursor_y + 2.0),
+                            tag_galley,
+                            egui::Color32::WHITE,
+                        );
+
+                        tag_x += chip_w + 4.0;
+                    }
                 }
-            }
-        });
+            });
+        };
 
         // Context menu for empty space
         let available = ui.available_size();

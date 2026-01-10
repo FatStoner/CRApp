@@ -7,6 +7,8 @@ pub struct ParsedCharacterData {
     pub first_message: String,
     pub example_dialogue: String,
     pub external_tags: Vec<String>,
+    pub app_tags: Vec<String>,
+    pub urls: Vec<crate::models::CharacterUrl>,
 }
 
 pub fn parse_clipboard(text: &str) -> ParsedCharacterData {

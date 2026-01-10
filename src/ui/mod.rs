@@ -120,6 +120,7 @@ pub struct CrapApp {
     pub sort_direction: SortDirection,
     pub browser_sort_mode: SortMode,
     pub browser_sort_direction: SortDirection,
+    pub browser_show_urls: bool,
     pub selected_collection_id: Option<i64>,
 
     pub popup_state: PopupState,
@@ -170,6 +171,7 @@ impl CrapApp {
             sort_direction: SortDirection::Ascending,
             browser_sort_mode: SortMode::Alphabetical,
             browser_sort_direction: SortDirection::Ascending,
+            browser_show_urls: false,
             selected_collection_id: None,
             popup_state: PopupState::None,
             is_saving: false,
@@ -874,6 +876,17 @@ impl CrapApp {
                 }
             }
 
+            // 3.5. Fetch URLs for result candidates
+            if !char_map.is_empty() {
+                if let Ok(urls) = db.get_all_character_urls_flat().await {
+                    for u in urls {
+                        if let Some(c) = char_map.get_mut(&u.character_id) {
+                            c.urls.push(u);
+                        }
+                    }
+                }
+            }
+
             // 4. Build Character Results
             for (_, c) in char_map {
                 let mut matches = Vec::new();
@@ -895,6 +908,17 @@ impl CrapApp {
                 }
                 for s in extract_snippets(&c.author_notes, &query) {
                     matches.push(("Notes".to_string(), s));
+                }
+
+                for url in &c.urls {
+                    for s in extract_snippets(&url.url, &query) {
+                        matches.push(("URL".to_string(), s));
+                    }
+                    if let Some(label) = &url.label {
+                        for s in extract_snippets(label, &query) {
+                            matches.push(("URL Label".to_string(), s));
+                        }
+                    }
                 }
 
                 for (tid, tname, is_ext) in &tag_matches {
@@ -1177,6 +1201,12 @@ impl eframe::App for CrapApp {
                                         .iter()
                                         .map(|t| t.name.clone())
                                         .collect(),
+                                    app_tags: char_obj
+                                        .app_tags
+                                        .iter()
+                                        .map(|t| t.name.clone())
+                                        .collect(),
+                                    urls: char_obj.urls.clone(),
                                 };
 
                                 // Force "New Character" mode
