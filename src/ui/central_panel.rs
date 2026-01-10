@@ -1052,20 +1052,20 @@ fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                                          
                                          ui.label("First Message");
                                          ui.add(egui::TextEdit::multiline(&mut character.first_message).desired_width(f32::INFINITY));
-                                         ui.label(egui::RichText::new(format!("Tokens: {}", count_tokens(&character.first_message))).size(10.0).color(egui::Color32::GRAY));
+                                         ui.label(egui::RichText::new(format!("Tokens: {} | Chars: {}", count_tokens(&character.first_message), character.first_message.chars().count())).size(12.0).color(egui::Color32::GRAY));
                                          
                                          ui.add_space(8.0);
                                          ui.label("Personality");
                                          ui.add(egui::TextEdit::multiline(&mut character.personality).desired_width(f32::INFINITY));
-                                         ui.label(egui::RichText::new(format!("Tokens: {}", count_tokens(&character.personality))).size(10.0).color(egui::Color32::GRAY));
+                                         ui.label(egui::RichText::new(format!("Tokens: {} | Chars: {}", count_tokens(&character.personality), character.personality.chars().count())).size(12.0).color(egui::Color32::GRAY));
         
                                          ui.label("Scenario");
                                          ui.add(egui::TextEdit::multiline(&mut character.scenario).desired_width(f32::INFINITY));
-                                         ui.label(egui::RichText::new(format!("Tokens: {}", count_tokens(&character.scenario))).size(10.0).color(egui::Color32::GRAY));
+                                         ui.label(egui::RichText::new(format!("Tokens: {} | Chars: {}", count_tokens(&character.scenario), character.scenario.chars().count())).size(12.0).color(egui::Color32::GRAY));
         
                                          ui.label("Example Dialogue");
                                          ui.add(egui::TextEdit::multiline(&mut character.example_dialogue).desired_width(f32::INFINITY));
-                                         ui.label(egui::RichText::new(format!("Tokens: {}", count_tokens(&character.example_dialogue))).size(10.0).color(egui::Color32::GRAY));
+                                         ui.label(egui::RichText::new(format!("Tokens: {} | Chars: {}", count_tokens(&character.example_dialogue), character.example_dialogue.chars().count())).size(12.0).color(egui::Color32::GRAY));
                                          
                                          egui::CollapsingHeader::new("Tags & Metadata")
                                             .default_open(true)
@@ -1074,7 +1074,9 @@ fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                                                      // App Tags
                                                     ui.label(egui::RichText::new("CRApp Tags").strong().color(egui::Color32::from_rgb(100, 150, 255)));
                                                     ui.horizontal(|ui| {
-                                                        for tag in &character.app_tags {
+                                                        let mut app_tags_sorted: Vec<_> = character.app_tags.iter().collect();
+                                                        app_tags_sorted.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+                                                        for tag in app_tags_sorted {
                                                             egui::Frame::none().fill(egui::Color32::from_rgb(50, 80, 150)).rounding(12.0).inner_margin(4.0).show(ui, |ui| {
                                                                 ui.horizontal(|ui| {
                                                                     ui.label(egui::RichText::new(&tag.name).color(egui::Color32::WHITE).size(12.0));
@@ -1098,7 +1100,9 @@ fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                                                     // External Tags
                                                     ui.label(egui::RichText::new("External Tags").strong().color(egui::Color32::GRAY));
                                                     ui.horizontal(|ui| {
-                                                        for tag in &character.external_tags {
+                                                        let mut ext_tags_sorted: Vec<_> = character.external_tags.iter().collect();
+                                                        ext_tags_sorted.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+                                                        for tag in ext_tags_sorted {
                                                             egui::Frame::none().fill(egui::Color32::from_gray(80)).rounding(12.0).inner_margin(4.0).show(ui, |ui| {
                                                                 ui.horizontal(|ui| {
                                                                     ui.label(egui::RichText::new(&tag.name).color(egui::Color32::WHITE).size(12.0));
@@ -1229,6 +1233,7 @@ fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                                                      }
                                                  }
                                              });
+                                             
                                          } else {
                                              ui.label(egui::RichText::new("No avatar selected").italics());
                                          }
@@ -1285,6 +1290,21 @@ fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                                                   }
                                              }
                                          });
+                                         
+                                         ui.add_space(8.0);
+                                         
+                                         // Token Summary
+                                         let t_first = count_tokens(&character.first_message);
+                                         let t_pers = count_tokens(&character.personality);
+                                         let t_scen = count_tokens(&character.scenario);
+                                         let t_ex = count_tokens(&character.example_dialogue);
+                                         
+                                         let total_tokens = t_first + t_pers + t_scen + t_ex;
+                                         let perm_tokens = t_pers + t_scen;
+                                         
+                                         ui.label(egui::RichText::new(format!("Total Tokens: {} (Permanent: {})", total_tokens, perm_tokens))
+                                             .strong()
+                                             .color(egui::Color32::WHITE));
                                      });
                                  });
                              },
