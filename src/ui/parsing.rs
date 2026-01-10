@@ -221,7 +221,20 @@ fn parse_profile_view(lines: &[&str]) -> ParsedCharacterData {
                     .iter()
                     .filter(|&&l| {
                         let s = l.to_lowercase();
-                        !s.chars().all(|c| c.is_numeric() || c == ',' || c == '.') && // pure numbers
+
+                        let is_numeric_ish = |c: char| c.is_numeric() || c == ',' || c == '.';
+                        let is_usage_count = if let Some(last) = s.chars().last() {
+                            if matches!(last, 'k' | 'm' | 'b') {
+                                s[..s.len() - 1].chars().all(is_numeric_ish)
+                            } else {
+                                false
+                            }
+                        } else {
+                            false
+                        };
+
+                        !s.chars().all(is_numeric_ish) && // pure numbers
+                        !is_usage_count &&
                     !s.contains('%') &&
                     !s.contains("tokens") &&
                     !s.contains("chat now") &&
@@ -401,5 +414,36 @@ Choose tags to help people discover your bot
         let data = parse_clipboard(text);
         assert_eq!(data.scenario.trim(), "Some scenario content.");
         assert_eq!(data.external_tags, vec!["scenario"]);
+    }
+
+    #[test]
+    fn test_parse_profile_high_usage() {
+        let text = r#"
+Back
+avatar image
+Eve
+@fatstoner
+Favorite
+Share
+9.6k
+0%
+1,607 tokens
+Months after meeting a bunyip...
+Futanari
+NSFW
+Suggest Tag
+"#;
+        let data = parse_clipboard(text);
+        assert_eq!(data.name, "Eve");
+        // "9.6k" should be ignored, so title should be the next line or empty/handled.
+        // In this snippet, "Months after meeting..." acts as title based on position if "9.6k" is ignored.
+        // If "9.6k" is NOT ignored, it becomes the title.
+        assert_ne!(data.title, "9.6k", "Failed to ignore high usage count 9.6k");
+        assert!(
+            data.title.starts_with("Months after"),
+            "Title detection failed: got '{}'",
+            data.title
+        );
+        assert!(data.external_tags.contains(&"Futanari".to_string()));
     }
 }
