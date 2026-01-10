@@ -69,6 +69,12 @@ pub fn render_browser_view(app: &mut CrapApp, ui: &mut egui::Ui) {
             if ui.button("⬅ Back").clicked() {
                 app.request_collection_switch(parent_id);
             }
+            // Handle Esc key for Back navigation
+            if ui.memory(|m| m.focused().is_none())
+                && ui.input(|i| i.key_pressed(egui::Key::Escape))
+            {
+                app.request_collection_switch(parent_id);
+            }
         }
         ui.heading(format!("Browsing: {}", collection_name));
 

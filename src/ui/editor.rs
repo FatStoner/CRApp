@@ -43,6 +43,10 @@ pub fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                         if ui.button("⬅ Back").clicked() {
                             back_req = Some(character.collection_id);
                         }
+                        // Handle Esc key for Back navigation
+                        if ui.memory(|m| m.focused().is_none()) && ui.input(|i| i.key_pressed(egui::Key::Escape)) {
+                            back_req = Some(character.collection_id);
+                        }
                         ui.heading("Edit Character");
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                             ui.menu_button("EXPORT", |ui| {
@@ -213,6 +217,11 @@ pub fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                                      save_color = egui::Color32::from_rgb(200, 100, 50); // Orange/Red
                                 }
                                 
+                                // Check for Ctrl+S
+                                if ui.input_mut(|i| i.consume_key(egui::Modifiers::CTRL, egui::Key::S)) {
+                                     save_req = Some(character.clone());
+                                }
+
                                 if ui.add(egui::Button::new(egui::RichText::new("SAVE").strong()).fill(save_color)).clicked() {
                                     save_req = Some(character.clone());
                                 }
@@ -350,10 +359,11 @@ pub fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                                                         }
                                                     });
                                                     ui.horizontal(|ui| {
-                                                        ui.text_edit_singleline(&mut app.app_tag_input);
-                                                        if ui.button("Add").clicked() && !app.app_tag_input.is_empty() {
+                                                        let response = ui.text_edit_singleline(&mut app.app_tag_input);
+                                                        if (ui.button("Add").clicked() || (response.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)))) && !app.app_tag_input.is_empty() {
                                                             tag_add_request = Some((character.id, app.app_tag_input.clone(), false));
                                                             app.app_tag_input.clear();
+                                                            response.request_focus();
                                                         }
                                                     });
                                                     
@@ -376,10 +386,11 @@ pub fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                                                         }
                                                     });
                                                     ui.horizontal(|ui| {
-                                                        ui.text_edit_singleline(&mut app.ext_tag_input);
-                                                        if ui.button("Add").clicked() && !app.ext_tag_input.is_empty() {
+                                                        let response = ui.text_edit_singleline(&mut app.ext_tag_input);
+                                                        if (ui.button("Add").clicked() || (response.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)))) && !app.ext_tag_input.is_empty() {
                                                              tag_add_request = Some((character.id, app.ext_tag_input.clone(), true));
                                                              app.ext_tag_input.clear();
+                                                             response.request_focus();
                                                         }
                                                     });
                                                 });
