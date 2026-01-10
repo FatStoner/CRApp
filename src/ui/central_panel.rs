@@ -1050,22 +1050,66 @@ fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                                          ui.add(egui::TextEdit::singleline(&mut character.char_title).desired_width(f32::INFINITY));
                                          ui.add_space(8.0);
                                          
-                                         ui.label("First Message");
-                                         ui.add(egui::TextEdit::multiline(&mut character.first_message).desired_width(f32::INFINITY));
-                                         ui.label(egui::RichText::new(format!("Tokens: {} | Chars: {}", count_tokens(&character.first_message), character.first_message.chars().count())).size(12.0).color(egui::Color32::GRAY));
+                                         egui::CollapsingHeader::new("First Message")
+                                             .default_open(true)
+                                             .show(ui, |ui| {
+                                                 ui.add(egui::TextEdit::multiline(&mut character.first_message).desired_width(f32::INFINITY));
+                                                 ui.horizontal(|ui| {
+                                                     ui.label(egui::RichText::new(format!("Tokens: {} | Chars: {}", count_tokens(&character.first_message), character.first_message.chars().count())).size(12.0).color(egui::Color32::GRAY));
+                                                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                                         if ui.small_button("Copy").clicked() {
+                                                             ui.output_mut(|o| o.copied_text = character.first_message.clone());
+                                                             status_update = Some(("Copied First Message to clipboard".to_string(), egui::Color32::GREEN));
+                                                         }
+                                                     });
+                                                 });
+                                             });
                                          
                                          ui.add_space(8.0);
-                                         ui.label("Personality");
-                                         ui.add(egui::TextEdit::multiline(&mut character.personality).desired_width(f32::INFINITY));
-                                         ui.label(egui::RichText::new(format!("Tokens: {} | Chars: {}", count_tokens(&character.personality), character.personality.chars().count())).size(12.0).color(egui::Color32::GRAY));
+                                         egui::CollapsingHeader::new("Personality")
+                                             .default_open(true)
+                                             .show(ui, |ui| {
+                                                 ui.add(egui::TextEdit::multiline(&mut character.personality).desired_width(f32::INFINITY));
+                                                 ui.horizontal(|ui| {
+                                                     ui.label(egui::RichText::new(format!("Tokens: {} | Chars: {}", count_tokens(&character.personality), character.personality.chars().count())).size(12.0).color(egui::Color32::GRAY));
+                                                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                                         if ui.small_button("Copy").clicked() {
+                                                             ui.output_mut(|o| o.copied_text = character.personality.clone());
+                                                             status_update = Some(("Copied Personality to clipboard".to_string(), egui::Color32::GREEN));
+                                                         }
+                                                     });
+                                                 });
+                                             });
         
-                                         ui.label("Scenario");
-                                         ui.add(egui::TextEdit::multiline(&mut character.scenario).desired_width(f32::INFINITY));
-                                         ui.label(egui::RichText::new(format!("Tokens: {} | Chars: {}", count_tokens(&character.scenario), character.scenario.chars().count())).size(12.0).color(egui::Color32::GRAY));
+                                         egui::CollapsingHeader::new("Scenario")
+                                             .default_open(true)
+                                             .show(ui, |ui| {
+                                                 ui.add(egui::TextEdit::multiline(&mut character.scenario).desired_width(f32::INFINITY));
+                                                 ui.horizontal(|ui| {
+                                                     ui.label(egui::RichText::new(format!("Tokens: {} | Chars: {}", count_tokens(&character.scenario), character.scenario.chars().count())).size(12.0).color(egui::Color32::GRAY));
+                                                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                                        if ui.small_button("Copy").clicked() {
+                                                             ui.output_mut(|o| o.copied_text = character.scenario.clone());
+                                                             status_update = Some(("Copied Scenario to clipboard".to_string(), egui::Color32::GREEN));
+                                                         }
+                                                     });
+                                                 });
+                                             });
         
-                                         ui.label("Example Dialogue");
-                                         ui.add(egui::TextEdit::multiline(&mut character.example_dialogue).desired_width(f32::INFINITY));
-                                         ui.label(egui::RichText::new(format!("Tokens: {} | Chars: {}", count_tokens(&character.example_dialogue), character.example_dialogue.chars().count())).size(12.0).color(egui::Color32::GRAY));
+                                         egui::CollapsingHeader::new("Example Dialogue")
+                                             .default_open(true)
+                                             .show(ui, |ui| {
+                                                 ui.add(egui::TextEdit::multiline(&mut character.example_dialogue).desired_width(f32::INFINITY));
+                                                 ui.horizontal(|ui| {
+                                                     ui.label(egui::RichText::new(format!("Tokens: {} | Chars: {}", count_tokens(&character.example_dialogue), character.example_dialogue.chars().count())).size(12.0).color(egui::Color32::GRAY));
+                                                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                                         if ui.small_button("Copy").clicked() {
+                                                             ui.output_mut(|o| o.copied_text = character.example_dialogue.clone());
+                                                             status_update = Some(("Copied Example Dialogue to clipboard".to_string(), egui::Color32::GREEN));
+                                                         }
+                                                     });
+                                                 });
+                                             });
                                          
                                          egui::CollapsingHeader::new("Tags & Metadata")
                                             .default_open(true)
