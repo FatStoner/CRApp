@@ -15,7 +15,7 @@ C.R.App leverages the power of a local SQLite database to handle thousands of ch
 -   **💾 Local-First Database**: All data is stored in a structured local SQLite database.
 -   **🔍 Deep Search**: Search through character names, descriptions, and tags instantly.
 -   **📂 Nested Collections**: Organize your library with a robust, hierarchical folder system.
--   **🔄 Import/Export**: Supports PNG, JSON, and native formats. Quick clipboard importing from spicychat.ai profiles.
+-   **🔄 Import/Export**: Supports JSON, text, and native formats. Quick clipboard importing from spicychat.ai profiles.
 
 ## Download
 
