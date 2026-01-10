@@ -128,20 +128,31 @@ pub fn render_browser_view(app: &mut CrapApp, ui: &mut egui::Ui) {
             ui.add_space(8.0);
 
             // 1. Rename Button (To the left of Sorting)
-            if !viewing_all {
-                if let Some(id) = collection_id {
-                    if ui.button("✏ Rename Folder").clicked() {
-                        let current_name = app
-                            .collections
-                            .iter()
-                            .find(|c| c.id == id)
-                            .map(|c| c.name.clone())
-                            .unwrap_or_default();
-                        app.popup_state = crate::ui::PopupState::Renaming {
-                            id,
-                            name: current_name,
-                        };
+            if let Some(id) = collection_id {
+                if ui.button("✏ Rename Folder").clicked() {
+                    let current_name = app
+                        .collections
+                        .iter()
+                        .find(|c| c.id == id)
+                        .map(|c| c.name.clone())
+                        .unwrap_or_default();
+                    app.popup_state = crate::ui::PopupState::Renaming {
+                        id,
+                        name: current_name,
+                    };
+                }
+            } else {
+                // Root View: Show DB Management
+                if collection_id.is_none() {
+                    if ui.button("📥 Import DB").clicked() {
+                        app.popup_state = crate::ui::PopupState::ImportDbWarning;
                     }
+                    if ui.button("📤 Export DB").clicked() {
+                        app.trigger_db_export();
+                    }
+                    ui.add_space(8.0);
+                    ui.separator();
+                    ui.add_space(8.0);
                 }
             }
         });

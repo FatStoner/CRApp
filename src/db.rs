@@ -14,7 +14,7 @@ pub struct Database {
 static MIGRATOR: Migrator = sqlx::migrate!();
 
 impl Database {
-    pub async fn init() -> Result<Self, Box<dyn Error>> {
+    pub async fn init() -> Result<Self, Box<dyn Error + Send + Sync>> {
         let db_url = "sqlite://crap_data.db";
         let db_path = "crap_data.db";
 
@@ -616,5 +616,53 @@ impl Database {
             .execute(&self.pool)
             .await?;
         Ok(())
+    }
+
+    // Database Management
+    pub async fn checkpoint(&self) -> Result<(), sqlx::Error> {
+        sqlx::query("PRAGMA wal_checkpoint(TRUNCATE)")
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
+    pub async fn close(&self) {
+        self.pool.close().await;
+    }
+
+    pub async fn validate_candidate(path: &std::path::Path) -> Result<(), String> {
+        if !path.exists() {
+            return Err("File does not exist".to_string());
+        }
+
+        let db_url = format!("sqlite://{}", path.to_string_lossy());
+
+        // Open separate pool
+        let pool = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect(&db_url)
+            .await
+            .map_err(|e| e.to_string())?;
+
+        // Basic Check: Does 'characters' table exist?
+        let row: Option<(i64,)> = sqlx::query_as(
+            "SELECT count(*) FROM sqlite_master WHERE type='table' AND name='characters'",
+        )
+        .fetch_optional(&pool)
+        .await
+        .map_err(|e| e.to_string())?;
+
+        let valid = match row {
+            Some((count,)) => count > 0,
+            None => false,
+        };
+
+        pool.close().await;
+
+        if valid {
+            Ok(())
+        } else {
+            Err("Invalid database schema: 'characters' table missing.".to_string())
+        }
     }
 }

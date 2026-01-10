@@ -1,4 +1,4 @@
-#[derive(Default, Clone)]
+#[derive(Default, Clone, Debug)]
 pub struct ParsedCharacterData {
     pub name: String,
     pub title: String,
@@ -11,10 +11,13 @@ pub struct ParsedCharacterData {
     pub urls: Vec<crate::models::CharacterUrl>,
 }
 
-pub fn parse_clipboard(text: &str) -> ParsedCharacterData {
-    let mut data = ParsedCharacterData::default();
+enum ImportFormat {
+    Profile,
+    Edit,
+    Unknown,
+}
 
-    // Pre-processing
+pub fn parse_clipboard(text: &str) -> ParsedCharacterData {
     let lines: Vec<&str> = text
         .lines()
         .map(|l| l.trim())
@@ -22,12 +25,169 @@ pub fn parse_clipboard(text: &str) -> ParsedCharacterData {
         .collect();
 
     if lines.is_empty() {
-        return data;
+        return ParsedCharacterData::default();
     }
 
-    // -------------------------------------------------------------------------
+    match detect_format(&lines) {
+        ImportFormat::Edit => parse_edit_view(&lines),
+        ImportFormat::Profile => parse_profile_view(&lines),
+        ImportFormat::Unknown => {
+            // Fallback to Profile parser as it's more generic/loose
+            parse_profile_view(&lines)
+        }
+    }
+}
+
+fn detect_format(lines: &[&str]) -> ImportFormat {
+    // Edit view specific characteristic
+    if lines
+        .iter()
+        .any(|l| *l == "Edit Chatbot" || *l == "Review Chatbot")
+    {
+        return ImportFormat::Edit;
+    }
+
+    // Also check for "Name" -> "*" -> <Value> pattern if "Edit Chatbot" header is missing (partial copy)
+    // or checks for the token counter footer style "___/___ characters | ___ tokens"
+    if lines
+        .iter()
+        .any(|l| l.contains("characters |") && l.contains("tokens"))
+    {
+        return ImportFormat::Edit;
+    }
+
+    // Profile view specific characteristic
+    if lines
+        .iter()
+        .any(|l| *l == "avatar image" || *l == "Suggest Tag")
+    {
+        return ImportFormat::Profile;
+    }
+
+    ImportFormat::Unknown
+}
+
+fn parse_edit_view(lines: &[&str]) -> ParsedCharacterData {
+    let mut data = ParsedCharacterData::default();
+    let iter = lines.iter().enumerate();
+    let mut current_section = "";
+
+    for (i, &line) in iter {
+        let lower = line.to_lowercase();
+
+        // 1. Single Line Fields
+        if lower == "name" {
+            // Next line might be "*", then Value
+            if let Some(val_idx) = find_next_value_index(lines, i) {
+                data.name = lines[val_idx].to_string();
+            }
+            continue;
+        }
+        if lower == "title" {
+            if let Some(val_idx) = find_next_value_index(lines, i) {
+                data.title = lines[val_idx].to_string();
+            }
+            continue;
+        }
+
+        // 2. Multiline Sections
+        // Starts with header, optionally "*", then content
+        // Ends with token counter or next section
+
+        if lower == "tags" {
+            current_section = "tags";
+            continue;
+        }
+
+        // --- Header Checks ---
+        // If we are already in 'tags', avoid switching back to standard sections
+        // merely because a tag happens to match a header keyword (e.g. "scenario").
+        if current_section != "tags" {
+            if lower == "greeting" {
+                current_section = "greeting";
+                continue;
+            }
+            if lower == "chatbot's personality" || lower == "personality" {
+                current_section = "personality";
+                continue;
+            }
+            if lower == "scenario" {
+                current_section = "scenario";
+                continue;
+            }
+            if lower == "example dialogue" {
+                current_section = "example_dialogue";
+                continue;
+            }
+        }
+
+        // Stop Keywords
+        if lower.starts_with("tokens:") || lower.contains("characters |") {
+            current_section = "";
+            continue;
+        }
+        if line == "*" {
+            continue;
+        }
+
+        // Accumulate Content
+        match current_section {
+            "greeting" => {
+                data.first_message.push_str(line);
+                data.first_message.push('\n');
+            }
+            "personality" => {
+                data.personality.push_str(line);
+                data.personality.push('\n');
+            }
+            "scenario" => {
+                data.scenario.push_str(line);
+                data.scenario.push('\n');
+            }
+            "example_dialogue" => {
+                data.example_dialogue.push_str(line);
+                data.example_dialogue.push('\n');
+            }
+            "tags" => {
+                // Stop if we hit the helper text
+                if lower.contains("choose tags to help people discover your bot")
+                    || lower == "advanced"
+                    || lower.chars().all(|c| c.is_numeric() || c == '/')
+                // e.g. "1/12"
+                {
+                    current_section = "";
+                    continue;
+                }
+                data.external_tags.push(line.to_string());
+            }
+            _ => {}
+        }
+    }
+
+    // Edit View Tags (often under "Tags" -> "Add Tags" -> ...)
+    // But in the sample, tags don't appear clearly listed as values, just "0/12".
+    // If they are listed, they might be just floating text.
+    // For now, Edit View tags might be hard to parse unless we see a populated sample.
+    // The provided sample has "0/12" implying no tags.
+    // Leaving tags empty for Edit View for now unless identified.
+
+    data.cleanup();
+    data
+}
+
+fn find_next_value_index(lines: &[&str], current_index: usize) -> Option<usize> {
+    for i in (current_index + 1)..lines.len() {
+        if lines[i] != "*" {
+            return Some(i);
+        }
+    }
+    None
+}
+
+fn parse_profile_view(lines: &[&str]) -> ParsedCharacterData {
+    let mut data = ParsedCharacterData::default();
+
     // 1. ANCHORS & METADATA
-    // -------------------------------------------------------------------------
     let idx_back = lines.iter().position(|&l| l == "Back");
     let idx_share = lines
         .iter()
@@ -52,8 +212,7 @@ pub fn parse_clipboard(text: &str) -> ParsedCharacterData {
         }
     }
 
-    // Title & Tags extraction (Share -> ... -> Suggest Tag)
-    // We prioritize this block for tags to avoid reading section headers as tags or vice versa.
+    // Title & Tags extraction
     let content_start_idx = if let Some(end) = idx_suggest_tag {
         if let Some(start) = idx_share {
             if end > start {
@@ -80,14 +239,12 @@ pub fn parse_clipboard(text: &str) -> ParsedCharacterData {
                 }
             }
         }
-        end + 1 // Start scanning content just after "Suggest Tag"
+        end + 1
     } else {
-        0 // Fallback: if no strict metadata block, scan whole file (less safe but necessary fallback)
+        0
     };
 
-    // -------------------------------------------------------------------------
-    // 2. CONTENT SECTIONS (Strict Scan)
-    // -------------------------------------------------------------------------
+    // 2. CONTENT SECTIONS
     let mut current_section = "";
 
     for i in content_start_idx..lines.len() {
@@ -121,8 +278,7 @@ pub fn parse_clipboard(text: &str) -> ParsedCharacterData {
             continue;
         }
 
-        // Key-Value checks (Only inside relevant sections or if valid)
-        // Note: Name might be in Personality if we missed it earlier
+        // Catch Name if missed
         if current_section == "personality" && lower.starts_with("name:") && data.name.is_empty() {
             if let Some((_, val)) = line.split_once(':') {
                 data.name = val.trim().to_string();
@@ -146,27 +302,104 @@ pub fn parse_clipboard(text: &str) -> ParsedCharacterData {
                 data.example_dialogue.push_str(line);
                 data.example_dialogue.push('\n');
             }
-            _ => {
-                // Fallback catch for Name if purely unstructured and we are outside sections
-                if i < 20
-                    && data.name.is_empty()
-                    && line.len() < 50
-                    && !line.contains(':')
-                    && !lower.starts_with('@')
-                    && !lower.contains("tokens")
-                {
-                    // Only if we haven't found a name yet and we are early in the file
-                    // data.name = line.to_string(); // Too risky with strict parsing?
-                }
-            }
+            _ => {}
         }
     }
 
-    // Cleanup
-    data.personality = data.personality.trim().to_string();
-    data.scenario = data.scenario.trim().to_string();
-    data.first_message = data.first_message.trim().to_string();
-    data.example_dialogue = data.example_dialogue.trim().to_string();
-
+    data.cleanup();
     data
+}
+
+impl ParsedCharacterData {
+    fn cleanup(&mut self) {
+        self.name = self.name.trim().to_string();
+        self.title = self.title.trim().to_string();
+        self.personality = self.personality.trim().to_string();
+        self.scenario = self.scenario.trim().to_string();
+        self.first_message = self.first_message.trim().to_string();
+        self.example_dialogue = self.example_dialogue.trim().to_string();
+    }
+}
+
+// ----------------------------------------------------------------------------
+// TESTS
+// ----------------------------------------------------------------------------
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_detect_format_edit() {
+        let text = r#"
+Spicychat
+...
+Edit Chatbot
+...
+Name
+*
+Silent Storm
+"#;
+        let lines: Vec<&str> = text.lines().map(|l| l.trim()).collect();
+        match detect_format(&lines) {
+            ImportFormat::Edit => {}
+            _ => panic!("Failed to detect Edit format"),
+        }
+    }
+
+    #[test]
+    fn test_detect_format_profile() {
+        let text = r#"
+Spicychat
+...
+Back
+avatar image
+SomeName
+...
+Suggest Tag
+"#;
+        let lines: Vec<&str> = text.lines().map(|l| l.trim()).collect();
+        match detect_format(&lines) {
+            ImportFormat::Profile => {}
+            _ => panic!("Failed to detect Profile format"),
+        }
+    }
+
+    #[test]
+    fn test_parse_edit_tags() {
+        let text = r#"
+Edit Chatbot
+Tags
+
+
+Female
+
+
+Choose tags to help people discover your bot
+1/12
+"#;
+        let data = parse_clipboard(text);
+        assert_eq!(data.external_tags, vec!["Female"]);
+    }
+
+    #[test]
+    fn test_parse_edit_tags_edge_case() {
+        let text = r#"
+Edit Chatbot
+Scenario
+Some scenario content.
+Example Dialogue
+Some dialogue.
+Tags
+
+
+scenario
+
+
+Choose tags to help people discover your bot
+1/12
+"#;
+        let data = parse_clipboard(text);
+        assert_eq!(data.scenario.trim(), "Some scenario content.");
+        assert_eq!(data.external_tags, vec!["scenario"]);
+    }
 }

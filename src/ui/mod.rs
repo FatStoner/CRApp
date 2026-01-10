@@ -72,6 +72,7 @@ pub enum PopupState {
     DeleteWarning { id: i64, count: usize },
     DeleteCharacterConfirmation { id: i64, name: String },
     UnsavedChanges { target: AppAction },
+    ImportDbWarning,
 }
 
 pub enum UiEvent {
@@ -94,6 +95,8 @@ pub enum UiEvent {
     ImportFileLoaded(Result<String, String>),
     ThemeLoaded(Result<ThemeMode, String>),
     ScaleLoaded(Result<f32, String>),
+    DbExportFinished(Result<String, String>),
+    DbReloaded(Result<Database, String>),
 }
 
 pub struct CrapApp {
@@ -1232,6 +1235,29 @@ impl eframe::App for CrapApp {
                         Err(e) => self.set_status(format!("Read Error: {}", e), egui::Color32::RED),
                     }
                 }
+                UiEvent::DbExportFinished(res) => match res {
+                    Ok(path) => self.set_status(
+                        format!("Database exported to: {}", path),
+                        egui::Color32::GREEN,
+                    ),
+                    Err(e) => self.set_status(format!("Export Failed: {}", e), egui::Color32::RED),
+                },
+                UiEvent::DbReloaded(res) => match res {
+                    Ok(new_db) => {
+                        self.db = new_db;
+                        self.set_status(
+                            "Database imported successfully. Reloading view...".to_string(),
+                            egui::Color32::GREEN,
+                        );
+                        self.refresh_all();
+                    }
+                    Err(e) => {
+                        self.set_status(
+                            format!("CRITICAL: Database Swap Failed: {}", e),
+                            egui::Color32::RED,
+                        );
+                    }
+                },
             }
         }
 
@@ -1390,6 +1416,40 @@ impl eframe::App for CrapApp {
             }
         }
 
+        if let PopupState::ImportDbWarning = self.popup_state {
+            let mut close = false;
+            let mut proceed = false;
+            egui::Window::new("Import Database Warning")
+                .collapsible(false)
+                .resizable(false)
+                .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
+                .show(ctx, |ui| {
+                    ui.colored_label(
+                        egui::Color32::RED,
+                        "Warning: This action will replace your existing database.",
+                    );
+                    ui.label("You should export your current database before proceeding.");
+                    ui.add_space(10.0);
+
+                    ui.horizontal(|ui| {
+                        if ui.button("OK").clicked() {
+                            proceed = true;
+                            close = true;
+                        }
+                        if ui.button("Cancel").clicked() {
+                            close = true;
+                        }
+                    });
+                });
+
+            if close {
+                self.popup_state = PopupState::None;
+                if proceed {
+                    self.trigger_db_import();
+                }
+            }
+        }
+
         if let Some((id, new_name)) = rename_request {
             let parent_id = self
                 .collections
@@ -1417,6 +1477,100 @@ impl eframe::App for CrapApp {
                     });
                 });
         }
+    }
+}
+
+impl CrapApp {
+    pub fn trigger_db_export(&self) {
+        let db = self.db.clone();
+        let tx = self.tx.clone();
+        tokio::spawn(async move {
+            // Checkpoint first
+            if let Err(e) = db.checkpoint().await {
+                let _ = tx
+                    .send(UiEvent::DbExportFinished(Err(format!(
+                        "Checkpoint failed: {}",
+                        e
+                    ))))
+                    .await;
+                return;
+            }
+
+            if let Some(path) = rfd::FileDialog::new()
+                .set_title("Export Database Backup")
+                .set_file_name("crap_data_backup.db")
+                .save_file()
+            {
+                match std::fs::copy("crap_data.db", &path) {
+                    Ok(_) => {
+                        let _ = tx
+                            .send(UiEvent::DbExportFinished(Ok(path
+                                .to_string_lossy()
+                                .to_string())))
+                            .await;
+                    }
+                    Err(e) => {
+                        let _ = tx.send(UiEvent::DbExportFinished(Err(e.to_string()))).await;
+                    }
+                }
+            }
+        });
+    }
+
+    pub fn trigger_db_import(&self) {
+        let db = self.db.clone();
+        let tx = self.tx.clone();
+        tokio::spawn(async move {
+            if let Some(path) = rfd::FileDialog::new()
+                .set_title("Import Database (Restores Backup)")
+                .add_filter("SQLite Database", &["db", "sqlite", "sqlite3"])
+                .pick_file()
+            {
+                // 1. Validate
+                if let Err(e) = Database::validate_candidate(&path).await {
+                    let _ = tx
+                        .send(UiEvent::DbReloaded(Err(format!(
+                            "Validation Failed: {}",
+                            e
+                        ))))
+                        .await;
+                    return;
+                }
+
+                // 2. Hot Swap Logic
+                // Close current
+                db.close().await;
+
+                // Backup current
+                let _ = std::fs::copy("crap_data.db", "crap_data.db.old");
+
+                // Replace
+                if let Err(e) = std::fs::copy(&path, "crap_data.db") {
+                    // Try to restore old?
+                    let _ = std::fs::copy("crap_data.db.old", "crap_data.db");
+                    let _ = tx
+                        .send(UiEvent::DbReloaded(Err(format!(
+                            "Copy Failed (Restored): {}",
+                            e
+                        ))))
+                        .await;
+                    // We still need to re-init DB because we closed pool.
+                    // But we fail properly.
+                }
+
+                // 3. Re-init
+                match Database::init().await {
+                    Ok(new_db) => {
+                        let _ = tx.send(UiEvent::DbReloaded(Ok(new_db))).await;
+                    }
+                    Err(e) => {
+                        let _ = tx
+                            .send(UiEvent::DbReloaded(Err(format!("Re-init Failed: {}", e))))
+                            .await;
+                    }
+                }
+            }
+        });
     }
 }
 
