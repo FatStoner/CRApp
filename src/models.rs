@@ -159,6 +159,8 @@ pub struct Lorebook {
     pub cover_path: Option<String>,
     #[sqlx(skip)]
     pub tags: Vec<crate::models::Tag>,
+    #[sqlx(skip)]
+    pub entries: Vec<LorebookEntry>,
 }
 
 #[derive(Debug, Clone, FromRow, PartialEq)]
@@ -170,6 +172,31 @@ pub struct Collection {
     pub display_order: i64,
 }
 
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, sqlx::FromRow, PartialEq)]
+pub struct LorebookEntry {
+    pub id: i64,
+    pub lorebook_id: i64,
+    pub name: String,
+    pub keywords: String,
+    pub content: String,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+    pub updated_at: chrono::DateTime<chrono::Utc>,
+}
+
+impl Default for LorebookEntry {
+    fn default() -> Self {
+        Self {
+            id: 0,
+            lorebook_id: 0,
+            name: "New Entry".to_string(),
+            keywords: String::new(),
+            content: String::new(),
+            created_at: chrono::Utc::now(),
+            updated_at: chrono::Utc::now(),
+        }
+    }
+}
+
 impl Default for Lorebook {
     fn default() -> Self {
         Self {
@@ -179,6 +206,7 @@ impl Default for Lorebook {
             content: "".to_string(),
             cover_path: None,
             tags: Vec::new(),
+            entries: Vec::new(),
         }
     }
 }

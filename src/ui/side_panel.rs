@@ -226,6 +226,7 @@ pub fn render_side_panel(app: &mut CrapApp, ctx: &egui::Context) {
                                     .clicked()
                                 {
                                     app.selected_lorebook = Some(book.clone());
+                                    app.load_lorebook_entries(book.id);
                                     app.mode = AppMode::Lorebooks; // Ensure mode
                                     app.selected_character = None; // Deselect char
                                 }

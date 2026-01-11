@@ -610,6 +610,61 @@ impl Database {
             .await
     }
 
+    // --- Lorebook Entries ---
+
+    pub async fn get_entries_for_lorebook(
+        &self,
+        lorebook_id: i64,
+    ) -> Result<Vec<crate::models::LorebookEntry>, sqlx::Error> {
+        sqlx::query_as::<_, crate::models::LorebookEntry>(
+            "SELECT * FROM lorebook_entries WHERE lorebook_id = ? ORDER BY name ASC",
+        )
+        .bind(lorebook_id)
+        .fetch_all(&self.pool)
+        .await
+    }
+
+    pub async fn add_entry_to_lorebook(
+        &self,
+        entry: &crate::models::LorebookEntry,
+    ) -> Result<i64, sqlx::Error> {
+        sqlx::query("INSERT INTO lorebook_entries (lorebook_id, name, keywords, content, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)")
+            .bind(entry.lorebook_id)
+            .bind(&entry.name)
+            .bind(&entry.keywords)
+            .bind(&entry.content)
+            .bind(entry.created_at)
+            .bind(entry.updated_at)
+            .execute(&self.pool)
+            .await
+            .map(|r| r.last_insert_rowid())
+    }
+
+    pub async fn update_lorebook_entry(
+        &self,
+        entry: &crate::models::LorebookEntry,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            "UPDATE lorebook_entries SET name=?, keywords=?, content=?, updated_at=? WHERE id=?",
+        )
+        .bind(&entry.name)
+        .bind(&entry.keywords)
+        .bind(&entry.content)
+        .bind(entry.updated_at)
+        .bind(entry.id)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    pub async fn delete_lorebook_entry(&self, id: i64) -> Result<(), sqlx::Error> {
+        sqlx::query("DELETE FROM lorebook_entries WHERE id = ?")
+            .bind(id)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
     pub async fn upsert_lorebook(
         &self,
         lorebook: &mut crate::models::Lorebook,

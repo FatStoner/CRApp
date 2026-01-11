@@ -144,6 +144,12 @@ pub enum UiEvent {
     TagOperationFinished(Result<(), String>),
     LorebookTagOperationFinished(Result<(), String>),
 
+    // Lorebook Entries
+    LorebookEntriesLoaded(Result<(i64, Vec<crate::models::LorebookEntry>), String>),
+    LorebookEntrySaved(Result<(), String>),
+    LorebookEntryDeleted(Result<i64, String>),
+    LorebookEntryAdded(Result<i64, String>), // Returns new ID
+
     ImportFileLoaded(Result<String, String>),
     ThemeLoaded(Result<ThemeMode, String>),
     ScaleLoaded(Result<f32, String>),
@@ -167,6 +173,7 @@ pub struct CrapApp {
     pub mode: AppMode,
     pub selected_character: Option<Character>,
     pub selected_lorebook: Option<Lorebook>,
+    pub selected_entry: Option<crate::models::LorebookEntry>,
     pub active_char_tab: CharacterTab,
     pub central_view: CentralView,
     pub theme: ThemeMode,
@@ -224,6 +231,7 @@ impl CrapApp {
             mode: AppMode::Characters,
             selected_character: None,
             selected_lorebook: None,
+            selected_entry: None,
             active_char_tab: CharacterTab::MainData,
             central_view: CentralView::Browser,
             sort_mode: SortMode::Alphabetical,
@@ -1063,6 +1071,112 @@ impl CrapApp {
         });
     }
 
+    pub fn load_lorebook_entries(&self, lorebook_id: i64) {
+        let tx = self.tx.clone();
+        let db = self.db.clone();
+        let ctx = self.ctx.clone();
+        tokio::spawn(async move {
+            match db.get_entries_for_lorebook(lorebook_id).await {
+                Ok(entries) => {
+                    let _ = tx
+                        .send(UiEvent::LorebookEntriesLoaded(Ok((lorebook_id, entries))))
+                        .await;
+                }
+                Err(e) => {
+                    let _ = tx
+                        .send(UiEvent::LorebookEntriesLoaded(Err(e.to_string())))
+                        .await;
+                }
+            }
+            ctx.request_repaint();
+        });
+    }
+
+    pub fn add_entry_to_lorebook(&self, lorebook_id: i64) {
+        let tx = self.tx.clone();
+        let db = self.db.clone();
+        let ctx = self.ctx.clone();
+        tokio::spawn(async move {
+            let mut entry = crate::models::LorebookEntry::default();
+            entry.lorebook_id = lorebook_id;
+
+            match db.add_entry_to_lorebook(&entry).await {
+                Ok(id) => {
+                    let _ = tx.send(UiEvent::LorebookEntryAdded(Ok(id))).await;
+                    // Auto-reload
+                    match db.get_entries_for_lorebook(lorebook_id).await {
+                        Ok(entries) => {
+                            let _ = tx
+                                .send(UiEvent::LorebookEntriesLoaded(Ok((lorebook_id, entries))))
+                                .await;
+                        }
+                        Err(_) => {}
+                    }
+                }
+                Err(e) => {
+                    let _ = tx
+                        .send(UiEvent::LorebookEntryAdded(Err(e.to_string())))
+                        .await;
+                }
+            }
+            ctx.request_repaint();
+        });
+    }
+
+    pub fn save_lorebook_entry(&self, entry: crate::models::LorebookEntry) {
+        let tx = self.tx.clone();
+        let db = self.db.clone();
+        let ctx = self.ctx.clone();
+        tokio::spawn(async move {
+            match db.update_lorebook_entry(&entry).await {
+                Ok(_) => {
+                    let _ = tx.send(UiEvent::LorebookEntrySaved(Ok(()))).await;
+                    if let Ok(entries) = db.get_entries_for_lorebook(entry.lorebook_id).await {
+                        let _ = tx
+                            .send(UiEvent::LorebookEntriesLoaded(Ok((
+                                entry.lorebook_id,
+                                entries,
+                            ))))
+                            .await;
+                    }
+                }
+                Err(e) => {
+                    let _ = tx
+                        .send(UiEvent::LorebookEntrySaved(Err(e.to_string())))
+                        .await;
+                }
+            }
+            ctx.request_repaint();
+        });
+    }
+
+    pub fn delete_lorebook_entry(&self, entry_id: i64, lorebook_id: i64) {
+        let tx = self.tx.clone();
+        let db = self.db.clone();
+        let ctx = self.ctx.clone();
+        tokio::spawn(async move {
+            match db.delete_lorebook_entry(entry_id).await {
+                Ok(_) => {
+                    let _ = tx.send(UiEvent::LorebookEntryDeleted(Ok(entry_id))).await;
+                    match db.get_entries_for_lorebook(lorebook_id).await {
+                        Ok(entries) => {
+                            let _ = tx
+                                .send(UiEvent::LorebookEntriesLoaded(Ok((lorebook_id, entries))))
+                                .await;
+                        }
+                        Err(_) => {}
+                    }
+                }
+                Err(e) => {
+                    let _ = tx
+                        .send(UiEvent::LorebookEntryDeleted(Err(e.to_string())))
+                        .await;
+                }
+            }
+            ctx.request_repaint();
+        });
+    }
+
     pub fn perform_deep_search(&mut self) {
         // ... (This logically could be here or in global_search module if it was purely logic,
         // but it modifies App state heavily.
@@ -1462,6 +1576,39 @@ impl eframe::App for CrapApp {
                         self.set_status(format!("Tag Error: {}", e), egui::Color32::RED);
                     }
                 }
+                UiEvent::LorebookEntriesLoaded(res) => match res {
+                    Ok((lid, entries)) => {
+                        // Update cache
+                        if let Some(l) = self.lorebooks.iter_mut().find(|l| l.id == lid) {
+                            l.entries = entries.clone();
+                        }
+                        // Update selected
+                        if let Some(l) = &mut self.selected_lorebook {
+                            if l.id == lid {
+                                l.entries = entries;
+                            }
+                        }
+                    }
+                    Err(e) => self
+                        .set_status(format!("Failed to load entries: {}", e), egui::Color32::RED),
+                },
+                UiEvent::LorebookEntryAdded(res) => match res {
+                    Ok(_) => self.set_status("Entry added".to_string(), egui::Color32::GREEN),
+                    Err(e) => {
+                        self.set_status(format!("Failed to add entry: {}", e), egui::Color32::RED)
+                    }
+                },
+                UiEvent::LorebookEntrySaved(res) => match res {
+                    Ok(_) => {} // Silent save
+                    Err(e) => {
+                        self.set_status(format!("Failed to save entry: {}", e), egui::Color32::RED)
+                    }
+                },
+                UiEvent::LorebookEntryDeleted(res) => match res {
+                    Ok(_) => self.set_status("Entry deleted".to_string(), egui::Color32::GREEN),
+                    Err(e) => self
+                        .set_status(format!("Failed to delete entry: {}", e), egui::Color32::RED),
+                },
                 UiEvent::DeepSearchCompleted(res) => {
                     self.is_deep_searching = false;
                     match res {

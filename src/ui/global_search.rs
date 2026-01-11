@@ -217,7 +217,8 @@ pub fn render_deep_search(app: &mut CrapApp, ui: &mut egui::Ui) {
                 }
                 SearchResultKind::Lorebook => {
                     if let Some(l) = app.lorebooks.iter().find(|x| x.id == id).cloned() {
-                        app.selected_lorebook = Some(l);
+                        app.selected_lorebook = Some(l.clone());
+                        app.load_lorebook_entries(l.id);
                         app.mode = AppMode::Lorebooks;
                     }
                 }
