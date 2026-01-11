@@ -55,6 +55,7 @@ Represents a folder for organizing characters.
 -   **Fields**:
     -   `id`: `i64`.
     -   `name`: `String`.
+    -   `image_path`: `Option<String>` (Path to custom folder icon).
     -   `parent_id`: `Option<i64>` (Allows hierarchical folders).
 
 ### Tag

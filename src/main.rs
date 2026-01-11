@@ -1,5 +1,6 @@
 mod card_v2;
 mod db;
+mod image_utils;
 mod models;
 mod ui;
 

@@ -52,6 +52,23 @@ impl Database {
         }
         println!("Migrations applied successfully.");
 
+        // Manual Migration Fixes (for cases where sqlx migration aborts or history is desynced)
+
+        // 1. Ensure 'content' in 'lorebooks' exists (covered by sqlx usually, but good to be sure if we silenced error)
+        // (Skipping for now as app works, focusing on the new issue)
+
+        // 2. Ensure 'image_path' in 'collections'
+        // We try to add it. If it exists, it errors, and we ignore that error.
+        println!("Verifying schema for 'collections'...");
+        let _ = sqlx::query("ALTER TABLE collections ADD COLUMN image_path TEXT")
+            .execute(&pool)
+            .await
+            .map_err(|e| {
+                if !e.to_string().contains("duplicate column name") {
+                    eprintln!("Warning: Failed to add image_path column: {}", e);
+                }
+            });
+
         Ok(Database { pool })
     }
 
@@ -204,19 +221,21 @@ impl Database {
             let next_order = max_order.unwrap_or(0) + 1;
 
             let id = sqlx::query(
-                "INSERT INTO collections (name, parent_id, display_order) VALUES (?, ?, ?)",
+                "INSERT INTO collections (name, parent_id, display_order, image_path) VALUES (?, ?, ?, ?)",
             )
             .bind(&collection.name)
             .bind(collection.parent_id)
             .bind(next_order)
+            .bind(&collection.image_path)
             .execute(&self.pool)
             .await?
             .last_insert_rowid();
             Ok(id)
         } else {
-            sqlx::query("UPDATE collections SET name=?, parent_id=? WHERE id=?")
+            sqlx::query("UPDATE collections SET name=?, parent_id=?, image_path=? WHERE id=?")
                 .bind(&collection.name)
                 .bind(collection.parent_id)
+                .bind(&collection.image_path)
                 .bind(collection.id)
                 .execute(&self.pool)
                 .await?;

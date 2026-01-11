@@ -14,13 +14,16 @@ The `central_panel.rs` module acts as the orchestrator for the main content area
 ### 2. Browser View (`ui/browser.rs`)
 Handles the "Gallery" or "Browser" view where characters are listed.
 -   **Features**:
-    -   **Grid/List Display**: Renders characters as cards.
+    -   **Grid/List Display**: Renders characters and subfolders as cards.
+        -   **Folder Images**: Custom square icons can be assigned to folders.
     -   **Filtering**: By collection, search term, and tags.
     -   **Sorting**: Alphabetical, Date, etc. (Ascending/Descending).
     -   **Navigation**: Folder traversal for collections.
     -   **Favorites View**: Dedicated filtered view for favorite characters.
-    -   **Visual Indicators**: Red heart (\u2764) watermark on favorite character cards.
-    -   **Context Menu**: Right-click actions (Move, Delete, Edit, Toggle Favorite).
+    -   **Visual Indicators**:
+        -   Red heart (\u2764) watermark on favorite character cards.
+        -   Custom 1:1 cropped images for folder icons.
+    -   **Context Menu**: Right-click actions (Move, Delete, Edit, Toggle Favorite, **Change Icon**).
 
 ### 3. Editor View (`ui/editor.rs`)
 Handles the detailed editing interfaces.

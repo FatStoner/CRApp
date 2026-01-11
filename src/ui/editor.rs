@@ -1231,6 +1231,13 @@ pub fn render_lorebook_editor(app: &mut CrapApp, ui: &mut egui::Ui) {
                                       crate::ui::browser::BrowserAction::CreateCollection(cid) => {
                                           app.save_collection(0, "New Folder".to_string(), cid);
                                       }
+                                      crate::ui::browser::BrowserAction::UpdateCollectionIcon(id) => {
+                                          app.popup_state = crate::ui::PopupState::CollectionIconConfirmation {
+                                              id,
+                                              path: String::new(),
+                                              preview_texture: None,
+                                          };
+                                      }
                                  }
                              }
                         }

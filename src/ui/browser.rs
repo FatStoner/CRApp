@@ -10,6 +10,7 @@ pub enum BrowserAction {
     CreateCharacter(Option<i64>),
     CreateCollection(Option<i64>),
     ToggleFavorite(i64),
+    UpdateCollectionIcon(i64),
 }
 
 pub fn render_collection_move_menu(
@@ -545,6 +546,13 @@ pub fn render_browser_view(app: &mut CrapApp, ui: &mut egui::Ui) {
             BrowserAction::CreateCollection(cid) => {
                 app.save_collection(0, "New Folder".to_string(), cid);
             }
+            BrowserAction::UpdateCollectionIcon(id) => {
+                app.popup_state = crate::ui::PopupState::CollectionIconConfirmation {
+                    id,
+                    path: String::new(),
+                    preview_texture: None,
+                };
+            }
         }
     }
 
@@ -769,67 +777,96 @@ pub fn render_subfolder_card(
     let card_width = 180.0;
     let card_height = 260.0;
 
+    // 1. Allocate space and interact
     let (rect, response) =
         ui.allocate_exact_size(egui::vec2(card_width, card_height), egui::Sense::click());
 
-    let bg_color = if response.hovered() {
-        ui.visuals().widgets.hovered.bg_fill
+    // 2. Visuals (Hover effect)
+    let is_hovered = response.hovered();
+    let bg_color = if is_hovered {
+        egui::Color32::from_gray(45)
     } else {
-        ui.visuals().widgets.noninteractive.bg_fill
+        egui::Color32::from_gray(32)
+    };
+    let stroke_color = if is_hovered {
+        egui::Color32::from_gray(100)
+    } else {
+        egui::Color32::from_gray(60)
     };
 
+    // 3. Paint Background
     ui.painter().rect_filled(rect, 8.0, bg_color);
     ui.painter()
-        .rect_stroke(rect, 1.0, ui.visuals().widgets.noninteractive.bg_stroke);
+        .rect_stroke(rect, 8.0, egui::Stroke::new(1.0, stroke_color));
 
+    // 4. Render Content (Manual Painting)
+    let center_x = rect.center().x;
+
+    // Icon Area
+    let icon_size = 140.0;
+    let icon_top = rect.min.y + 24.0;
+    let icon_rect = egui::Rect::from_min_size(
+        egui::pos2(center_x - icon_size / 2.0, icon_top),
+        egui::vec2(icon_size, icon_size),
+    );
+
+    if let Some(path) = &folder.image_path {
+        let uri = if path.contains("://") {
+            path.clone()
+        } else {
+            if let Ok(abs) = std::fs::canonicalize(path) {
+                format!("file://{}", abs.to_string_lossy())
+            } else {
+                path.clone()
+            }
+        };
+        crate::ui::widgets::paint_avatar_crop(ui, icon_rect, &uri, 8.0);
+    } else {
+        ui.painter()
+            .rect_filled(icon_rect, 8.0, egui::Color32::from_rgb(45, 45, 60));
+        ui.painter().text(
+            icon_rect.center(),
+            egui::Align2::CENTER_CENTER,
+            "📁",
+            egui::FontId::proportional(64.0),
+            egui::Color32::from_rgb(200, 200, 200),
+        );
+    }
+
+    // Text Area
+    let text_top = icon_rect.max.y + 16.0;
+    let text_pos = egui::pos2(center_x, text_top);
+
+    // Manual layout for centered text (wrapping if overly long?)
+    // For now simple single line or limited wrap centered
+    ui.painter().text(
+        text_pos,
+        egui::Align2::CENTER_TOP,
+        &folder.name,
+        egui::FontId::proportional(16.0),
+        egui::Color32::from_gray(220),
+    );
+
+    // 5. Interaction Logic
     if response.clicked() {
         app.selected_collection_id = Some(folder.id);
     }
 
     response.context_menu(|ui| {
-        if ui.button("✏ Rename").clicked() {
+        if ui.button("Rename Folder").clicked() {
             actions.push(BrowserAction::RenameCollection(
                 folder.id,
                 folder.name.clone(),
             ));
             ui.close_menu();
         }
-        if ui.button("🗑 Delete").clicked() {
+        if ui.button("Change Icon").clicked() {
+            actions.push(BrowserAction::UpdateCollectionIcon(folder.id));
+            ui.close_menu();
+        }
+        if ui.button("Delete Folder").clicked() {
             actions.push(BrowserAction::DeleteCollection(folder.id));
             ui.close_menu();
         }
     });
-
-    // Content
-    let content_rect = rect.shrink(8.0);
-
-    // Avatar (Top Square - Folder Icon)
-    let avatar_size = content_rect.width();
-    let avatar_rect =
-        egui::Rect::from_min_size(content_rect.min, egui::vec2(avatar_size, avatar_size));
-
-    // Draw centered folder icon
-    ui.painter()
-        .rect_filled(avatar_rect, 4.0, egui::Color32::from_rgb(60, 60, 70)); // Darker bg for folder
-    ui.painter().text(
-        avatar_rect.center(),
-        egui::Align2::CENTER_CENTER,
-        "📁",
-        egui::FontId::proportional(64.0),
-        egui::Color32::from_rgb(200, 200, 220),
-    );
-
-    // Text Area (Name)
-    let text_top = avatar_rect.max.y + 8.0;
-    let name_font = egui::FontId::proportional(16.0);
-    let name_galley = ui.painter().layout_no_wrap(
-        folder.name.clone(),
-        name_font.clone(),
-        ui.visuals().text_color(),
-    );
-    ui.painter().galley(
-        egui::pos2(content_rect.min.x, text_top),
-        name_galley,
-        ui.visuals().text_color(),
-    );
 }

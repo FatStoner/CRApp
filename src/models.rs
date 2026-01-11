@@ -170,6 +170,7 @@ pub struct Collection {
     pub parent_id: Option<i64>,
     #[sqlx(default)]
     pub display_order: i64,
+    pub image_path: Option<String>,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, sqlx::FromRow, PartialEq)]

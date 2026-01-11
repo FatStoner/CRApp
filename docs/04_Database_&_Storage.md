@@ -68,6 +68,7 @@ Hierarchical folder structure.
 | --- | --- | --- |
 | `id` | INTEGER PK | |
 | `name` | TEXT | |
+| `image_path` | TEXT | Path to custom icon file. |
 | `parent_id` | INTEGER FK | Self-referencing FK for nesting. |
 
 ### Tags Tables
@@ -104,6 +105,7 @@ Individual lore pieces within a book.
 ## File Storage
 Non-text data is stored on the local filesystem, with paths stored in the database.
 -   **Avatars**: Stored in `data/avatars/`.
+-   **Collection Images**: Stored in `data/collection_images/`.
 -   **Exports**: Saved to `exports/` (default dialog path).
 
 ## Async Operations
