@@ -341,7 +341,7 @@ pub fn render_side_panel(app: &mut CrapApp, ctx: &egui::Context) {
                         }
                     });
                     if app.mode == AppMode::Characters {
-                        if ui.button("📁 New Root Folder").clicked() {
+                        if ui.button("📁 New Folder").clicked() {
                             app.save_collection(0, "New Folder".to_string(), None);
                         }
                     }
@@ -504,7 +504,7 @@ pub fn render_tree(
 
                 ui.separator();
 
-                if ui.button("New Subfolder").clicked() {
+                if ui.button("📁 New Folder").clicked() {
                     actions.push(TreeAction::CreateSubfolder(col.id));
                     ui.close_menu();
                 }
