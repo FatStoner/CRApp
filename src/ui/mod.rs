@@ -1215,6 +1215,10 @@ impl eframe::App for CrapApp {
                     self.is_saving = false;
                     match res {
                         Ok(c) => {
+                            // Ensure links and tags are loaded (critical for new characters)
+                            self.load_links(c.id);
+                            self.load_tags(c.id);
+
                             self.selected_character = Some(c);
                             self.set_status("Character Saved!".to_string(), egui::Color32::GREEN);
 
