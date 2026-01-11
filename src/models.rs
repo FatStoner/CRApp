@@ -157,6 +157,8 @@ pub struct Lorebook {
     #[sqlx(default)]
     pub content: String, // Added handling for content column
     pub cover_path: Option<String>,
+    #[sqlx(skip)]
+    pub tags: Vec<crate::models::Tag>,
 }
 
 #[derive(Debug, Clone, FromRow, PartialEq)]
@@ -176,6 +178,7 @@ impl Default for Lorebook {
             description: "".to_string(),
             content: "".to_string(),
             cover_path: None,
+            tags: Vec::new(),
         }
     }
 }

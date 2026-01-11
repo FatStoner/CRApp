@@ -920,22 +920,198 @@ pub fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
 
 
 pub fn render_lorebook_editor(app: &mut CrapApp, ui: &mut egui::Ui) {
-                if let Some(book) = &mut app.selected_lorebook {
+                if let Some(mut book) = app.selected_lorebook.take() {
                     let mut save_lore_req = None;
+                    let mut tag_add_request = None;
+                    let mut tag_remove_request = None;
+                    let mut status_update: Option<(String, egui::Color32)> = None;
                     
                     ui.heading("Edit Lorebook");
-                    ui.text_edit_singleline(&mut book.title);
-                    ui.add_space(4.0);
-                    ui.label("Description / Content");
-                    ui.text_edit_multiline(&mut book.description);
+                    ui.add_space(8.0);
+
+                    ui.columns(2, |columns| {
+                        // Left Column: Basic Data
+                        columns[0].vertical(|ui| {
+                            ui.label("Title");
+                            ui.text_edit_singleline(&mut book.title);
+                            ui.add_space(8.0);
+                            
+                            ui.label("Description");
+                            ui.text_edit_multiline(&mut book.content);
+                            ui.add_space(8.0);
+
+                            // Tags Section
+                            ui.label("Tags:");
+                            ui.horizontal_wrapped(|ui| {
+                                for tag in &book.tags {
+                                    ui.group(|ui| {
+                                        ui.horizontal(|ui| {
+                                            ui.label(egui::RichText::new(&tag.name).color(egui::Color32::WHITE).size(12.0));
+                                            if ui.small_button("x").clicked() {
+                                                tag_remove_request = Some((book.id, tag.id));
+                                            }
+                                        });
+                                    });
+                                }
+                            });
+                            ui.horizontal(|ui| {
+                                let response = ui.text_edit_singleline(&mut app.app_tag_input);
+                                if (ui.button("Add").clicked() || (response.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)))) && !app.app_tag_input.is_empty() {
+                                    tag_add_request = Some((book.id, app.app_tag_input.clone()));
+                                    app.app_tag_input.clear();
+                                    response.request_focus();
+                                }
+                            });
+                            
+                            ui.add_space(16.0);
+                            if ui.button("Save Lorebook").clicked() {
+                                 save_lore_req = Some(book.clone());
+                            }
+                        });
+
+
+                        // Right Column: Cover Image
+                        columns[1].vertical(|ui| {
+                            ui.group(|ui| {
+                                ui.label("Cover Image");
+                                
+                                // Input
+                                let mut cover_path_str = book.cover_path.clone().unwrap_or_default();
+                                if ui.text_edit_singleline(&mut cover_path_str).changed() {
+                                     if cover_path_str.trim().is_empty() {
+                                         book.cover_path = None;
+                                     } else {
+                                         book.cover_path = Some(cover_path_str.clone());
+                                     }
+                                }
+
+                                // Preview
+                                if let Some(path_str) = &book.cover_path {
+                                    ui.add_space(4.0);
+                                     let uri = if path_str.contains("://") { 
+                                         path_str.clone() 
+                                     } else {
+                                         if let Ok(abs_path) = std::fs::canonicalize(path_str) {
+                                              format!("file://{}", abs_path.to_string_lossy())
+                                         } else {
+                                              path_str.clone() 
+                                         }
+                                     };
+                                     
+                                     let preview_width = ui.available_width() - 8.0;
+                                     ui.add(egui::Image::new(uri)
+                                         .rounding(egui::Rounding::same(4.0))
+                                         .fit_to_original_size(0.5)
+                                         .max_width(preview_width));
+                                 } else {
+                                     ui.label(egui::RichText::new("No cover image").italics());
+                                 }
+
+                                ui.add_space(8.0);
+                                ui.vertical(|ui| {
+                                    if ui.button("Browse Image").clicked() {
+                                        if let Some(path) = rfd::FileDialog::new().add_filter("image", &["png", "jpg", "jpeg"]).pick_file() {
+                                              // We store lorebook covers in data/covers for example, or just data/avatars?
+                                              // The user didn't specify, but covers makes sense.
+                                              let dest_dir = std::path::Path::new("data/covers");
+                                              let _ = std::fs::create_dir_all(dest_dir);
+                                              if let Some(name) = path.file_name() {
+                                                  let dest = dest_dir.join(name);
+                                                  let _ = std::fs::copy(&path, &dest);
+                                                  book.cover_path = Some(dest.to_string_lossy().to_string());
+                                              }
+                                        }
+                                    }
+
+                                    if ui.button("Paste from Clipboard").clicked() {
+                                         match arboard::Clipboard::new() {
+                                              Ok(mut clipboard) => {
+                                                  match clipboard.get_image() {
+                                                      Ok(img_data) => {
+                                                          let width = img_data.width as u32;
+                                                          let height = img_data.height as u32;
+                                                          let bytes = img_data.bytes.into_owned();
+                                                          
+                                                          if let Some(image_buffer) = image::ImageBuffer::<image::Rgba<u8>, Vec<u8>>::from_raw(width, height, bytes) {
+                                                              let timestamp = chrono::Utc::now().timestamp_millis();
+                                                              let filename = format!("pasted_cover_{}.png", timestamp);
+                                                              let dest_dir = std::path::Path::new("data/covers");
+                                                              let _ = std::fs::create_dir_all(dest_dir);
+                                                              let dest_path = dest_dir.join(&filename);
+                                                              
+                                                              if let Ok(_) = image_buffer.save(&dest_path) {
+                                                                  book.cover_path = Some(dest_path.to_string_lossy().to_string());
+                                                                  status_update = Some(("Cover pasted successfully!".to_string(), egui::Color32::GREEN));
+                                                              } else {
+                                                                   status_update = Some(("Failed to save cover image to disk.".to_string(), egui::Color32::RED));
+                                                              }
+                                                          } else {
+                                                               status_update = Some(("Failed to process image buffer from clipboard.".to_string(), egui::Color32::RED));
+                                                          }
+                                                      },
+                                                      Err(_) => {
+                                                          status_update = Some(("Clipboard does not contain an image.".to_string(), egui::Color32::RED));
+                                                      }
+                                                  }
+                                              },
+                                              Err(e) => {
+                                                  status_update = Some((format!("Clipboard error: {}", e), egui::Color32::RED));
+                                              }
+                                         }
+                                    }
+
+                                    // Keep old actions too? Maybe useful.
+                                    ui.add_space(4.0);
+                                    ui.horizontal(|ui| {
+                                        if let Some(path_str) = &book.cover_path {
+                                             if ui.button("Copy Path").clicked() {
+                                                  ui.output_mut(|o| o.copied_text = path_str.clone());
+                                                  status_update = Some(("Path copied!".to_string(), egui::Color32::GREEN));
+                                             }
+                                             
+                                             if ui.button("Open Folder").clicked() {
+                                                 #[cfg(target_os = "windows")]
+                                                 {
+                                                     let _ = std::process::Command::new("explorer")
+                                                         .arg("/select,")
+                                                         .arg(path_str.replace("/", "\\"))
+                                                         .spawn();
+                                                 }
+
+                                                 #[cfg(target_os = "linux")]
+                                                 {
+                                                     if let Ok(abs_path) = std::fs::canonicalize(path_str) {
+                                                         let _ = std::process::Command::new("xdg-open")
+                                                              .arg(abs_path.parent().unwrap_or(std::path::Path::new("/")))
+                                                              .spawn();
+                                                     }
+                                                 }
+                                             }
+                                        }
+                                    });
+                                });
+                            });
+                        });
+                    });
                     
-                    if ui.button("Save Lorebook").clicked() {
-                         save_lore_req = Some(book.clone());
+                    if let Some((msg, color)) = status_update {
+                        app.set_status(msg, color);
                     }
                     
                     if let Some(l) = save_lore_req {
                         app.save_lorebook(l);
                     }
+                    
+                    if let Some((lid, name)) = tag_add_request {
+                        app.add_tag_to_lorebook(lid, name);
+                    }
+                    if let Some((lid, tid)) = tag_remove_request {
+                        app.remove_tag_from_lorebook(lid, tid);
+                    }
+                    
+                    // Restore ownership
+                    app.selected_lorebook = Some(book);
+
                 } else {
                     ui.label("Select a lorebook.");
                 }

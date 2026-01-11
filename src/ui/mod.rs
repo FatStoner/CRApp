@@ -140,7 +140,9 @@ pub enum UiEvent {
     CollectionDeleted(Result<i64, String>),
     LinkUpdated(Result<(), String>),
     TagsLoaded(Result<(i64, Vec<Tag>, Vec<Tag>), String>),
+    LorebookTagsLoaded(Result<(i64, Vec<Tag>), String>),
     TagOperationFinished(Result<(), String>),
+    LorebookTagOperationFinished(Result<(), String>),
 
     ImportFileLoaded(Result<String, String>),
     ThemeLoaded(Result<ThemeMode, String>),
@@ -359,9 +361,28 @@ impl CrapApp {
             ctx.request_repaint();
 
             // Load Lorebooks
-            let books_res = db.get_all_lorebooks().await.map_err(|e| e.to_string());
-            let _ = tx.send(UiEvent::LorebooksLoaded(books_res)).await;
-            ctx.request_repaint();
+            match db.get_all_lorebooks().await {
+                Ok(mut books) => {
+                    let tags_res = db.get_all_lorebook_tags_flat().await;
+                    if let Ok(tags_flat) = tags_res {
+                        let mut tag_map: HashMap<i64, Vec<Tag>> = HashMap::new();
+                        for (lid, tag) in tags_flat {
+                            tag_map.entry(lid).or_default().push(tag);
+                        }
+                        for b in &mut books {
+                            if let Some(tags) = tag_map.remove(&b.id) {
+                                b.tags = tags;
+                            }
+                        }
+                    }
+                    let _ = tx.send(UiEvent::LorebooksLoaded(Ok(books))).await;
+                    ctx.request_repaint();
+                }
+                Err(e) => {
+                    let _ = tx.send(UiEvent::LorebooksLoaded(Err(e.to_string()))).await;
+                    ctx.request_repaint();
+                }
+            }
         });
     }
 
@@ -426,9 +447,28 @@ impl CrapApp {
         let db = self.db.clone();
         let ctx = self.ctx.clone();
         tokio::spawn(async move {
-            let result = db.get_all_lorebooks().await.map_err(|e| e.to_string());
-            let _ = tx.send(UiEvent::LorebooksLoaded(result)).await;
-            ctx.request_repaint();
+            match db.get_all_lorebooks().await {
+                Ok(mut books) => {
+                    let tags_res = db.get_all_lorebook_tags_flat().await;
+                    if let Ok(tags_flat) = tags_res {
+                        let mut tag_map: HashMap<i64, Vec<Tag>> = HashMap::new();
+                        for (lid, tag) in tags_flat {
+                            tag_map.entry(lid).or_default().push(tag);
+                        }
+                        for b in &mut books {
+                            if let Some(tags) = tag_map.remove(&b.id) {
+                                b.tags = tags;
+                            }
+                        }
+                    }
+                    let _ = tx.send(UiEvent::LorebooksLoaded(Ok(books))).await;
+                    ctx.request_repaint();
+                }
+                Err(e) => {
+                    let _ = tx.send(UiEvent::LorebooksLoaded(Err(e.to_string()))).await;
+                    ctx.request_repaint();
+                }
+            }
         });
     }
 
@@ -618,8 +658,28 @@ impl CrapApp {
             } else {
                 let _ = tx.send(UiEvent::LorebookSaved(Ok(lorebook))).await;
                 ctx.request_repaint();
-                let list = db.get_all_lorebooks().await.map_err(|e| e.to_string());
-                let _ = tx.send(UiEvent::LorebooksLoaded(list)).await;
+
+                // Correctly reload lorebooks WITH tags
+                match db.get_all_lorebooks().await {
+                    Ok(mut books) => {
+                        let tags_res = db.get_all_lorebook_tags_flat().await;
+                        if let Ok(tags_flat) = tags_res {
+                            let mut tag_map: HashMap<i64, Vec<Tag>> = HashMap::new();
+                            for (lid, tag) in tags_flat {
+                                tag_map.entry(lid).or_default().push(tag);
+                            }
+                            for b in &mut books {
+                                if let Some(tags) = tag_map.remove(&b.id) {
+                                    b.tags = tags;
+                                }
+                            }
+                        }
+                        let _ = tx.send(UiEvent::LorebooksLoaded(Ok(books))).await;
+                    }
+                    Err(e) => {
+                        let _ = tx.send(UiEvent::LorebooksLoaded(Err(e.to_string()))).await;
+                    }
+                }
                 ctx.request_repaint();
             }
         });
@@ -923,6 +983,82 @@ impl CrapApp {
                 .await
                 .map_err(|e| e.to_string());
             let _ = tx.send(UiEvent::TagOperationFinished(res)).await;
+            ctx.request_repaint();
+        });
+    }
+
+    pub fn load_lorebook_tags(&self, lorebook_id: i64) {
+        if lorebook_id == 0 {
+            return;
+        }
+        let tx = self.tx.clone();
+        let db = self.db.clone();
+        let ctx = self.ctx.clone();
+        tokio::spawn(async move {
+            match db.get_tags_for_lorebook(lorebook_id).await {
+                Ok(tags) => {
+                    let _ = tx
+                        .send(UiEvent::LorebookTagsLoaded(Ok((lorebook_id, tags))))
+                        .await;
+                }
+                Err(e) => {
+                    let _ = tx
+                        .send(UiEvent::LorebookTagsLoaded(Err(e.to_string())))
+                        .await;
+                }
+            }
+            ctx.request_repaint();
+        });
+    }
+
+    pub fn add_tag_to_lorebook(&self, lorebook_id: i64, name: String) {
+        let tx = self.tx.clone();
+        let db = self.db.clone();
+        let ctx = self.ctx.clone();
+        tokio::spawn(async move {
+            let res = db.add_tag_to_lorebook(lorebook_id, &name).await;
+
+            match res {
+                Ok(_) => {
+                    let tags = db.get_tags_for_lorebook(lorebook_id).await;
+                    if let Ok(t) = tags {
+                        let _ = tx
+                            .send(UiEvent::LorebookTagsLoaded(Ok((lorebook_id, t))))
+                            .await;
+                    }
+                    let _ = tx.send(UiEvent::LorebookTagOperationFinished(Ok(()))).await;
+                }
+                Err(e) => {
+                    let _ = tx
+                        .send(UiEvent::LorebookTagOperationFinished(Err(e.to_string())))
+                        .await;
+                }
+            }
+            ctx.request_repaint();
+        });
+    }
+
+    pub fn remove_tag_from_lorebook(&self, lorebook_id: i64, tag_id: i64) {
+        let tx = self.tx.clone();
+        let db = self.db.clone();
+        let ctx = self.ctx.clone();
+        tokio::spawn(async move {
+            match db.remove_tag_from_lorebook(lorebook_id, tag_id).await {
+                Ok(_) => {
+                    let tags = db.get_tags_for_lorebook(lorebook_id).await;
+                    if let Ok(t) = tags {
+                        let _ = tx
+                            .send(UiEvent::LorebookTagsLoaded(Ok((lorebook_id, t))))
+                            .await;
+                    }
+                    let _ = tx.send(UiEvent::LorebookTagOperationFinished(Ok(()))).await;
+                }
+                Err(e) => {
+                    let _ = tx
+                        .send(UiEvent::LorebookTagOperationFinished(Err(e.to_string())))
+                        .await;
+                }
+            }
             ctx.request_repaint();
         });
     }
@@ -1306,6 +1442,21 @@ impl eframe::App for CrapApp {
                     }
                     Err(e) => self.set_status(format!("Tag Error: {}", e), egui::Color32::RED),
                 },
+                UiEvent::LorebookTagsLoaded(res) => match res {
+                    Ok((id, tags)) => {
+                        if let Some(l) = &mut self.selected_lorebook {
+                            if l.id == id {
+                                l.tags = tags;
+                            }
+                        }
+                    }
+                    Err(e) => eprintln!("Lorebook tags load error: {}", e),
+                },
+                UiEvent::LorebookTagOperationFinished(res) => {
+                    if let Err(e) = res {
+                        self.set_status(format!("Tag Error: {}", e), egui::Color32::RED);
+                    }
+                }
                 UiEvent::DeepSearchCompleted(res) => {
                     self.is_deep_searching = false;
                     match res {

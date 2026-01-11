@@ -415,6 +415,82 @@ impl Database {
         Ok(results)
     }
 
+    // Lorebook Tags
+    pub async fn add_tag_to_lorebook(
+        &self,
+        lorebook_id: i64,
+        tag_name: &str,
+    ) -> Result<(), sqlx::Error> {
+        // 1. Ensure tag exists (using 'tags' table shared with characters app tags)
+        let insert_tag_query = "INSERT OR IGNORE INTO tags (name) VALUES (?)";
+        sqlx::query(insert_tag_query)
+            .bind(tag_name)
+            .execute(&self.pool)
+            .await?;
+
+        // 2. Get Tag ID
+        let get_id_query = "SELECT id FROM tags WHERE name = ?";
+        let tag_id: i64 = sqlx::query_scalar(get_id_query)
+            .bind(tag_name)
+            .fetch_one(&self.pool)
+            .await?;
+
+        // 3. Link
+        let link_query = "INSERT OR IGNORE INTO lorebook_tags (lorebook_id, tag_id) VALUES (?, ?)";
+        sqlx::query(link_query)
+            .bind(lorebook_id)
+            .bind(tag_id)
+            .execute(&self.pool)
+            .await?;
+
+        Ok(())
+    }
+
+    pub async fn remove_tag_from_lorebook(
+        &self,
+        lorebook_id: i64,
+        tag_id: i64,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query("DELETE FROM lorebook_tags WHERE lorebook_id = ? AND tag_id = ?")
+            .bind(lorebook_id)
+            .bind(tag_id)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
+    pub async fn get_tags_for_lorebook(&self, lorebook_id: i64) -> Result<Vec<Tag>, sqlx::Error> {
+        let query = "
+            SELECT t.id, t.name FROM tags t
+            JOIN lorebook_tags lt ON t.id = lt.tag_id
+            WHERE lt.lorebook_id = ?
+        ";
+        sqlx::query_as::<_, Tag>(query)
+            .bind(lorebook_id)
+            .fetch_all(&self.pool)
+            .await
+    }
+
+    pub async fn get_all_lorebook_tags_flat(&self) -> Result<Vec<(i64, Tag)>, sqlx::Error> {
+        let query = "
+            SELECT lt.lorebook_id, t.id, t.name FROM tags t
+            JOIN lorebook_tags lt ON t.id = lt.tag_id
+        ";
+        let rows = sqlx::query(query).fetch_all(&self.pool).await?;
+
+        use sqlx::Row;
+        let mut results = Vec::new();
+        for row in rows {
+            let lb_id: i64 = row.get(0);
+            let tag = Tag {
+                id: row.get(1),
+                name: row.get(2),
+            };
+            results.push((lb_id, tag));
+        }
+        Ok(results)
+    }
+
     pub async fn get_all_character_urls_flat(
         &self,
     ) -> Result<Vec<crate::models::CharacterUrl>, sqlx::Error> {
