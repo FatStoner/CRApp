@@ -334,7 +334,7 @@ pub fn render_side_panel(app: &mut CrapApp, ctx: &egui::Context) {
                     ui.add_space(5.0);
                     ui.horizontal(|ui| {
                         if ui.button("➕ New Character").clicked() {
-                            app.create_new_character(app.selected_collection_id);
+                            app.create_new_character(None);
                         }
                         if ui.button("➕ New Lorebook").clicked() {
                             app.create_new_lorebook();
