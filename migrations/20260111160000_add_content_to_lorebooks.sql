@@ -1,0 +1,1 @@
+ALTER TABLE lorebooks ADD COLUMN content TEXT NOT NULL DEFAULT '';
