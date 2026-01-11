@@ -115,6 +115,7 @@ pub fn render_side_panel(app: &mut CrapApp, ctx: &egui::Context) {
                     // Auto-fill query if present
                     if !app.search_query.is_empty() {
                         app.deep_search_query = app.search_query.clone();
+                        app.perform_deep_search();
                     }
                 }
 

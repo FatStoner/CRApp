@@ -40,6 +40,49 @@ pub fn render_browser_view(app: &mut CrapApp, ui: &mut egui::Ui) {
     let collection_id = app.selected_collection_id;
     let mut actions = Vec::new();
 
+    // Background Image
+    if let Ok(abs_path) = std::fs::canonicalize("data/background/default.png") {
+        // Attempt to read dimensions to calculate aspect ratio
+        if let Ok(reader) = image::io::Reader::open(&abs_path) {
+            if let Ok(dims) = reader.into_dimensions() {
+                let (img_w, img_h) = dims;
+                if img_w > 0 && img_h > 0 {
+                    let uri = format!("file://{}", abs_path.to_string_lossy());
+                    let rect = ui.available_rect_before_wrap();
+
+                    let avail_w = rect.width();
+                    let avail_h = rect.height();
+
+                    let img_aspect = img_w as f32 / img_h as f32;
+                    let avail_aspect = avail_w / avail_h;
+
+                    // We want to CONTAIN the image (fit inside), so we take the smaller scale
+                    // But then we also want it 10% smaller than that, so 0.9 scale.
+                    let scale_factor = if avail_aspect > img_aspect {
+                        // Available is wider than image, so height is the limiting factor
+                        avail_h / img_h as f32
+                    } else {
+                        // Available is taller than image, so width is the limiting factor
+                        avail_w / img_w as f32
+                    };
+
+                    let final_scale = scale_factor * 0.9;
+
+                    let final_w = img_w as f32 * final_scale;
+                    let final_h = img_h as f32 * final_scale;
+
+                    let center = rect.center();
+                    let final_rect =
+                        egui::Rect::from_center_size(center, egui::vec2(final_w, final_h));
+
+                    egui::Image::new(uri)
+                        .tint(egui::Color32::WHITE.gamma_multiply(0.5))
+                        .paint_at(ui, final_rect);
+                }
+            }
+        }
+    }
+
     // Clone collections for context menu usage
     let all_collections = app.collections.clone();
 

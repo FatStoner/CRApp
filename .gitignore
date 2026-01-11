@@ -4,7 +4,8 @@
 *.db-wal
 *.db.bak
 *.exe
-data/
+data/avatars/
+data/covers/
 Docs/
 *.crapp
 *.json
