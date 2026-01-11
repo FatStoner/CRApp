@@ -331,5 +331,78 @@ impl ParsedCharacterData {
         self.scenario = self.scenario.trim().to_string();
         self.first_message = self.first_message.trim().to_string();
         self.example_dialogue = self.example_dialogue.trim().to_string();
+
+        // 1. Remove Advice Lines
+        let advice_greeting = "What will they say to start a conversation.";
+        let advice_personality = "In a few sentences, describe your chatbot's personality.";
+        let advice_scenario = "Describe the current situation and context of the conversation";
+
+        if self.first_message.ends_with(advice_greeting) {
+            self.first_message = self
+                .first_message
+                .trim_end_matches(advice_greeting)
+                .trim()
+                .to_string();
+        }
+        if self.personality.ends_with(advice_personality) {
+            self.personality = self
+                .personality
+                .trim_end_matches(advice_personality)
+                .trim()
+                .to_string();
+        }
+        if self.scenario.ends_with(advice_scenario) {
+            self.scenario = self
+                .scenario
+                .trim_end_matches(advice_scenario)
+                .trim()
+                .to_string();
+        }
+
+        // 2. Remove Placeholders
+        let placeholder_scenario = "Elara Nightshade stands in the center of a dimly lit room, a map of ancient ruins spread out before her. The faint glow from a nearby lantern reflects off the silver streaks in her dark hair as her piercing amber eyes scan the details, her enigmatic presence commanding the air of mystery surrounding the secrets she’s about to uncover.";
+        let placeholder_dialogue = "{{User}}: Hey, what are you doing?\n{{Char}}: Greetings {{User}}! I am maintaining SpicyChat’s characters. Pleasure to meet you!\nExample conversations to define your Chatbot. This will impact how it talks.";
+
+        if self.scenario == placeholder_scenario {
+            self.scenario = String::new();
+        }
+        if self.example_dialogue.replace("\r\n", "\n").trim()
+            == placeholder_dialogue.replace("\r\n", "\n").trim()
+        {
+            self.example_dialogue = String::new();
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_spicy_cleanup_advice_lines() {
+        let mut data = ParsedCharacterData {
+            first_message: "Hello user!\nWhat will they say to start a conversation.".to_string(),
+            personality: "Kind bot.\nIn a few sentences, describe your chatbot's personality."
+                .to_string(),
+            scenario: "In a park.\nDescribe the current situation and context of the conversation"
+                .to_string(),
+            ..Default::default()
+        };
+        data.cleanup();
+        assert_eq!(data.first_message, "Hello user!");
+        assert_eq!(data.personality, "Kind bot.");
+        assert_eq!(data.scenario, "In a park.");
+    }
+
+    #[test]
+    fn test_spicy_cleanup_placeholders() {
+        let mut data = ParsedCharacterData {
+            scenario: "Elara Nightshade stands in the center of a dimly lit room, a map of ancient ruins spread out before her. The faint glow from a nearby lantern reflects off the silver streaks in her dark hair as her piercing amber eyes scan the details, her enigmatic presence commanding the air of mystery surrounding the secrets she’s about to uncover.".to_string(),
+            example_dialogue: "{{User}}: Hey, what are you doing?\n{{Char}}: Greetings {{User}}! I am maintaining SpicyChat’s characters. Pleasure to meet you!\nExample conversations to define your Chatbot. This will impact how it talks.".to_string(),
+            ..Default::default()
+        };
+        data.cleanup();
+        assert_eq!(data.scenario, "");
+        assert_eq!(data.example_dialogue, "");
     }
 }
