@@ -123,11 +123,29 @@ impl SearchFieldFilters {
 #[derive(Clone, Debug)]
 pub enum PopupState {
     None,
-    Renaming { id: i64, name: String },
-    DeleteConfirmation { id: i64 },
-    DeleteWarning { id: i64, count: usize },
-    DeleteCharacterConfirmation { id: i64, name: String },
-    UnsavedChanges { target: AppAction },
+    Renaming {
+        id: i64,
+        name: String,
+    },
+    DeleteConfirmation {
+        id: i64,
+    },
+    DeleteWarning {
+        id: i64,
+        count: usize,
+    },
+    DeleteCharacterConfirmation {
+        id: i64,
+        name: String,
+    },
+    DeleteLorebookEntryConfirmation {
+        id: i64,
+        lorebook_id: i64,
+        name: String,
+    },
+    UnsavedChanges {
+        target: AppAction,
+    },
     ImportDbWarning,
 }
 
@@ -1942,6 +1960,60 @@ impl eframe::App for CrapApp {
 
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
                         if ui.button("OK").clicked() {
+                            close = true;
+                        }
+                    });
+                });
+            if close {
+                self.popup_state = PopupState::None;
+            }
+        }
+
+        if let PopupState::DeleteLorebookEntryConfirmation {
+            id,
+            lorebook_id,
+            name,
+        } = self.popup_state.clone()
+        {
+            let mut close = false;
+            egui::Window::new("Delete Entry?")
+                .collapsible(false)
+                .resizable(false)
+                .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
+                .show(ctx, |ui| {
+                    ui.label(format!("Are you sure you want to delete '{}'?", name));
+                    ui.colored_label(egui::Color32::RED, "This action cannot be undone.");
+                    ui.add_space(10.0);
+
+                    ui.horizontal(|ui| {
+                        if ui.button("Yes, Delete").clicked() {
+                            let tx = self.tx.clone();
+                            let db = self.db.clone();
+                            let entry_id = id;
+                            let lid = lorebook_id;
+                            tokio::spawn(async move {
+                                match db.delete_lorebook_entry(entry_id).await {
+                                    Ok(_) => {
+                                        let _ = tx
+                                            .send(UiEvent::LorebookEntryDeleted(Ok(entry_id)))
+                                            .await;
+                                    }
+                                    Err(e) => {
+                                        let _ = tx
+                                            .send(UiEvent::LorebookEntryDeleted(Err(e.to_string())))
+                                            .await;
+                                    }
+                                }
+                                // Trigger reload of entries for this lorebook
+                                if let Ok(entries) = db.get_entries_for_lorebook(lid).await {
+                                    let _ = tx
+                                        .send(UiEvent::LorebookEntriesLoaded(Ok((lid, entries))))
+                                        .await;
+                                }
+                            });
+                            close = true;
+                        }
+                        if ui.button("Cancel").clicked() {
                             close = true;
                         }
                     });

@@ -28,11 +28,15 @@ Handles the detailed editing interfaces.
     -   **Fields**: Name, Title, Personality, Scenario, Examples, etc.
     -   **Avatars**: Image preview, clipboard pasting, file browsing.
     -   **Tags**: Management of App and External tags.
+    -   **Lorebooks**: Selection of linked lorebooks with "Go to Lorebook" navigation button.
     -   **Export**: Export to .crapp (Native), .json (SpicyChat), .md, or .png (Card).
 -   **Lorebook Editor**:
     -   **Metadata**: Title, Description (Content), Tags, and Cover management.
-    -   **Entry Management**: A Master-Detail view for managing individual lore entries.
+    -   **Tabbed Section**:
+        -   **Entries Tab**: Master-Detail view for managing individual entries. Feature a swapped layout (Editor on Left, List on Right) and dynamic count badge.
+        -   **Characters Tab**: Gallery view of all characters linked to this lorebook with dynamic count badge.
     -   **Sync**: Automatically keeps description and content columns in sync.
+    -   **Safety**: Delete confirmation for lore entries.
 
 ### 4. Parsing (`ui/parsing.rs`)
 Dedicated logic for parsing character data from external text sources (clipboard).

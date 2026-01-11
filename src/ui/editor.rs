@@ -1060,11 +1060,17 @@ pub fn render_lorebook_editor(app: &mut CrapApp, ui: &mut egui::Ui) {
                     ui.separator();
                     
                     // --- Bottom Section: Tabs ---
+                    let linked_char_count = app.characters.iter()
+                        .filter(|c| app.char_lore_map.get(&c.id).map(|l| l.contains(&book.id)).unwrap_or(false))
+                        .count();
+
                     ui.horizontal(|ui| {
-                        if ui.selectable_label(app.active_lorebook_tab == crate::ui::LorebookTab::Entries, "Entries").clicked() {
+                        let entries_label = format!("Entries ({})", book.entries.len());
+                        if ui.selectable_label(app.active_lorebook_tab == crate::ui::LorebookTab::Entries, entries_label).clicked() {
                             app.active_lorebook_tab = crate::ui::LorebookTab::Entries;
                         }
-                        if ui.selectable_label(app.active_lorebook_tab == crate::ui::LorebookTab::Characters, "Characters").clicked() {
+                        let chars_label = format!("Characters ({})", linked_char_count);
+                        if ui.selectable_label(app.active_lorebook_tab == crate::ui::LorebookTab::Characters, chars_label).clicked() {
                             app.active_lorebook_tab = crate::ui::LorebookTab::Characters;
                         }
                     });
@@ -1075,8 +1081,52 @@ pub fn render_lorebook_editor(app: &mut CrapApp, ui: &mut egui::Ui) {
                             // --- Master-Detail Entries View ---
                             ui.allocate_ui(ui.available_size(), |ui| {
                                  ui.columns(2, |columns| {
-                                     // ENTRY LIST
+                                     // ENTRY EDITOR (Now on Left)
                                      columns[0].vertical(|ui| {
+                                         if let Some(entry) = &mut app.selected_entry {
+                                             // Ensure we are editing an entry belonging to this lorebook
+                                             if entry.lorebook_id == book.id {
+                                                 ui.heading("Edit Entry");
+                                                 ui.label("Name");
+                                                 ui.text_edit_singleline(&mut entry.name);
+                                                 
+                                                 ui.label("Keywords (comma separated)");
+                                                 ui.text_edit_singleline(&mut entry.keywords);
+                                                 
+                                                 ui.label("Content");
+                                                 egui::ScrollArea::vertical().id_source("entry_content_scroll").show(ui, |ui| {
+                                                       ui.add(egui::TextEdit::multiline(&mut entry.content).desired_width(f32::INFINITY));
+                                                 });
+        
+                                                 ui.add_space(8.0);
+                                                 ui.horizontal(|ui| {
+                                                     ui.with_layout(egui::Layout::left_to_right(egui::Align::Min), |ui| {
+                                                         if ui.button("Save Entry").clicked() {
+                                                             entry_save_req = Some(entry.clone());
+                                                         }
+                                                     });
+                                                     
+                                                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
+                                                         if ui.button(egui::RichText::new("Delete").color(egui::Color32::RED)).clicked() {
+                                                             // Trigger confirmation popup
+                                                             app.popup_state = crate::ui::PopupState::DeleteLorebookEntryConfirmation { 
+                                                                 id: entry.id, 
+                                                                 lorebook_id: book.id,
+                                                                 name: entry.name.clone() 
+                                                             };
+                                                         }
+                                                     });
+                                                 });
+                                             } else {
+                                                 ui.centered_and_justified(|ui| ui.label("Select an entry from this Lorebook."));
+                                             }
+                                         } else {
+                                             ui.centered_and_justified(|ui| ui.label("Select an entry to edit."));
+                                         }
+                                     });
+
+                                     // ENTRY LIST (Now on Right)
+                                     columns[1].vertical(|ui| {
                                          ui.horizontal(|ui| {
                                              ui.heading("Entries");
                                              if ui.small_button("+").clicked() {
@@ -1093,40 +1143,6 @@ pub fn render_lorebook_editor(app: &mut CrapApp, ui: &mut egui::Ui) {
                                                  }
                                              }
                                          });
-                                     });
-                                     
-                                     // ENTRY EDITOR
-                                     columns[1].vertical(|ui| {
-                                         if let Some(entry) = &mut app.selected_entry {
-                                             // Ensure we are editing an entry belonging to this lorebook
-                                             if entry.lorebook_id == book.id {
-                                                 ui.heading("Edit Entry");
-                                                 ui.label("Name");
-                                                 ui.text_edit_singleline(&mut entry.name);
-                                                 
-                                                 ui.label("Keywords (comma separated)");
-                                                 ui.text_edit_singleline(&mut entry.keywords);
-                                                 
-                                                 ui.label("Content");
-                                                 egui::ScrollArea::vertical().id_source("entry_content_scroll").show(ui, |ui| {
-                                                       ui.add(egui::TextEdit::multiline(&mut entry.content).desired_width(f32::INFINITY));
-                                                 });
-        
-                                                 ui.horizontal(|ui| {
-                                                     if ui.button("Save Entry").clicked() {
-                                                         entry_save_req = Some(entry.clone());
-                                                     }
-                                                     if ui.button(egui::RichText::new("Delete").color(egui::Color32::RED)).clicked() {
-                                                         entry_delete_req = Some(entry.id);
-                                                     }
-                                                 });
-                                             } else {
-                                                 ui.centered_and_justified(|ui| ui.label("Select an entry from this Lorebook."));
-                                                 // If mismatch, clear selection?
-                                             }
-                                         } else {
-                                             ui.centered_and_justified(|ui| ui.label("Select an entry to edit."));
-                                         }
                                      });
                                  });
                             });
