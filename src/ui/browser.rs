@@ -348,109 +348,143 @@ pub fn render_browser_view(app: &mut CrapApp, ui: &mut egui::Ui) {
     }
 
     egui::ScrollArea::vertical().show(ui, |ui| {
-        if app.browser_show_urls {
-            // LIST VIEW (URLs)
-            // Keep folders separate at the top
-            ui.horizontal_wrapped(|ui| {
-                for folder in &subfolders {
-                    render_subfolder_card(ui, app, folder, &mut actions);
+        // Context menu for the content area (handles gaps and right side)
+        // We use a stateful approach: store the rect from the previous frame and interact with it *before* drawing content.
+        // This ensures the interaction is added first (logically behind), so buttons added later will sit on top and capture their own clicks.
+        let bg_id = ui.make_persistent_id("browser_content_bg");
+        let cached_bg_rect = ui
+            .data(|d| d.get_temp::<egui::Rect>(bg_id))
+            .unwrap_or(egui::Rect::ZERO);
+
+        if cached_bg_rect.width() > 0.0 && cached_bg_rect.height() > 0.0 {
+            let bg_response = ui.interact(cached_bg_rect, bg_id, egui::Sense::click());
+            bg_response.context_menu(|ui| {
+                if ui.button("➕ New Character").clicked() {
+                    actions.push(BrowserAction::CreateCharacter(collection_id));
+                    ui.close_menu();
                 }
-            });
-
-            ui.vertical(|ui| {
-                for char in &chars {
-                    ui.add_space(8.0);
-                    egui::Frame::group(ui.style()).show(ui, |ui| {
-                        ui.set_min_width(ui.available_width());
-                        ui.horizontal(|ui| {
-                            // Avatar
-                            let avatar_size = 80.0;
-                            let (rect, response) = ui.allocate_exact_size(
-                                egui::vec2(avatar_size, avatar_size),
-                                egui::Sense::click(),
-                            );
-
-                            if response.clicked() {
-                                app.selected_character = Some(char.clone());
-                                app.central_view = crate::ui::CentralView::Editor;
-                                app.load_tags(char.id);
-                                app.load_links(char.id);
-                            }
-
-                            // Avatar Painting
-                            if let Some(path_str) = &char.avatar_path {
-                                let uri = if path_str.contains("://") {
-                                    path_str.clone()
-                                } else {
-                                    if let Ok(abs_path) = std::fs::canonicalize(path_str) {
-                                        format!("file://{}", abs_path.to_string_lossy())
-                                    } else {
-                                        path_str.clone()
-                                    }
-                                };
-                                crate::ui::widgets::paint_avatar_crop(ui, rect, &uri, 4.0);
-                            } else {
-                                ui.painter()
-                                    .rect_filled(rect, 4.0, egui::Color32::from_gray(60));
-                                let initial = char
-                                    .name
-                                    .chars()
-                                    .next()
-                                    .unwrap_or('?')
-                                    .to_uppercase()
-                                    .to_string();
-                                ui.painter().text(
-                                    rect.center(),
-                                    egui::Align2::CENTER_CENTER,
-                                    initial,
-                                    egui::FontId::proportional(32.0),
-                                    egui::Color32::WHITE,
-                                );
-                            }
-
-                            ui.add_space(10.0);
-
-                            // Info Vertical
-                            ui.vertical(|ui| {
-                                ui.heading(&char.name);
-                                ui.add_space(4.0);
-
-                                if char.urls.is_empty() {
-                                    ui.label(
-                                        egui::RichText::new("No URLs")
-                                            .italics()
-                                            .color(egui::Color32::GRAY),
-                                    );
-                                }
-
-                                for url in &char.urls {
-                                    ui.horizontal(|ui| {
-                                        let label = url.label.as_deref().unwrap_or("Link");
-                                        ui.label(
-                                            egui::RichText::new(format!("{}:", label)).strong(),
-                                        );
-                                        ui.hyperlink(&url.url);
-                                    });
-                                }
-                            });
-                        });
-                    });
-                }
-            });
-        } else {
-            // GRID VIEW
-            // Mix folders and characters in one flow
-            ui.horizontal_wrapped(|ui| {
-                for folder in &subfolders {
-                    render_subfolder_card(ui, app, folder, &mut actions);
-                }
-                for char in &chars {
-                    render_character_card(ui, app, char, &all_collections, &mut actions);
+                if ui.button("📁 New Folder").clicked() {
+                    actions.push(BrowserAction::CreateCollection(collection_id));
+                    ui.close_menu();
                 }
             });
         }
 
-        // Context menu for empty space
+        let content_response = egui::Frame::none()
+            .show(ui, |ui| {
+                ui.set_min_width(ui.available_width());
+                if app.browser_show_urls {
+                    // LIST VIEW (URLs)
+                    // Keep folders separate at the top
+                    ui.horizontal_wrapped(|ui| {
+                        for folder in &subfolders {
+                            render_subfolder_card(ui, app, folder, &mut actions);
+                        }
+                    });
+
+                    ui.vertical(|ui| {
+                        for char in &chars {
+                            ui.add_space(8.0);
+                            egui::Frame::group(ui.style()).show(ui, |ui| {
+                                ui.set_min_width(ui.available_width());
+                                ui.horizontal(|ui| {
+                                    // Avatar
+                                    let avatar_size = 80.0;
+                                    let (rect, response) = ui.allocate_exact_size(
+                                        egui::vec2(avatar_size, avatar_size),
+                                        egui::Sense::click(),
+                                    );
+
+                                    if response.clicked() {
+                                        app.selected_character = Some(char.clone());
+                                        app.central_view = crate::ui::CentralView::Editor;
+                                        app.load_tags(char.id);
+                                        app.load_links(char.id);
+                                    }
+
+                                    // Avatar Painting
+                                    if let Some(path_str) = &char.avatar_path {
+                                        let uri = if path_str.contains("://") {
+                                            path_str.clone()
+                                        } else {
+                                            if let Ok(abs_path) = std::fs::canonicalize(path_str) {
+                                                format!("file://{}", abs_path.to_string_lossy())
+                                            } else {
+                                                path_str.clone()
+                                            }
+                                        };
+                                        crate::ui::widgets::paint_avatar_crop(ui, rect, &uri, 4.0);
+                                    } else {
+                                        ui.painter().rect_filled(
+                                            rect,
+                                            4.0,
+                                            egui::Color32::from_gray(60),
+                                        );
+                                        let initial = char
+                                            .name
+                                            .chars()
+                                            .next()
+                                            .unwrap_or('?')
+                                            .to_uppercase()
+                                            .to_string();
+                                        ui.painter().text(
+                                            rect.center(),
+                                            egui::Align2::CENTER_CENTER,
+                                            initial,
+                                            egui::FontId::proportional(32.0),
+                                            egui::Color32::WHITE,
+                                        );
+                                    }
+
+                                    ui.add_space(10.0);
+
+                                    // Info Vertical
+                                    ui.vertical(|ui| {
+                                        ui.heading(&char.name);
+                                        ui.add_space(4.0);
+
+                                        if char.urls.is_empty() {
+                                            ui.label(
+                                                egui::RichText::new("No URLs")
+                                                    .italics()
+                                                    .color(egui::Color32::GRAY),
+                                            );
+                                        }
+
+                                        for url in &char.urls {
+                                            ui.horizontal(|ui| {
+                                                let label = url.label.as_deref().unwrap_or("Link");
+                                                ui.label(
+                                                    egui::RichText::new(format!("{}:", label))
+                                                        .strong(),
+                                                );
+                                                ui.hyperlink(&url.url);
+                                            });
+                                        }
+                                    });
+                                });
+                            });
+                        }
+                    });
+                } else {
+                    // GRID VIEW
+                    // Mix folders and characters in one flow
+                    ui.horizontal_wrapped(|ui| {
+                        for folder in &subfolders {
+                            render_subfolder_card(ui, app, folder, &mut actions);
+                        }
+                        for char in &chars {
+                            render_character_card(ui, app, char, &all_collections, &mut actions);
+                        }
+                    });
+                }
+            })
+            .response;
+
+        // Store the current frame's rect for the next frame's background interaction
+        ui.data_mut(|d| d.insert_temp(bg_id, content_response.rect));
+
+        // Context menu for empty space (handles bottom area)
         let available = ui.available_size();
         let (_rect, response) = ui.allocate_at_least(available, egui::Sense::click());
         response.context_menu(|ui| {
