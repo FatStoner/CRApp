@@ -577,9 +577,8 @@ pub fn render_character_card(
         app.central_view = crate::ui::CentralView::Editor;
         app.load_tags(char.id);
         app.load_links(char.id);
-        // Also open the Lorebooks tab if clicking from the Lorebook Editor?
-        // No, stay in Editor. The user logic might need refinement here if used from Lorebook Editor.
-        // For now, it switches to Character Editor, which is likely desired behavior.
+        // FORCE SWITCH MODE to Characters so sidebar and other UI elements align
+        app.mode = crate::ui::AppMode::Characters;
     }
 
     response.context_menu(|ui| {

@@ -863,13 +863,25 @@ pub fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                              },
                              CharacterTab::Lorebooks => {
                                  ui.label("Select relevant lorebooks:");
+                                 let mut go_to_lorebook = None;
                                  for lore in &app.lorebooks {
-                                     let mut is_linked = app.lore_links.contains(&lore.id);
-                                     if ui.checkbox(&mut is_linked, &lore.title).clicked() {
-                                         if character.id != 0 {
-                                             toggle_requests.push((character.id, lore.id, is_linked));
+                                     ui.horizontal(|ui| {
+                                         let mut is_linked = app.lore_links.contains(&lore.id);
+                                         if ui.checkbox(&mut is_linked, &lore.title).clicked() {
+                                             if character.id != 0 {
+                                                 toggle_requests.push((character.id, lore.id, is_linked));
+                                             }
                                          }
-                                     }
+                                         if ui.small_button("➡").on_hover_text("Go to Lorebook").clicked() {
+                                             go_to_lorebook = Some(lore.clone());
+                                         }
+                                     });
+                                 }
+                                 
+                                 if let Some(target_lore) = go_to_lorebook {
+                                     app.selected_lorebook = Some(target_lore);
+                                     app.mode = crate::ui::AppMode::Lorebooks;
+                                     app.central_view = crate::ui::CentralView::Editor;
                                  }
                              }
                          }
