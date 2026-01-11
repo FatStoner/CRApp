@@ -548,11 +548,7 @@ impl Database {
             WHERE et.name LIKE ?
         ";
 
-        let rows = sqlx::query(q)
-            .bind(&pattern)
-            .bind(&pattern)
-            .fetch_all(&self.pool)
-            .await?;
+        let rows = sqlx::query(q).bind(&pattern).fetch_all(&self.pool).await?;
 
         use sqlx::Row;
         let mut results = Vec::new();
@@ -596,12 +592,74 @@ impl Database {
         sqlx::query_as::<_, crate::models::Lorebook>(
             "SELECT * FROM lorebooks WHERE 
              title LIKE ? OR 
-             description LIKE ?",
+             description LIKE ? OR
+             content LIKE ?",
         )
+        .bind(&pattern)
         .bind(&pattern)
         .bind(&pattern)
         .fetch_all(&self.pool)
         .await
+    }
+
+    pub async fn search_lorebook_entries_text(
+        &self,
+        query: &str,
+    ) -> Result<Vec<crate::models::LorebookEntry>, sqlx::Error> {
+        let pattern = format!("%{}%", query);
+        sqlx::query_as::<_, crate::models::LorebookEntry>(
+            "SELECT * FROM lorebook_entries WHERE 
+             name LIKE ? OR 
+             keywords LIKE ? OR 
+             content LIKE ?",
+        )
+        .bind(&pattern)
+        .bind(&pattern)
+        .bind(&pattern)
+        .fetch_all(&self.pool)
+        .await
+    }
+
+    pub async fn search_lorebook_tags_matching(
+        &self,
+        query: &str,
+    ) -> Result<Vec<(i64, String)>, sqlx::Error> {
+        let pattern = format!("%{}%", query);
+        let q = "
+            SELECT lt.lorebook_id, t.name
+            FROM lorebook_tags lt 
+            JOIN tags t ON lt.tag_id = t.id 
+            WHERE t.name LIKE ?
+        ";
+        let rows = sqlx::query(q).bind(&pattern).fetch_all(&self.pool).await?;
+
+        use sqlx::Row;
+        let mut results = Vec::new();
+        for row in rows {
+            let lid: i64 = row.get(0);
+            let name: String = row.get(1);
+            results.push((lid, name));
+        }
+        Ok(results)
+    }
+
+    pub async fn get_lorebooks_by_ids(
+        &self,
+        ids: &[i64],
+    ) -> Result<Vec<crate::models::Lorebook>, sqlx::Error> {
+        if ids.is_empty() {
+            return Ok(Vec::new());
+        }
+        let placeholders: Vec<String> = ids.iter().map(|_| "?".to_string()).collect();
+        let query = format!(
+            "SELECT * FROM lorebooks WHERE id IN ({})",
+            placeholders.join(",")
+        );
+        let mut q = sqlx::query_as::<_, crate::models::Lorebook>(&query);
+        for id in ids {
+            q = q.bind(id);
+        }
+        q.fetch_all(&self.pool).await
     }
 
     pub async fn get_all_lorebooks(&self) -> Result<Vec<crate::models::Lorebook>, sqlx::Error> {
@@ -669,6 +727,9 @@ impl Database {
         &self,
         lorebook: &mut crate::models::Lorebook,
     ) -> Result<(), sqlx::Error> {
+        // Keep description and content in sync for search compatibility
+        lorebook.description = lorebook.content.clone();
+
         if lorebook.id == 0 {
             // INSERT
             let id = sqlx::query(
@@ -696,6 +757,7 @@ impl Database {
             .execute(&self.pool)
             .await?;
         }
+
         Ok(())
     }
 

@@ -30,7 +30,9 @@ Handles the detailed editing interfaces.
     -   **Tags**: Management of App and External tags.
     -   **Export**: Export to .crapp (Native), .json (SpicyChat), .md, or .png (Card).
 -   **Lorebook Editor**:
-    -   Title, Description, and Cover management.
+    -   **Metadata**: Title, Description (Content), Tags, and Cover management.
+    -   **Entry Management**: A Master-Detail view for managing individual lore entries.
+    -   **Sync**: Automatically keeps description and content columns in sync.
 
 ### 4. Parsing (`ui/parsing.rs`)
 Dedicated logic for parsing character data from external text sources (clipboard).
@@ -44,10 +46,11 @@ The left-hand navigation bar.
     -   **Favorites**: Dedicated section for quickly accessing favorite characters. Displays a heart (\u2764) next to favorite character names.
     -   Collection Tree (recursive rendering of folders).
     -   Global Search input.
-    -   **Deep Search**:
+        -   **Deep Search**:
         -   **Query**: Full-text search across all character and lorebook fields.
+        -   **Lorebook Matching**: Searches Title, Description/Content, Tags, and all Entry fields.
         -   **Folder Filter**: Ability to limit search to a specific Collection and all its descendants.
-        -   **Safe Snippets**: Heuristic snippet extraction with UTF-8 boundary protection and result limiting for performance.
+        -   **Safe Snippets**: Contextual snippet extraction with UTF-8 boundary protection.
 
 ## UI Event Loop & State
 The `CrapApp` struct (in `ui/mod.rs`) holds all the transient UI state:

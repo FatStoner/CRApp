@@ -81,8 +81,22 @@ World info entries.
 | --- | --- | --- |
 | `id` | INTEGER PK | |
 | `title` | TEXT | |
-| `description` | TEXT | |
+| `description` | TEXT | Legacy column, synced with `content`. |
+| `content` | TEXT | Main body text. |
 | `cover_path` | TEXT | |
+
+### Lorebook Entries Table (`lorebook_entries`)
+Individual lore pieces within a book.
+| Column | Type | Description |
+| --- | --- | --- |
+| `id` | INTEGER PK | |
+| `lorebook_id` | INTEGER FK | Links to `lorebooks`. |
+| `name` | TEXT | |
+| `keywords` | TEXT | |
+| `content` | TEXT | |
+
+### Lorebook Tags
+-   `lorebook_tags`: Links `lorebooks` to `tags`.
 
 ### Links
 -   `character_lore_link`: Many-to-Many link between Characters and Lorebooks.

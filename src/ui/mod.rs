@@ -1326,24 +1326,98 @@ impl CrapApp {
                 }
             }
 
-            // Search Lorebooks
+            // 5. Build Lorebook Results
             use crate::ui::widgets::extract_snippets;
+            let mut lorebook_map: std::collections::HashMap<i64, Lorebook> =
+                std::collections::HashMap::new();
+
+            // 5.1 Text Search
             if let Ok(books) = db.search_lorebooks_text(&query).await {
                 for b in books {
-                    let mut matches = Vec::new();
-                    for s in extract_snippets(&b.description, &query) {
-                        matches.push(("Description".to_string(), s));
-                    }
+                    lorebook_map.insert(b.id, b);
+                }
+            }
 
-                    if !matches.is_empty() {
-                        results.push(DeepSearchResult {
-                            id: b.id,
-                            kind: SearchResultKind::Lorebook,
-                            display_name: b.title,
-                            collection_id: None, // Lorebooks don't have collections
-                            matches,
-                        });
+            // 5.2 Tags Search
+            let mut lb_tag_matches: Vec<(i64, String)> = Vec::new();
+            if let Ok(tags) = db.search_lorebook_tags_matching(&query).await {
+                lb_tag_matches = tags;
+            }
+
+            // 5.3 Entries Search
+            let mut entry_matches: Vec<crate::models::LorebookEntry> = Vec::new();
+            if let Ok(entries) = db.search_lorebook_entries_text(&query).await {
+                entry_matches = entries;
+            }
+
+            // 5.4 Fetch Missing Lorebooks
+            let mut missing_lb_ids: std::collections::HashSet<i64> =
+                std::collections::HashSet::new();
+            for (lid, _) in &lb_tag_matches {
+                if !lorebook_map.contains_key(lid) {
+                    missing_lb_ids.insert(*lid);
+                }
+            }
+            for entry in &entry_matches {
+                if !lorebook_map.contains_key(&entry.lorebook_id) {
+                    missing_lb_ids.insert(entry.lorebook_id);
+                }
+            }
+
+            if !missing_lb_ids.is_empty() {
+                let ids: Vec<i64> = missing_lb_ids.into_iter().collect();
+                if let Ok(fetched) = db.get_lorebooks_by_ids(&ids).await {
+                    for b in fetched {
+                        lorebook_map.insert(b.id, b);
                     }
+                }
+            }
+
+            // 5.5 Aggregate Matches
+            for (_, mut lb) in lorebook_map {
+                let mut matches = Vec::new();
+
+                // 5.5.1 Lorebook Text Matches
+                for s in extract_snippets(&lb.title, &query) {
+                    matches.push(("Title".to_string(), s));
+                }
+                for s in extract_snippets(&lb.description, &query) {
+                    matches.push(("Description".to_string(), s));
+                }
+                for s in extract_snippets(&lb.content, &query) {
+                    matches.push(("Content".to_string(), s));
+                }
+
+                // 5.5.2 Tag Matches
+                for (lid, tname) in &lb_tag_matches {
+                    if *lid == lb.id {
+                        matches.push(("Tag".to_string(), tname.clone()));
+                    }
+                }
+
+                // 5.5.3 Entry Matches
+                for entry in &entry_matches {
+                    if entry.lorebook_id == lb.id {
+                        for s in extract_snippets(&entry.name, &query) {
+                            matches.push((format!("Entry: {}", entry.name), s));
+                        }
+                        for s in extract_snippets(&entry.keywords, &query) {
+                            matches.push((format!("Entry Keywords: {}", entry.name), s));
+                        }
+                        for s in extract_snippets(&entry.content, &query) {
+                            matches.push((format!("Entry Content: {}", entry.name), s));
+                        }
+                    }
+                }
+
+                if !matches.is_empty() {
+                    results.push(DeepSearchResult {
+                        id: lb.id,
+                        kind: SearchResultKind::Lorebook,
+                        display_name: lb.title,
+                        collection_id: None,
+                        matches,
+                    });
                 }
             }
 

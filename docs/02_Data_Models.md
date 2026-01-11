@@ -35,8 +35,20 @@ Represents a collection of lore entries (World Info).
 -   **Fields**:
     -   `id`: `i64`.
     -   `title`: `String`.
-    -   `description`: `String`.
+    -   `description`: `String` (Synced with `content`).
+    -   `content`: `String` (Main body text, synced with `description` for legacy/search compatibility).
     -   `cover_path`: `Option<String>`.
+    -   `tags`: `Vec<Tag>`.
+    -   `entries`: `Vec<LorebookEntry>`.
+
+### LorebookEntry
+Represents a specific entry within a Lorebook (e.g., a character or location).
+-   **Fields**:
+    -   `id`: `i64`.
+    -   `lorebook_id`: `i64`.
+    -   `name`: `String`.
+    -   `keywords`: `String` (Comma-separated search keys).
+    -   `content`: `String` (Detailed lore text).
 
 ### Collection
 Represents a folder for organizing characters.
