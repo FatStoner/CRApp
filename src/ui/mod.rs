@@ -39,6 +39,12 @@ pub enum CharacterTab {
 }
 
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
+pub enum LorebookTab {
+    Entries,
+    Characters,
+}
+
+#[derive(PartialEq, Eq, Clone, Copy, Debug)]
 pub enum CentralView {
     Editor,
     Browser,
@@ -177,6 +183,7 @@ pub struct CrapApp {
     pub selected_lorebook: Option<Lorebook>,
     pub selected_entry: Option<crate::models::LorebookEntry>,
     pub active_char_tab: CharacterTab,
+    pub active_lorebook_tab: LorebookTab,
     pub central_view: CentralView,
     pub theme: ThemeMode,
     pub ui_scale: f32,
@@ -235,7 +242,9 @@ impl CrapApp {
             selected_character: None,
             selected_lorebook: None,
             selected_entry: None,
+
             active_char_tab: CharacterTab::MainData,
+            active_lorebook_tab: LorebookTab::Entries,
             central_view: CentralView::Browser,
             sort_mode: SortMode::Alphabetical,
             sort_direction: SortDirection::Ascending,

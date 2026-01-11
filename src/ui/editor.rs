@@ -1045,64 +1045,142 @@ pub fn render_lorebook_editor(app: &mut CrapApp, ui: &mut egui::Ui) {
                     
                     ui.separator();
 
-                    // --- Bottom Section: Entries (Master-Detail) ---
-                    ui.allocate_ui(ui.available_size(), |ui| {
-                         ui.columns(2, |columns| {
-                             // ENTRY LIST
-                             columns[0].vertical(|ui| {
-                                 ui.horizontal(|ui| {
-                                     ui.heading("Entries");
-                                     if ui.small_button("+").clicked() {
-                                         entry_add_req = true;
-                                     }
-                                 });
-                                 ui.separator();
-                                 egui::ScrollArea::vertical().id_source("entries_list_scroll").show(ui, |ui| {
-                                     ui.set_width(ui.available_width());
-                                     for entry in &book.entries {
-                                         let selected = app.selected_entry.as_ref().map(|e| e.id) == Some(entry.id);
-                                         if ui.selectable_label(selected, &entry.name).clicked() {
-                                             app.selected_entry = Some(entry.clone());
-                                         }
-                                     }
-                                 });
-                             });
-                             
-                             // ENTRY EDITOR
-                             columns[1].vertical(|ui| {
-                                 if let Some(entry) = &mut app.selected_entry {
-                                     // Ensure we are editing an entry belonging to this lorebook
-                                     if entry.lorebook_id == book.id {
-                                         ui.heading("Edit Entry");
-                                         ui.label("Name");
-                                         ui.text_edit_singleline(&mut entry.name);
-                                         
-                                         ui.label("Keywords (comma separated)");
-                                         ui.text_edit_singleline(&mut entry.keywords);
-                                         
-                                         ui.label("Content");
-                                         egui::ScrollArea::vertical().id_source("entry_content_scroll").show(ui, |ui| {
-                                               ui.add(egui::TextEdit::multiline(&mut entry.content).desired_width(f32::INFINITY));
-                                         });
-
-                                         ui.horizontal(|ui| {
-                                             if ui.button("Save Entry").clicked() {
-                                                 entry_save_req = Some(entry.clone());
-                                             }
-                                             if ui.button(egui::RichText::new("Delete").color(egui::Color32::RED)).clicked() {
-                                                 entry_delete_req = Some(entry.id);
-                                             }
-                                         });
-                                     } else {
-                                         ui.centered_and_justified(|ui| ui.label("Select an entry from this Lorebook."));
-                                         // If mismatch, clear selection?
-                                     }
-                                 } else {
-                                     ui.centered_and_justified(|ui| ui.label("Select an entry to edit."));
-                                 }
-                             });
-                         });
+                    ui.separator();
+                    
+                    // --- Bottom Section: Tabs ---
+                    ui.horizontal(|ui| {
+                        if ui.selectable_label(app.active_lorebook_tab == crate::ui::LorebookTab::Entries, "Entries").clicked() {
+                            app.active_lorebook_tab = crate::ui::LorebookTab::Entries;
+                        }
+                        if ui.selectable_label(app.active_lorebook_tab == crate::ui::LorebookTab::Characters, "Characters").clicked() {
+                            app.active_lorebook_tab = crate::ui::LorebookTab::Characters;
+                        }
                     });
+                    ui.separator();
+
+                    match app.active_lorebook_tab {
+                        crate::ui::LorebookTab::Entries => {
+                            // --- Master-Detail Entries View ---
+                            ui.allocate_ui(ui.available_size(), |ui| {
+                                 ui.columns(2, |columns| {
+                                     // ENTRY LIST
+                                     columns[0].vertical(|ui| {
+                                         ui.horizontal(|ui| {
+                                             ui.heading("Entries");
+                                             if ui.small_button("+").clicked() {
+                                                 entry_add_req = true;
+                                             }
+                                         });
+                                         ui.separator();
+                                         egui::ScrollArea::vertical().id_source("entries_list_scroll").show(ui, |ui| {
+                                             ui.set_width(ui.available_width());
+                                             for entry in &book.entries {
+                                                 let selected = app.selected_entry.as_ref().map(|e| e.id) == Some(entry.id);
+                                                 if ui.selectable_label(selected, &entry.name).clicked() {
+                                                     app.selected_entry = Some(entry.clone());
+                                                 }
+                                             }
+                                         });
+                                     });
+                                     
+                                     // ENTRY EDITOR
+                                     columns[1].vertical(|ui| {
+                                         if let Some(entry) = &mut app.selected_entry {
+                                             // Ensure we are editing an entry belonging to this lorebook
+                                             if entry.lorebook_id == book.id {
+                                                 ui.heading("Edit Entry");
+                                                 ui.label("Name");
+                                                 ui.text_edit_singleline(&mut entry.name);
+                                                 
+                                                 ui.label("Keywords (comma separated)");
+                                                 ui.text_edit_singleline(&mut entry.keywords);
+                                                 
+                                                 ui.label("Content");
+                                                 egui::ScrollArea::vertical().id_source("entry_content_scroll").show(ui, |ui| {
+                                                       ui.add(egui::TextEdit::multiline(&mut entry.content).desired_width(f32::INFINITY));
+                                                 });
+        
+                                                 ui.horizontal(|ui| {
+                                                     if ui.button("Save Entry").clicked() {
+                                                         entry_save_req = Some(entry.clone());
+                                                     }
+                                                     if ui.button(egui::RichText::new("Delete").color(egui::Color32::RED)).clicked() {
+                                                         entry_delete_req = Some(entry.id);
+                                                     }
+                                                 });
+                                             } else {
+                                                 ui.centered_and_justified(|ui| ui.label("Select an entry from this Lorebook."));
+                                                 // If mismatch, clear selection?
+                                             }
+                                         } else {
+                                             ui.centered_and_justified(|ui| ui.label("Select an entry to edit."));
+                                         }
+                                     });
+                                 });
+                            });
+                        },
+                        crate::ui::LorebookTab::Characters => {
+                             // --- Linked Characters Gallery ---
+                             ui.heading(format!("Characters Linked to '{}'", book.title));
+                             ui.add_space(8.0);
+                             
+                             let mut browser_actions = Vec::new();
+                             let all_colls = app.collections.clone(); // Clone for immutable access to collections inside loop
+                             
+                             // Filter characters
+                             let linked_chars: Vec<crate::models::Character> = app.characters.iter()
+                                .filter(|c| {
+                                    if let Some(links) = app.char_lore_map.get(&c.id) {
+                                        links.contains(&book.id)
+                                    } else {
+                                        false
+                                    }
+                                })
+                                .cloned()
+                                .collect();
+
+                             if linked_chars.is_empty() {
+                                 ui.label("No characters linked to this Lorebook.");
+                                 ui.label("Go to a Character -> Lorebooks tab to link them.");
+                             } else {
+                                 egui::ScrollArea::vertical().id_source("lore_chars_scroll").show(ui, |ui| {
+                                     ui.horizontal_wrapped(|ui| {
+                                         for char in &linked_chars {
+                                             crate::ui::browser::render_character_card(ui, app, char, &all_colls, &mut browser_actions);
+                                         }
+                                     });
+                                 });
+                             }
+                             
+                             // Handle Browser Actions generated by cards
+                             for action in browser_actions {
+                                 match action {
+                                     crate::ui::browser::BrowserAction::MoveCharacter(char_id, target_id) => {
+                                         app.move_character(char_id, target_id);
+                                     }
+                                     crate::ui::browser::BrowserAction::ToggleFavorite(char_id) => {
+                                         app.toggle_favorite(char_id);
+                                     }
+                                     crate::ui::browser::BrowserAction::DeleteCharacter(id) => {
+                                          let name = app.characters.iter().find(|c| c.id == id).map(|c| c.name.clone()).unwrap_or_default();
+                                          app.popup_state = crate::ui::PopupState::DeleteCharacterConfirmation { id, name };
+                                     }
+                                     crate::ui::browser::BrowserAction::RenameCollection(id, name) => {
+                                         app.popup_state = crate::ui::PopupState::Renaming { id, name };
+                                     }
+                                     crate::ui::browser::BrowserAction::DeleteCollection(id) => {
+                                         app.delete_collection(id); // Simple delete call, ignoring complex warning logic for now or reusing if precise
+                                     }
+                                      crate::ui::browser::BrowserAction::CreateCharacter(cid) => {
+                                          app.create_new_character(cid);
+                                      }
+                                      crate::ui::browser::BrowserAction::CreateCollection(cid) => {
+                                          app.save_collection(0, "New Folder".to_string(), cid);
+                                      }
+                                 }
+                             }
+                        }
+                    }
 
 
                     // --- Event Handling ---
