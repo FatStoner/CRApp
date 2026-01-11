@@ -348,82 +348,15 @@ pub fn render_browser_view(app: &mut CrapApp, ui: &mut egui::Ui) {
     }
 
     egui::ScrollArea::vertical().show(ui, |ui| {
-        ui.horizontal_wrapped(|ui| {
-            // Render Subfolders
-            // Render Subfolders
-            for folder in subfolders {
-                let card_width = 180.0;
-                let card_height = 260.0;
-
-                let (rect, response) = ui
-                    .allocate_exact_size(egui::vec2(card_width, card_height), egui::Sense::click());
-
-                let bg_color = if response.hovered() {
-                    ui.visuals().widgets.hovered.bg_fill
-                } else {
-                    ui.visuals().widgets.noninteractive.bg_fill
-                };
-
-                ui.painter().rect_filled(rect, 8.0, bg_color);
-                ui.painter()
-                    .rect_stroke(rect, 1.0, ui.visuals().widgets.noninteractive.bg_stroke);
-
-                if response.clicked() {
-                    app.selected_collection_id = Some(folder.id);
-                }
-
-                response.context_menu(|ui| {
-                    if ui.button("✏ Rename").clicked() {
-                        actions.push(BrowserAction::RenameCollection(
-                            folder.id,
-                            folder.name.clone(),
-                        ));
-                        ui.close_menu();
-                    }
-                    if ui.button("🗑 Delete").clicked() {
-                        actions.push(BrowserAction::DeleteCollection(folder.id));
-                        ui.close_menu();
-                    }
-                });
-
-                // Content
-                let content_rect = rect.shrink(8.0);
-
-                // Avatar (Top Square - Folder Icon)
-                let avatar_size = content_rect.width();
-                let avatar_rect = egui::Rect::from_min_size(
-                    content_rect.min,
-                    egui::vec2(avatar_size, avatar_size),
-                );
-
-                // Draw centered folder icon
-                ui.painter()
-                    .rect_filled(avatar_rect, 4.0, egui::Color32::from_rgb(60, 60, 70)); // Darker bg for folder
-                ui.painter().text(
-                    avatar_rect.center(),
-                    egui::Align2::CENTER_CENTER,
-                    "📁",
-                    egui::FontId::proportional(64.0),
-                    egui::Color32::from_rgb(200, 200, 220),
-                );
-
-                // Text Area (Name)
-                let text_top = avatar_rect.max.y + 8.0;
-                let name_font = egui::FontId::proportional(16.0);
-                let name_galley = ui.painter().layout_no_wrap(
-                    folder.name.clone(),
-                    name_font.clone(),
-                    ui.visuals().text_color(),
-                );
-                ui.painter().galley(
-                    egui::pos2(content_rect.min.x, text_top),
-                    name_galley,
-                    ui.visuals().text_color(),
-                );
-            }
-        });
-
         if app.browser_show_urls {
+            // LIST VIEW (URLs)
+            // Keep folders separate at the top
+            ui.horizontal_wrapped(|ui| {
+                for folder in &subfolders {
+                    render_subfolder_card(ui, app, folder, &mut actions);
+                }
+            });
+
             ui.vertical(|ui| {
                 for char in &chars {
                     ui.add_space(8.0);
@@ -505,13 +438,17 @@ pub fn render_browser_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                 }
             });
         } else {
+            // GRID VIEW
+            // Mix folders and characters in one flow
             ui.horizontal_wrapped(|ui| {
-                // Render Characters
+                for folder in &subfolders {
+                    render_subfolder_card(ui, app, folder, &mut actions);
+                }
                 for char in &chars {
                     render_character_card(ui, app, char, &all_collections, &mut actions);
                 }
             });
-        };
+        }
 
         // Context menu for empty space
         let available = ui.available_size();
@@ -787,4 +724,78 @@ pub fn render_character_card(
 
         tag_x += chip_w + 4.0;
     }
+}
+
+pub fn render_subfolder_card(
+    ui: &mut egui::Ui,
+    app: &mut CrapApp,
+    folder: &crate::models::Collection,
+    actions: &mut Vec<BrowserAction>,
+) {
+    let card_width = 180.0;
+    let card_height = 260.0;
+
+    let (rect, response) =
+        ui.allocate_exact_size(egui::vec2(card_width, card_height), egui::Sense::click());
+
+    let bg_color = if response.hovered() {
+        ui.visuals().widgets.hovered.bg_fill
+    } else {
+        ui.visuals().widgets.noninteractive.bg_fill
+    };
+
+    ui.painter().rect_filled(rect, 8.0, bg_color);
+    ui.painter()
+        .rect_stroke(rect, 1.0, ui.visuals().widgets.noninteractive.bg_stroke);
+
+    if response.clicked() {
+        app.selected_collection_id = Some(folder.id);
+    }
+
+    response.context_menu(|ui| {
+        if ui.button("✏ Rename").clicked() {
+            actions.push(BrowserAction::RenameCollection(
+                folder.id,
+                folder.name.clone(),
+            ));
+            ui.close_menu();
+        }
+        if ui.button("🗑 Delete").clicked() {
+            actions.push(BrowserAction::DeleteCollection(folder.id));
+            ui.close_menu();
+        }
+    });
+
+    // Content
+    let content_rect = rect.shrink(8.0);
+
+    // Avatar (Top Square - Folder Icon)
+    let avatar_size = content_rect.width();
+    let avatar_rect =
+        egui::Rect::from_min_size(content_rect.min, egui::vec2(avatar_size, avatar_size));
+
+    // Draw centered folder icon
+    ui.painter()
+        .rect_filled(avatar_rect, 4.0, egui::Color32::from_rgb(60, 60, 70)); // Darker bg for folder
+    ui.painter().text(
+        avatar_rect.center(),
+        egui::Align2::CENTER_CENTER,
+        "📁",
+        egui::FontId::proportional(64.0),
+        egui::Color32::from_rgb(200, 200, 220),
+    );
+
+    // Text Area (Name)
+    let text_top = avatar_rect.max.y + 8.0;
+    let name_font = egui::FontId::proportional(16.0);
+    let name_galley = ui.painter().layout_no_wrap(
+        folder.name.clone(),
+        name_font.clone(),
+        ui.visuals().text_color(),
+    );
+    ui.painter().galley(
+        egui::pos2(content_rect.min.x, text_top),
+        name_galley,
+        ui.visuals().text_color(),
+    );
 }
