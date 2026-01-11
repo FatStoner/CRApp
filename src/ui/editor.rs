@@ -292,11 +292,37 @@ pub fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                                      
                                      ui.allocate_ui_with_layout(egui::vec2(left_width, ui.available_height()), egui::Layout::top_down(egui::Align::Min), |ui| {
                                          ui.label("Name (File Name)");
-                                         ui.add(egui::TextEdit::singleline(&mut character.name).desired_width(f32::INFINITY));
+                                         // File Name (character.name) with search highlight
+                                         if app.editor_search_query.len() >= 3 {
+                                              let mut layouter = crate::ui::text_highlight::create_highlight_layouter(app.editor_search_query.clone());
+                                              ui.add(egui::TextEdit::singleline(&mut character.name).layouter(&mut *layouter));
+                                         } else {
+                                              ui.add(egui::TextEdit::singleline(&mut character.name).desired_width(f32::INFINITY));
+                                         }
+
                                          ui.label("Character Name");
-                                         ui.add(egui::TextEdit::singleline(&mut character.char_name).desired_width(f32::INFINITY));
+                                         // Character Name (character.char_name) with search highlight
+                                         if app.editor_search_query.len() >= 3 {
+                                              let mut layouter = crate::ui::text_highlight::create_highlight_layouter(app.editor_search_query.clone());
+                                              ui.add(egui::TextEdit::singleline(&mut character.char_name).layouter(&mut *layouter));
+                                         } else {
+                                              ui.add(egui::TextEdit::singleline(&mut character.char_name).desired_width(f32::INFINITY));
+                                         }
+
                                          ui.label("Title");
-                                         ui.add(egui::TextEdit::singleline(&mut character.char_title).desired_width(f32::INFINITY));
+                                         // Title (character.char_title) with search highlight AND auto-resize
+                                         // Changed to multiline with min_rows(1) for auto-resize behavior
+                                         let title_edit = egui::TextEdit::multiline(&mut character.char_title)
+                                             .desired_width(f32::INFINITY)
+                                             .desired_rows(1);
+                                         
+                                         if app.editor_search_query.len() >= 3 {
+                                             let mut layouter = crate::ui::text_highlight::create_highlight_layouter(app.editor_search_query.clone());
+                                             ui.add(title_edit.layouter(&mut *layouter));
+                                         } else {
+                                             ui.add(title_edit);
+                                         }
+
                                          ui.add_space(8.0);
                                          
                                          egui::CollapsingHeader::new("First Message")
