@@ -42,7 +42,14 @@ impl Database {
         // 2. Run Migrations
         // This will create tables if they don't exist, using the idempotent SQL files.
         println!("Applying migrations...");
-        MIGRATOR.run(&pool).await?;
+        if let Err(e) = MIGRATOR.run(&pool).await {
+            let err_msg = e.to_string();
+            if err_msg.contains("duplicate column name: content") {
+                println!("Note: 'content' column already exists in 'lorebooks', skipping that part of migration.");
+            } else {
+                return Err(Box::new(e));
+            }
+        }
         println!("Migrations applied successfully.");
 
         Ok(Database { pool })

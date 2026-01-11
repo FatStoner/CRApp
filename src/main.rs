@@ -8,6 +8,19 @@ use ui::CrapApp;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let result = run_app().await;
+    if let Err(e) = result {
+        rfd::MessageDialog::new()
+            .set_title("Startup Error")
+            .set_description(&format!("The application failed to start:\n\n{}", e))
+            .set_level(rfd::MessageLevel::Error)
+            .show();
+        return Err(e);
+    }
+    Ok(())
+}
+
+async fn run_app() -> Result<(), Box<dyn std::error::Error>> {
     // Initialize Database
     let db = Database::init()
         .await
@@ -17,9 +30,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         viewport: eframe::egui::ViewportBuilder::default().with_inner_size([1024.0, 768.0]),
         ..Default::default()
     };
-
-    // We need to move db into the closure, but eframe::run_native expects closure to be synchronous usually if not using newest patterns but the closure itself returns the app.
-    // However, eframe::run_native blocks.
 
     eframe::run_native(
         "Character Repository Application",
