@@ -1444,10 +1444,15 @@ impl eframe::App for CrapApp {
                 },
                 UiEvent::LorebookTagsLoaded(res) => match res {
                     Ok((id, tags)) => {
+                        // Update selected if matches
                         if let Some(l) = &mut self.selected_lorebook {
                             if l.id == id {
-                                l.tags = tags;
+                                l.tags = tags.clone();
                             }
+                        }
+                        // Update cache
+                        if let Some(cached) = self.lorebooks.iter_mut().find(|b| b.id == id) {
+                            cached.tags = tags;
                         }
                     }
                     Err(e) => eprintln!("Lorebook tags load error: {}", e),
