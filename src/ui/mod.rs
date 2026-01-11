@@ -596,6 +596,15 @@ impl CrapApp {
         });
     }
 
+    pub fn create_new_lorebook(&mut self) {
+        let new_book = Lorebook::default();
+        // Optimistic update so UI shows it immediately
+        self.selected_lorebook = Some(new_book.clone());
+        self.save_lorebook(new_book);
+        self.mode = AppMode::Lorebooks;
+        self.selected_character = None;
+    }
+
     pub fn save_lorebook(&mut self, mut lorebook: Lorebook) {
         self.is_saving = true;
         self.status_message = None;

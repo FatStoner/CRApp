@@ -541,10 +541,11 @@ impl Database {
         if lorebook.id == 0 {
             // INSERT
             let id = sqlx::query(
-                "INSERT INTO lorebooks (title, description, cover_path) VALUES (?, ?, ?)",
+                "INSERT INTO lorebooks (title, description, content, cover_path) VALUES (?, ?, ?, ?)",
             )
             .bind(&lorebook.title)
             .bind(&lorebook.description)
+            .bind(&lorebook.content)
             .bind(&lorebook.cover_path)
             .execute(&self.pool)
             .await?
@@ -553,13 +554,16 @@ impl Database {
             lorebook.id = id;
         } else {
             // UPDATE
-            sqlx::query("UPDATE lorebooks SET title=?, description=?, cover_path=? WHERE id=?")
-                .bind(&lorebook.title)
-                .bind(&lorebook.description)
-                .bind(&lorebook.cover_path)
-                .bind(lorebook.id)
-                .execute(&self.pool)
-                .await?;
+            sqlx::query(
+                "UPDATE lorebooks SET title=?, description=?, content=?, cover_path=? WHERE id=?",
+            )
+            .bind(&lorebook.title)
+            .bind(&lorebook.description)
+            .bind(&lorebook.content)
+            .bind(&lorebook.cover_path)
+            .bind(lorebook.id)
+            .execute(&self.pool)
+            .await?;
         }
         Ok(())
     }

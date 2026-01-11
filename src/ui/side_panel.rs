@@ -334,8 +334,7 @@ pub fn render_side_panel(app: &mut CrapApp, ctx: &egui::Context) {
                             app.create_new_character(app.selected_collection_id);
                         }
                         if ui.button("➕ New Lorebook").clicked() {
-                            app.selected_lorebook = Some(crate::models::Lorebook::default());
-                            app.mode = AppMode::Lorebooks;
+                            app.create_new_lorebook();
                         }
                     });
                     if app.mode == AppMode::Characters {

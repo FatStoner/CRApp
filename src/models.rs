@@ -154,6 +154,8 @@ pub struct Lorebook {
     pub id: i64,
     pub title: String,
     pub description: String,
+    #[sqlx(default)]
+    pub content: String, // Added handling for content column
     pub cover_path: Option<String>,
 }
 
@@ -172,6 +174,7 @@ impl Default for Lorebook {
             id: 0,
             title: "New Lorebook".to_string(),
             description: "".to_string(),
+            content: "".to_string(),
             cover_path: None,
         }
     }
