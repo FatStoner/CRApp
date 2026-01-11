@@ -643,6 +643,19 @@ impl Database {
         Ok(results)
     }
 
+    pub async fn get_all_lore_links_flat(&self) -> Result<Vec<(i64, i64)>, sqlx::Error> {
+        let rows = sqlx::query("SELECT character_id, lore_id FROM character_lore_link")
+            .fetch_all(&self.pool)
+            .await?;
+
+        use sqlx::Row;
+        let mut results = Vec::new();
+        for row in rows {
+            results.push((row.get(0), row.get(1)));
+        }
+        Ok(results)
+    }
+
     pub async fn get_lorebooks_by_ids(
         &self,
         ids: &[i64],

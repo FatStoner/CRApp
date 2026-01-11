@@ -46,6 +46,8 @@ The left-hand navigation bar.
     -   **Favorites**: Dedicated section for quickly accessing favorite characters. Displays a heart (\u2764) next to favorite character names.
     -   Collection Tree (recursive rendering of folders).
     -   Global Search input.
+        -   Filters the character tree in real-time.
+        -   **Matches**: Character Name, Title, Tags, and **Linked Lorebook Titles**.
         -   **Deep Search**:
         -   **Query**: Full-text search across all character and lorebook fields.
         -   **Lorebook Matching**: Searches Title, Description/Content, Tags, and all Entry fields.

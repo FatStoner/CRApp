@@ -155,6 +155,7 @@ pub enum UiEvent {
     ScaleLoaded(Result<f32, String>),
     DbExportFinished(Result<String, String>),
     DbReloaded(Result<Database, String>),
+    LoreLinksBulkLoaded(HashMap<i64, Vec<i64>>),
 }
 
 pub struct CrapApp {
@@ -168,6 +169,7 @@ pub struct CrapApp {
     pub lorebooks: Vec<Lorebook>,
     pub collections: Vec<Collection>,
     pub lore_links: HashSet<i64>,
+    pub char_lore_map: HashMap<i64, Vec<i64>>,
 
     // State
     pub mode: AppMode,
@@ -228,6 +230,7 @@ impl CrapApp {
             lorebooks: Vec::new(),
             collections: Vec::new(),
             lore_links: HashSet::new(),
+            char_lore_map: HashMap::new(),
             mode: AppMode::Characters,
             selected_character: None,
             selected_lorebook: None,
@@ -363,6 +366,15 @@ impl CrapApp {
                 }
             }
 
+            // Load Lore Links (Bulk) - Critical for Sidebar Search
+            if let Ok(links_flat) = db.get_all_lore_links_flat().await {
+                let mut cl_map: HashMap<i64, Vec<i64>> = HashMap::new();
+                for (cid, lid) in links_flat {
+                    cl_map.entry(cid).or_default().push(lid);
+                }
+                let _ = tx.send(UiEvent::LoreLinksBulkLoaded(cl_map)).await;
+            }
+
             // Load collections
             let collections_res = db.get_all_collections().await.map_err(|e| e.to_string());
             let _ = tx.send(UiEvent::CollectionsLoaded(collections_res)).await;
@@ -440,6 +452,14 @@ impl CrapApp {
                     }
 
                     let _ = tx.send(UiEvent::CharactersLoaded(Ok(chars))).await;
+                    // Load Lore Links (Bulk)
+                    if let Ok(links_flat) = db.get_all_lore_links_flat().await {
+                        let mut cl_map: HashMap<i64, Vec<i64>> = HashMap::new();
+                        for (cid, lid) in links_flat {
+                            cl_map.entry(cid).or_default().push(lid);
+                        }
+                        let _ = tx.send(UiEvent::LoreLinksBulkLoaded(cl_map)).await;
+                    }
                     ctx.request_repaint();
                 }
                 Err(e) => {
@@ -545,7 +565,7 @@ impl CrapApp {
     pub fn delete_collection(&self, id: i64) {
         let tx = self.tx.clone();
         let db = self.db.clone();
-        let ctx = self.ctx.clone();
+        let _ctx = self.ctx.clone();
         let ctx = self.ctx.clone();
         tokio::spawn(async move {
             let res = db.delete_collection(id).await;
@@ -821,8 +841,12 @@ impl CrapApp {
         // Optimistic UI update
         if link {
             self.lore_links.insert(lore_id);
+            self.char_lore_map.entry(char_id).or_default().push(lore_id);
         } else {
             self.lore_links.remove(&lore_id);
+            if let Some(links) = self.char_lore_map.get_mut(&char_id) {
+                links.retain(|&id| id != lore_id);
+            }
         }
 
         let tx = self.tx.clone();
@@ -1544,6 +1568,9 @@ impl eframe::App for CrapApp {
                     Ok(set) => self.lore_links = set,
                     Err(e) => eprintln!("Link load error: {}", e),
                 },
+                UiEvent::LoreLinksBulkLoaded(map) => {
+                    self.char_lore_map = map;
+                }
                 UiEvent::CharacterSaved(res) => {
                     self.is_saving = false;
                     match res {

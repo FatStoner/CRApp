@@ -1,4 +1,4 @@
-use crate::models::{Character, Collection, ThemeMode};
+use crate::models::{Character, Collection, Lorebook, ThemeMode};
 use crate::ui::{AppMode, CrapApp, SortDirection, SortMode};
 use eframe::egui;
 
@@ -184,6 +184,8 @@ pub fn render_side_panel(app: &mut CrapApp, ctx: &egui::Context) {
                                 app.sort_mode,
                                 app.sort_direction,
                                 &app.search_query,
+                                &app.char_lore_map,
+                                &app.lorebooks,
                             );
 
                             // Fill empty space for context menu
@@ -377,6 +379,8 @@ pub fn render_tree(
     sort_mode: SortMode,
     sort_direction: SortDirection,
     search_query: &str,
+    char_lore_map: &std::collections::HashMap<i64, Vec<i64>>,
+    lorebooks: &[Lorebook],
 ) {
     let query_lower = search_query.to_lowercase();
     let is_search_active = !search_query.is_empty();
@@ -388,7 +392,14 @@ pub fn render_tree(
         .collect();
     for col in &node_colls {
         let has_visible_descendants = if is_search_active {
-            has_matches(col.id, collections, characters, &query_lower)
+            has_matches(
+                col.id,
+                collections,
+                characters,
+                &query_lower,
+                char_lore_map,
+                lorebooks,
+            )
         } else {
             true
         };
@@ -521,6 +532,8 @@ pub fn render_tree(
                 sort_mode,
                 sort_direction,
                 search_query,
+                char_lore_map,
+                lorebooks,
             );
         });
 
@@ -556,7 +569,18 @@ pub fn render_tree(
                 .external_tags
                 .iter()
                 .any(|t| t.name.to_lowercase().contains(&query_lower));
-            in_name || in_title || in_app_tags || in_ext_tags
+
+            let in_lore = if let Some(lore_ids) = char_lore_map.get(&c.id) {
+                lore_ids.iter().any(|&lid| {
+                    lorebooks
+                        .iter()
+                        .any(|lb| lb.id == lid && lb.title.to_lowercase().contains(&query_lower))
+                })
+            } else {
+                false
+            };
+
+            in_name || in_title || in_app_tags || in_ext_tags || in_lore
         });
     }
 
@@ -744,6 +768,8 @@ pub fn has_matches(
     collections: &[Collection],
     characters: &[Character],
     query: &str,
+    char_lore_map: &std::collections::HashMap<i64, Vec<i64>>,
+    lorebooks: &[Lorebook],
 ) -> bool {
     if characters.iter().any(|c| {
         c.collection_id == Some(collection_id) && {
@@ -757,7 +783,18 @@ pub fn has_matches(
                 .external_tags
                 .iter()
                 .any(|t| t.name.to_lowercase().contains(query));
-            name_match || title_match || app_tag_match || ext_tag_match
+
+            let lore_match = if let Some(lore_ids) = char_lore_map.get(&c.id) {
+                lore_ids.iter().any(|&lid| {
+                    lorebooks
+                        .iter()
+                        .any(|lb| lb.id == lid && lb.title.to_lowercase().contains(query))
+                })
+            } else {
+                false
+            };
+
+            name_match || title_match || app_tag_match || ext_tag_match || lore_match
         }
     }) {
         return true;
@@ -768,7 +805,14 @@ pub fn has_matches(
         .filter(|c| c.parent_id == Some(collection_id))
         .collect();
     for sub in sub_colls {
-        if has_matches(sub.id, collections, characters, query) {
+        if has_matches(
+            sub.id,
+            collections,
+            characters,
+            query,
+            char_lore_map,
+            lorebooks,
+        ) {
             return true;
         }
     }
