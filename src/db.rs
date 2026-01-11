@@ -63,8 +63,8 @@ impl Database {
         if character.id == 0 {
             // INSERT
             let id = sqlx::query(
-                "INSERT INTO characters (name, char_name, char_title, personality, scenario, example_dialogue, first_message, author_notes, avatar_path, created_at, updated_at, collection_id)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+                "INSERT INTO characters (name, char_name, char_title, personality, scenario, example_dialogue, first_message, author_notes, avatar_path, created_at, updated_at, collection_id, is_favorite)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
             )
             .bind(&character.name)
             .bind(&character.char_name)
@@ -78,6 +78,7 @@ impl Database {
             .bind(character.created_at)
             .bind(character.updated_at)
             .bind(character.collection_id)
+            .bind(character.is_favorite)
             .execute(&self.pool)
             .await?
             .last_insert_rowid();
@@ -86,7 +87,7 @@ impl Database {
         } else {
             // UPDATE
             sqlx::query(
-                "UPDATE characters SET name=?, char_name=?, char_title=?, personality=?, scenario=?, example_dialogue=?, first_message=?, author_notes=?, avatar_path=?, updated_at=?, collection_id=? WHERE id=?"
+                "UPDATE characters SET name=?, char_name=?, char_title=?, personality=?, scenario=?, example_dialogue=?, first_message=?, author_notes=?, avatar_path=?, updated_at=?, collection_id=?, is_favorite=? WHERE id=?"
             )
             .bind(&character.name)
             .bind(&character.char_name)
@@ -99,6 +100,7 @@ impl Database {
             .bind(&character.avatar_path)
             .bind(character.updated_at)
             .bind(character.collection_id)
+            .bind(character.is_favorite)
             .bind(character.id)
             .execute(&self.pool)
             .await?;

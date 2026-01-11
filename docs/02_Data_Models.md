@@ -17,6 +17,7 @@ Represents an AI character definition.
     -   `example_dialogue`: `String` (Q&A examples).
     -   `avatar_path`: `Option<String>` (Path to local image file).
     -   `collection_id`: `Option<i64>` (Foreign Key to Collection).
+    -   `is_favorite`: `bool` (Whether the character is marked as a favorite).
     -   `app_tags`: `Vec<Tag>` (Internal organization tags).
     -   `external_tags`: `Vec<Tag>` (Tags imported from source, e.g., spicychat).
     -   `urls`: `Vec<CharacterUrl>` (Source URLs for the character).

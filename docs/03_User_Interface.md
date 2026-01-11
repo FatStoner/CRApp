@@ -18,7 +18,9 @@ Handles the "Gallery" or "Browser" view where characters are listed.
     -   **Filtering**: By collection, search term, and tags.
     -   **Sorting**: Alphabetical, Date, etc. (Ascending/Descending).
     -   **Navigation**: Folder traversal for collections.
-    -   **Context Menu**: Right-click actions (Move, Delete, Edit).
+    -   **Favorites View**: Dedicated filtered view for favorite characters.
+    -   **Visual Indicators**: Red heart (\u2764) watermark on favorite character cards.
+    -   **Context Menu**: Right-click actions (Move, Delete, Edit, Toggle Favorite).
 
 ### 3. Editor View (`ui/editor.rs`)
 Handles the detailed editing interfaces.
@@ -39,6 +41,7 @@ Dedicated logic for parsing character data from external text sources (clipboard
 The left-hand navigation bar.
 -   **Features**:
     -   App Mode switching (Characters / Lorebooks / Settings).
+    -   **Favorites**: Dedicated section for quickly accessing favorite characters. Displays a heart (\u2764) next to favorite character names.
     -   Collection Tree (recursive rendering of folders).
     -   Global Search input.
     -   **Deep Search**:

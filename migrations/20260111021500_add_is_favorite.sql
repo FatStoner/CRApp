@@ -1,0 +1,1 @@
+ALTER TABLE characters ADD COLUMN is_favorite BOOLEAN NOT NULL DEFAULT 0;

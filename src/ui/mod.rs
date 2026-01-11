@@ -201,6 +201,7 @@ pub struct CrapApp {
     pub parsed_data: Option<ParsedCharacterData>,
 
     pub viewing_all_characters: bool,
+    pub viewing_favorites: bool,
     pub pending_action: Option<AppAction>,
 }
 
@@ -249,6 +250,7 @@ impl CrapApp {
             parsed_data: None,
 
             viewing_all_characters: false,
+            viewing_favorites: false,
             pending_action: None,
             theme: ThemeMode::System,
             ui_scale: 1.0,
@@ -804,6 +806,19 @@ impl CrapApp {
         }
     }
 
+    pub fn toggle_favorite(&mut self, char_id: i64) {
+        if let Some(c) = self.characters.iter_mut().find(|c| c.id == char_id) {
+            c.is_favorite = !c.is_favorite;
+            // Persist
+            let mut char_clone = c.clone();
+            // We use save_character which handles upsert.
+            // But save_character might be too heavy if it reloads everything?
+            // Actually it spawns a task and eventually reloads chars.
+            // That's fine for now.
+            self.save_character(char_clone);
+        }
+    }
+
     pub fn request_collection_switch(&mut self, id: Option<i64>) {
         if self.has_unsaved_changes() {
             self.popup_state = PopupState::UnsavedChanges {
@@ -811,6 +826,7 @@ impl CrapApp {
             };
         } else {
             self.viewing_all_characters = false;
+            self.viewing_favorites = false;
             self.selected_collection_id = id;
             self.mode = AppMode::Characters;
             self.central_view = CentralView::Browser;
@@ -826,6 +842,7 @@ impl CrapApp {
             };
         } else {
             self.viewing_all_characters = true;
+            self.viewing_favorites = false;
             self.selected_collection_id = None;
             self.mode = AppMode::Characters;
             self.central_view = CentralView::Browser;

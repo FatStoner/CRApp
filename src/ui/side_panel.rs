@@ -134,10 +134,26 @@ pub fn render_side_panel(app: &mut CrapApp, ctx: &egui::Context) {
                                 actions.push(TreeAction::SwitchToAll);
                             }
 
+                            if ui
+                                .selectable_label(
+                                    app.viewing_favorites,
+                                    format!("\u{2764} Favorites"),
+                                )
+                                .clicked()
+                            {
+                                if app.viewing_favorites {
+                                    // Toggle off -> go to Uncategorized (DeselectCollection logic effectively)
+                                    actions.push(TreeAction::DeselectCollection);
+                                } else {
+                                    actions.push(TreeAction::SwitchToFavorites);
+                                }
+                            }
+
                             ui.separator();
 
-                            let is_uncategorized =
-                                app.selected_collection_id.is_none() && !app.viewing_all_characters;
+                            let is_uncategorized = app.selected_collection_id.is_none()
+                                && !app.viewing_all_characters
+                                && !app.viewing_favorites;
                             let response =
                                 ui.selectable_label(is_uncategorized, "📁 Uncategorized");
                             if response.clicked() {
@@ -291,11 +307,21 @@ pub fn render_side_panel(app: &mut CrapApp, ctx: &egui::Context) {
                         TreeAction::SwitchToAll => {
                             app.request_view_all();
                         }
+                        TreeAction::SwitchToFavorites => {
+                            // Manual handling since we don't have a helper for this yet in mod.rs or it's simple enough
+                            app.viewing_favorites = true;
+                            app.viewing_all_characters = false;
+                            app.selected_collection_id = None;
+                            app.central_view = crate::ui::CentralView::Browser;
+                        }
                         TreeAction::CreateNewCharacter(target_coll_id) => {
                             app.create_new_character(target_coll_id.or(app.selected_collection_id));
                         }
                         TreeAction::MoveCollection(id, move_up) => {
                             app.reorder_collection(id, move_up);
+                        }
+                        TreeAction::ToggleFavorite(id) => {
+                            app.toggle_favorite(id);
                         }
                     }
                 }
@@ -331,10 +357,12 @@ pub enum TreeAction {
     CreateSubfolder(i64),
     CreateRootFolder,
     SwitchToAll,
+    SwitchToFavorites,
     MoveCharacter(i64, Option<i64>),
     RequestDeleteCharacter(i64),
     CreateNewCharacter(Option<i64>),
     MoveCollection(i64, bool), // id, move_up
+    ToggleFavorite(i64),
 }
 
 // Move render_tree here
@@ -622,9 +650,15 @@ pub fn render_tree(
             ui.visuals().text_color()
         };
 
+        let display_name = if char.is_favorite {
+            format!("{} \u{2764}", char.name)
+        } else {
+            char.name.clone()
+        };
+
         let name_galley = ui
             .painter()
-            .layout_no_wrap(char.name.clone(), name_font, name_color);
+            .layout_no_wrap(display_name, name_font, name_color);
         let name_pos = egui::pos2(text_left, rect.min.y + 4.0);
 
         ui.painter()
@@ -682,6 +716,18 @@ pub fn render_tree(
                 }
                 render_collection_options(ui, collections, None, actions, char.id);
             });
+
+            ui.separator();
+
+            let fav_label = if char.is_favorite {
+                "Remove from Favorites"
+            } else {
+                "Add to Favorites"
+            };
+            if ui.button(fav_label).clicked() {
+                actions.push(TreeAction::ToggleFavorite(char.id));
+                ui.close_menu();
+            }
 
             ui.separator();
 

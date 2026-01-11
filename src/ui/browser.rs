@@ -9,6 +9,7 @@ enum BrowserAction {
     DeleteCollection(i64),
     CreateCharacter(Option<i64>),
     CreateCollection(Option<i64>),
+    ToggleFavorite(i64),
 }
 
 fn render_collection_move_menu(
@@ -44,6 +45,8 @@ pub fn render_browser_view(app: &mut CrapApp, ui: &mut egui::Ui) {
 
     let collection_name = if viewing_all {
         "All Characters (Flat View)".to_string()
+    } else if app.viewing_favorites {
+        "Favorites".to_string()
     } else if let Some(id) = collection_id {
         app.collections
             .iter()
@@ -159,7 +162,7 @@ pub fn render_browser_view(app: &mut CrapApp, ui: &mut egui::Ui) {
     });
     ui.add_space(10.0);
 
-    let mut subfolders: Vec<crate::models::Collection> = if viewing_all {
+    let mut subfolders: Vec<crate::models::Collection> = if viewing_all || app.viewing_favorites {
         Vec::new()
     } else {
         app.collections
@@ -184,6 +187,12 @@ pub fn render_browser_view(app: &mut CrapApp, ui: &mut egui::Ui) {
 
     let mut chars: Vec<crate::models::Character> = if viewing_all {
         app.characters.clone()
+    } else if app.viewing_favorites {
+        app.characters
+            .iter()
+            .filter(|c| c.is_favorite)
+            .cloned()
+            .collect()
     } else {
         app.characters
             .iter()
@@ -502,6 +511,18 @@ pub fn render_browser_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                             );
                         });
 
+                        ui.separator();
+                        let fav_label = if char.is_favorite {
+                            "Remove from Favorites"
+                        } else {
+                            "Add to Favorites"
+                        };
+                        if ui.button(fav_label).clicked() {
+                            actions.push(BrowserAction::ToggleFavorite(char.id));
+                            ui.close_menu();
+                        }
+                        ui.separator();
+
                         if ui.button("🗑 Delete").clicked() {
                             actions.push(BrowserAction::DeleteCharacter(char.id));
                             ui.close_menu();
@@ -544,6 +565,21 @@ pub fn render_browser_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                             egui::Align2::CENTER_CENTER,
                             initial,
                             egui::FontId::proportional(40.0),
+                            egui::Color32::WHITE,
+                        );
+                    }
+
+                    // Watermark
+                    if char.is_favorite {
+                        ui.painter().text(
+                            if rect.max.x - 8.0 >= rect.min.x && rect.min.y + 32.0 <= rect.max.y {
+                                egui::pos2(rect.max.x - 8.0, rect.min.y + 8.0)
+                            } else {
+                                rect.min
+                            },
+                            egui::Align2::RIGHT_TOP,
+                            "\u{2764}",
+                            egui::FontId::proportional(20.0),
                             egui::Color32::WHITE,
                         );
                     }
@@ -660,6 +696,9 @@ pub fn render_browser_view(app: &mut CrapApp, ui: &mut egui::Ui) {
         match action {
             BrowserAction::MoveCharacter(char_id, target_id) => {
                 app.move_character(char_id, target_id);
+            }
+            BrowserAction::ToggleFavorite(char_id) => {
+                app.toggle_favorite(char_id);
             }
             BrowserAction::DeleteCharacter(id) => {
                 let name = app
