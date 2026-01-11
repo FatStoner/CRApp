@@ -189,6 +189,10 @@ pub fn render_central_panel(app: &mut CrapApp, ctx: &egui::Context) {
                                         let app_tags = d.app_tags.clone();
                                         
                                         tokio::spawn(async move {
+                                            // Reset tags first
+                                            let _ = db_clone.remove_all_tags_from_character(cid, true).await;
+                                            let _ = db_clone.remove_all_tags_from_character(cid, false).await;
+                                            
                                             for tag_name in ext_tags {
                                                 let _ = db_clone.add_tag_to_character(cid, &tag_name, true).await;
                                             }

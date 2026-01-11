@@ -389,6 +389,26 @@ impl Database {
         Ok(())
     }
 
+    pub async fn remove_all_tags_from_character(
+        &self,
+        char_id: i64,
+        is_external: bool,
+    ) -> Result<(), sqlx::Error> {
+        let join_table = if is_external {
+            "character_external_tags"
+        } else {
+            "character_tags"
+        };
+
+        let query = format!("DELETE FROM {} WHERE character_id = ?", join_table);
+        sqlx::query(&query)
+            .bind(char_id)
+            .execute(&self.pool)
+            .await?;
+
+        Ok(())
+    }
+
     // Returns (character_id, Tag) for all tags of a specific type (external or app)
     pub async fn get_all_tags_flat(
         &self,
