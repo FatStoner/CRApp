@@ -1661,24 +1661,35 @@ impl CrapApp {
         let include_title = self.count_title_in_total;
 
         tokio::spawn(async move {
-            let mut total_text = String::new();
-            total_text.push_str(&char_clone.name);
-            if include_title {
-                total_text.push_str(&char_clone.char_title);
-            }
-            total_text.push_str(&char_clone.personality);
-            total_text.push_str(&char_clone.scenario);
-            total_text.push_str(&char_clone.example_dialogue);
-            total_text.push_str(&char_clone.first_message);
+            let mut total_tokens = 0;
+            let mut total_chars = 0;
 
-            let char_count = total_text.len();
-            let token_count = crate::models::count_tokens(&total_text);
+            // Note: Editor excludes Name from token count, so we do too.
+            // fields: personality, scenario, example_dialogue, first_message, AND title (optional)
+
+            let t_pers = crate::models::count_tokens(&char_clone.personality);
+            let t_scen = crate::models::count_tokens(&char_clone.scenario);
+            let t_ex = crate::models::count_tokens(&char_clone.example_dialogue);
+            let t_first = crate::models::count_tokens(&char_clone.first_message);
+
+            total_tokens += t_pers + t_scen + t_ex + t_first;
+
+            total_chars += char_clone.personality.len();
+            total_chars += char_clone.scenario.len();
+            total_chars += char_clone.example_dialogue.len();
+            total_chars += char_clone.first_message.len();
+
+            if include_title {
+                let t_title = crate::models::count_tokens(&char_clone.char_title);
+                total_tokens += t_title;
+                total_chars += char_clone.char_title.len();
+            }
 
             let _ = tx
                 .send(UiEvent::TokenCountCalculated(
                     char_clone.id,
-                    token_count,
-                    char_count,
+                    total_tokens,
+                    total_chars,
                 ))
                 .await;
         });

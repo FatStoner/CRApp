@@ -371,7 +371,9 @@ pub fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                                                           ui.output_mut(|o| o.copied_text = character.char_title.clone());
                                                           status_update = Some(("Copied Title to clipboard".to_string(), egui::Color32::GREEN));
                                                       }
-                                                      ui.toggle_value(&mut app.count_title_in_total, "count in total");
+                                                      if ui.toggle_value(&mut app.count_title_in_total, "count in total").changed() {
+                                                          app.token_cache.clear();
+                                                      }
                                                       ui.label(egui::RichText::new(format!("Tokens: {} | Chars: {}", count_tokens(&character.char_title), character.char_title.chars().count())).size(12.0).color(egui::Color32::GRAY));
                                                   });
                                               })
