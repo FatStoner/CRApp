@@ -51,7 +51,7 @@ pub fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                         if ui.memory(|m| m.focused().is_none()) && ui.input(|i| i.key_pressed(egui::Key::Escape)) {
                             back_req = Some(character.collection_id);
                         }
-                        ui.heading("Edit Character");
+                        ui.heading(format!("Edit Character ({})", character.name));
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                             ui.menu_button("EXPORT", |ui| {
                                 let name_slug = character.name.replace(" ", "_");
