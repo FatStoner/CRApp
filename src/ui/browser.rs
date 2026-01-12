@@ -768,12 +768,21 @@ pub fn render_character_card(
     // Title
     if !char.char_title.is_empty() {
         let title_font = egui::FontId::proportional(12.0);
+        // Use only the first line to prevent overlap with tags below
+        let first_line = char.char_title.lines().next().unwrap_or("");
         let title_galley = ui.painter().layout_no_wrap(
-            char.char_title.clone(),
+            first_line.to_string(),
             title_font,
             ui.visuals().text_color().linear_multiply(0.7),
         );
-        ui.painter().with_clip_rect(rect).galley(
+
+        // Clip to content width to prevent horizontal overlap if it's a single very long line
+        let mut title_clip = content_rect;
+        title_clip.set_height(14.0);
+        title_clip.min.y = cursor_y;
+        title_clip.max.y = cursor_y + 14.0;
+
+        ui.painter().with_clip_rect(title_clip).galley(
             egui::pos2(content_rect.min.x, cursor_y),
             title_galley,
             ui.visuals().text_color(),
