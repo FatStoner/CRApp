@@ -29,7 +29,10 @@ Handles the "Gallery" or "Browser" view where characters are listed.
 Handles the detailed editing interfaces.
 -   **Character Editor**:
     -   **Fields**: Name, Title, Personality, Scenario, Examples, etc.
-    -   **Context Menu**: Custom Cut/Copy/Paste actions with selection persistence.
+        -   **Context Menu**: Custom Cut/Copy/Paste actions with selection persistence.
+    -   **Avatars**: Image preview, clipboard pasting, file browsing.
+    -   **Tags**: Management of App and External tags.
+    -   **Lorebooks**: Selection of linked lorebooks with "Go to Lorebook" navigation button.
     -   **Export**: Export to .crapp (Native), .json (SpicyChat), .md, or .png (Card).
 -   **Lorebook Editor**:
     -   **Metadata**: Title, Description (Content), Tags, and Cover management.
