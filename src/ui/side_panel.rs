@@ -226,7 +226,7 @@ pub fn render_side_panel(app: &mut CrapApp, ctx: &egui::Context) {
                                 let is_selected =
                                     app.selected_lorebook.as_ref().map(|l| l.id) == Some(book.id);
                                 let (rect, response) = ui.allocate_exact_size(
-                                    egui::vec2(ui.available_width(), 32.0),
+                                    egui::vec2(ui.available_width(), 34.0),
                                     egui::Sense::click(),
                                 );
 
@@ -248,7 +248,7 @@ pub fn render_side_panel(app: &mut CrapApp, ctx: &egui::Context) {
                                         egui::UiBuilder::new().max_rect(rect),
                                         |ui| {
                                             ui.horizontal(|ui| {
-                                                ui.add_space(4.0);
+                                                ui.add_space(6.0);
                                                 // Thumbnail
                                                 let thumb_size = 24.0;
                                                 let thumb_rect = ui
@@ -294,7 +294,9 @@ pub fn render_side_panel(app: &mut CrapApp, ctx: &egui::Context) {
                                                         .strong()
                                                         .color(egui::Color32::LIGHT_BLUE);
                                                 }
-                                                ui.label(label_text);
+                                                ui.add(
+                                                    egui::Label::new(label_text).selectable(false),
+                                                );
                                             });
                                         },
                                     );
