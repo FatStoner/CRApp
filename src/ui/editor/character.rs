@@ -358,26 +358,39 @@ pub fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                                                });
                                           }
 
-                                         ui.label("Title / Description");
-                                         // Title (character.char_title) with search highlight AND auto-resize
-                                         // Changed to multiline with min_rows(1) for auto-resize behavior
-                                         let title_edit = egui::TextEdit::multiline(&mut character.char_title)
-                                             .desired_width(f32::INFINITY)
-                                             .desired_rows(1);
-                                                                                  if app.editor_search_query.len() >= 3 {
-                                              let mut layouter = crate::ui::text_highlight::create_highlight_layouter(app.editor_search_query.clone());
-                                              let response = ui.add(title_edit.layouter(&mut *layouter));
-                                              crate::ui::widgets::track_text_selection(ui, &response);
-                                              response.context_menu(|ui| {
-                                                   crate::ui::widgets::text_context_menu(ui, &mut character.char_title, response.id);
-                                               });
-                                          } else {
-                                              let response = ui.add(title_edit);
-                                              crate::ui::widgets::track_text_selection(ui, &response);
-                                               response.context_menu(|ui| {
-                                                   crate::ui::widgets::text_context_menu(ui, &mut character.char_title, response.id);
-                                               });
-                                          }
+                                          let id = ui.make_persistent_id("title_header");
+                                          egui::collapsing_header::CollapsingState::load_with_default_open(ui.ctx(), id, true)
+                                              .show_header(ui, |ui| {
+                                                  ui.label("Title / Description");
+                                                  ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                                      if ui.small_button("Copy").clicked() {
+                                                          ui.output_mut(|o| o.copied_text = character.char_title.clone());
+                                                          status_update = Some(("Copied Title to clipboard".to_string(), egui::Color32::GREEN));
+                                                      }
+                                                      ui.label(egui::RichText::new(format!("Tokens: {} | Chars: {}", count_tokens(&character.char_title), character.char_title.chars().count())).size(12.0).color(egui::Color32::GRAY));
+                                                  });
+                                              })
+                                              .body(|ui| {
+                                                 // Title (character.char_title) with search highlight AND auto-resize
+                                                 // Changed to multiline with min_rows(1) for auto-resize behavior
+                                                 let title_edit = egui::TextEdit::multiline(&mut character.char_title)
+                                                     .desired_width(f32::INFINITY)
+                                                     .desired_rows(1);
+                                                 if app.editor_search_query.len() >= 3 {
+                                                      let mut layouter = crate::ui::text_highlight::create_highlight_layouter(app.editor_search_query.clone());
+                                                      let response = ui.add(title_edit.layouter(&mut *layouter));
+                                                      crate::ui::widgets::track_text_selection(ui, &response);
+                                                      response.context_menu(|ui| {
+                                                           crate::ui::widgets::text_context_menu(ui, &mut character.char_title, response.id);
+                                                       });
+                                                  } else {
+                                                      let response = ui.add(title_edit);
+                                                      crate::ui::widgets::track_text_selection(ui, &response);
+                                                       response.context_menu(|ui| {
+                                                           crate::ui::widgets::text_context_menu(ui, &mut character.char_title, response.id);
+                                                       });
+                                                  }
+                                              });
 
 
                                          ui.add_space(8.0);
