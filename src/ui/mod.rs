@@ -66,6 +66,12 @@ pub enum SortDirection {
     Descending,
 }
 
+#[derive(PartialEq, Eq, Clone, Copy, Debug)]
+pub enum BrowserViewMode {
+    Grid,
+    List, // Title + URLs
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum AppAction {
     SwitchCharacter(i64),
@@ -151,7 +157,7 @@ pub struct CrapApp {
     pub sort_direction: SortDirection,
     pub browser_sort_mode: SortMode,
     pub browser_sort_direction: SortDirection,
-    pub browser_show_urls: bool,
+    pub browser_view_mode: BrowserViewMode,
     pub selected_collection_id: Option<i64>,
 
     pub popup_state: PopupState,
@@ -217,7 +223,7 @@ impl CrapApp {
             sort_direction: SortDirection::Ascending,
             browser_sort_mode: SortMode::Alphabetical,
             browser_sort_direction: SortDirection::Ascending,
-            browser_show_urls: false,
+            browser_view_mode: BrowserViewMode::Grid,
             selected_collection_id: None,
             popup_state: PopupState::None,
             is_saving: false,

@@ -65,7 +65,11 @@ The left-hand navigation bar.
         -   **Folder Filter**: Ability to limit search to a specific Collection and all its descendants.
         -   **Safe Snippets**: Contextual snippet extraction with UTF-8 boundary protection.
     -   **Lorebooks**:
-        -   **Context Menu**: Right-click actions (Delete).
+        -   **Unified Aesthetic**: Lorebook rows are designed to match the character tree, with a height of **48.0px**.
+        -   **Thumbnails**: Center-aligned **40.0px** thumbnails (or initials) are displayed for each entry.
+        -   **Vertical Gaps**: Selection highlights are slightly shrunk (to **44.0px**) to ensure a clear 4.0px gap between items, preventing visual overlap.
+        -   **Interaction**: Title labels are non-selectable and set to `Sense::hover()` to ensure smooth click-through for row selection.
+        -   **Context Menu**: Right-click actions for quick deletion and management.
 
 
 ### 6. Reusable Components (`ui/widgets.rs`)
@@ -89,8 +93,10 @@ To manage ownership in the immediate mode loop, complex views (like `render_edit
 The application supports the following keyboard shortcuts for improved efficiency:
 -   **Ctrl + S**: Save the current character (in Editor view).
 -   **Enter**: Add a tag when the input field is focused (in Editor view).
--   **Esc**: Navigate back. Acts identical to the **Back button**. Returns to previous view or parent folder. Triggers "Unsaved Changes" warning in Editor (Character/Lorebook). Only works when no text field is focused.
--   **Back / Up Buttons**: Utilize `request_back` and `request_collection_switch` to ensure state is saved before navigating.
+-   **Esc**: Navigate back. Acts identical to the **Back button**. Returns to previous view or parent folder using the navigation history. Triggers "Unsaved Changes" warning in Editor (Character/Lorebook). Only works when no text field is focused.
+-   **Back / Up Buttons**: Utilize `request_back()` and `request_collection_switch()` to ensure state is saved before navigating.
+    -   **Navigation History**: The application maintains a navigation stack, allowing the user to return to previous folders or views after deep searches or editor sessions.
+    -   **Unsaved Changes**: If the editor detects changes (via boolean flags like `lorebook_has_changes`), the navigation is intercepted, and a confirmation popup is displayed.
 
 ## Performance & Optimization
 To ensure a responsive UI, especially with large numbers of characters (thousands), several optimizations are implemented:

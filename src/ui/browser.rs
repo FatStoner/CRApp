@@ -1,5 +1,5 @@
 use crate::models::Tag;
-use crate::ui::{CrapApp, SortDirection, SortMode};
+use crate::ui::{BrowserViewMode, CrapApp, SortDirection, SortMode};
 use eframe::egui;
 
 pub enum BrowserAction {
@@ -172,14 +172,17 @@ pub fn render_browser_view(app: &mut CrapApp, ui: &mut egui::Ui) {
             ui.add_space(8.0);
 
             ui.add_space(8.0);
-            let label = if app.browser_show_urls {
-                "URLs (On)"
-            } else {
-                "URLs"
-            };
-            if ui.selectable_label(app.browser_show_urls, label).clicked() {
-                app.browser_show_urls = !app.browser_show_urls;
-            }
+            ui.add_space(8.0);
+
+            egui::ComboBox::from_id_source("view_mode_selector")
+                .selected_text(match app.browser_view_mode {
+                    BrowserViewMode::Grid => "View: Grid",
+                    BrowserViewMode::List => "View: List",
+                })
+                .show_ui(ui, |ui| {
+                    ui.selectable_value(&mut app.browser_view_mode, BrowserViewMode::Grid, "Grid");
+                    ui.selectable_value(&mut app.browser_view_mode, BrowserViewMode::List, "List");
+                });
             ui.add_space(8.0);
             ui.separator();
             ui.add_space(8.0);
@@ -384,9 +387,19 @@ pub fn render_browser_view(app: &mut CrapApp, ui: &mut egui::Ui) {
         let content_response = egui::Frame::none()
             .show(ui, |ui| {
                 ui.set_min_width(ui.available_width());
-                if app.browser_show_urls {
-                    // LIST VIEW (URLs)
-                    // Keep folders separate at the top
+                if app.browser_view_mode == BrowserViewMode::Grid {
+                    // GRID VIEW (Standard)
+                    ui.horizontal_wrapped(|ui| {
+                        for folder in &subfolders {
+                            render_subfolder_card(ui, app, folder, &mut actions);
+                        }
+                        for char in &chars {
+                            render_character_card(ui, app, char, &all_collections, &mut actions);
+                        }
+                    });
+                } else {
+                    // LIST or URL VIEW
+                    // Keep folders separate at the top (horizontal wrapped for folders)
                     ui.horizontal_wrapped(|ui| {
                         for folder in &subfolders {
                             render_subfolder_card(ui, app, folder, &mut actions);
@@ -396,97 +409,112 @@ pub fn render_browser_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                     ui.vertical(|ui| {
                         for char in &chars {
                             ui.add_space(8.0);
-                            egui::Frame::group(ui.style()).show(ui, |ui| {
-                                ui.set_min_width(ui.available_width());
-                                ui.horizontal(|ui| {
-                                    // Avatar
-                                    let avatar_size = 80.0;
-                                    let (rect, response) = ui.allocate_exact_size(
-                                        egui::vec2(avatar_size, avatar_size),
-                                        egui::Sense::click(),
-                                    );
 
-                                    // Culling for List View
-                                    if !ui.is_rect_visible(rect) {
-                                        ui.add_space(10.0);
-                                        // Still need to layout the rest of the horizontal content or just skip it?
-                                        // In horizontal layout, we can't easily skip the rest without messing up the cursor.
-                                        // But we can skip painting.
-                                        // Actually, since we are inside `ui.horizontal`, skipping might be tricky if we don't allocate the rest.
-                                        // Let's at least skip the avatar painting.
-                                    } else {
-                                        if response.clicked() {
-                                            actions.push(BrowserAction::OpenCharacter(char.id));
-                                        }
+                            // Main card container
+                            let bg_color = ui.visuals().widgets.noninteractive.bg_fill;
+                            // We want a card look for List/URL views now
+                            egui::Frame::group(ui.style())
+                                .fill(bg_color)
+                                .stroke(ui.visuals().widgets.noninteractive.bg_stroke)
+                                .rounding(4.0)
+                                .inner_margin(8.0)
+                                .show(ui, |ui| {
+                                    ui.set_min_width(ui.available_width());
+                                    ui.horizontal(|ui| {
+                                        // Avatar (Universal for List/URL)
+                                        let avatar_size = 80.0;
+                                        let (rect, response) = ui.allocate_exact_size(
+                                            egui::vec2(avatar_size, avatar_size),
+                                            egui::Sense::click(),
+                                        );
 
-                                        // Avatar Painting
-                                        if let Some(path_str) = &char.avatar_path {
-                                            let uri = crate::ui::get_image_uri(path_str);
-                                            crate::ui::widgets::paint_avatar_crop(
-                                                ui, rect, &uri, 4.0,
-                                            );
+                                        // Culling
+                                        if !ui.is_rect_visible(rect) {
+                                            // Skip painting
                                         } else {
-                                            ui.painter().rect_filled(
-                                                rect,
-                                                4.0,
-                                                egui::Color32::from_gray(60),
-                                            );
-                                            let initial = char
-                                                .name
-                                                .chars()
-                                                .next()
-                                                .unwrap_or('?')
-                                                .to_uppercase()
-                                                .to_string();
-                                            ui.painter().text(
-                                                rect.center(),
-                                                egui::Align2::CENTER_CENTER,
-                                                initial,
-                                                egui::FontId::proportional(32.0),
-                                                egui::Color32::WHITE,
-                                            );
-                                        }
-                                    }
+                                            if response.clicked() {
+                                                actions.push(BrowserAction::OpenCharacter(char.id));
+                                            }
 
-                                    ui.add_space(10.0);
-
-                                    // Info Vertical
-                                    ui.vertical(|ui| {
-                                        ui.heading(&char.name);
-                                        ui.add_space(4.0);
-
-                                        if char.urls.is_empty() {
-                                            ui.label(
-                                                egui::RichText::new("No URLs")
-                                                    .italics()
-                                                    .color(egui::Color32::GRAY),
-                                            );
-                                        }
-
-                                        for url in &char.urls {
-                                            ui.horizontal(|ui| {
-                                                let label = url.label.as_deref().unwrap_or("Link");
-                                                ui.label(
-                                                    egui::RichText::new(format!("{}:", label))
-                                                        .strong(),
+                                            // Avatar Painting
+                                            if let Some(path_str) = &char.avatar_path {
+                                                let uri = crate::ui::get_image_uri(path_str);
+                                                crate::ui::widgets::paint_avatar_crop(
+                                                    ui, rect, &uri, 4.0,
                                                 );
-                                                ui.hyperlink(&url.url);
-                                            });
+                                            } else {
+                                                ui.painter().rect_filled(
+                                                    rect,
+                                                    4.0,
+                                                    egui::Color32::from_gray(60),
+                                                );
+                                                let initial = char
+                                                    .name
+                                                    .chars()
+                                                    .next()
+                                                    .unwrap_or('?')
+                                                    .to_uppercase()
+                                                    .to_string();
+                                                ui.painter().text(
+                                                    rect.center(),
+                                                    egui::Align2::CENTER_CENTER,
+                                                    initial,
+                                                    egui::FontId::proportional(32.0),
+                                                    egui::Color32::WHITE,
+                                                );
+                                            }
                                         }
+
+                                        ui.add_space(10.0);
+
+                                        // Info Vertical
+                                        ui.vertical(|ui| {
+                                            ui.heading(&char.name);
+                                            ui.add_space(4.0);
+
+                                            match app.browser_view_mode {
+                                                BrowserViewMode::List => {
+                                                    // LIST VIEW CONTENT (Title + URLs)
+                                                    if !char.char_title.is_empty() {
+                                                        ui.label(
+                                                            egui::RichText::new(&char.char_title)
+                                                                .strong()
+                                                                .color(egui::Color32::LIGHT_GRAY),
+                                                        );
+                                                    }
+
+                                                    ui.add_space(4.0);
+
+                                                    if char.urls.is_empty() {
+                                                        ui.label(
+                                                            egui::RichText::new("No URLs")
+                                                                .italics()
+                                                                .color(egui::Color32::GRAY),
+                                                        );
+                                                    }
+
+                                                    for url in &char.urls {
+                                                        ui.horizontal(|ui| {
+                                                            let label = url
+                                                                .label
+                                                                .as_deref()
+                                                                .unwrap_or("Link");
+                                                            ui.label(
+                                                                egui::RichText::new(format!(
+                                                                    "{}:",
+                                                                    label
+                                                                ))
+                                                                .strong(),
+                                                            );
+                                                            ui.hyperlink(&url.url);
+                                                        });
+                                                    }
+                                                }
+                                                _ => {} // Grid handled above
+                                            }
+                                        });
                                     });
                                 });
-                            });
-                        }
-                    });
-                } else {
-                    // GRID VIEW
-                    // Mix folders and characters in one flow
-                    ui.horizontal_wrapped(|ui| {
-                        for folder in &subfolders {
-                            render_subfolder_card(ui, app, folder, &mut actions);
-                        }
-                        for char in &chars {
-                            render_character_card(ui, app, char, &all_collections, &mut actions);
                         }
                     });
                 }

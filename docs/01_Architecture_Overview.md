@@ -23,6 +23,7 @@ The application runs on the main thread using `eframe::run_native`. The `CrapApp
 ### State Management
 -   **Persistence**: Data is stored in `crap_data.db` (SQLite).
 -   **Runtime**: Data is loaded into `Vec<Character>` etc. in `CrapApp` for fast access during rendering. Major changes (Save/Delete) trigger database updates and a reload of runtime state.
+-   **Navigation History**: A built-in history stack (in `ui/mod.rs`) tracks user movement between folders and app modes, enabling consistent "Back" button behavior across the interface.
 -   **Communication**: `tokio::sync::mpsc` channels are used for async tasks (like file I/O or DB operations) to communicate back to the UI thread via `UiEvent`.
 
 ## Directory Structure
