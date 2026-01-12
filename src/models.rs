@@ -211,3 +211,13 @@ impl Default for Lorebook {
         }
     }
 }
+impl Lorebook {
+    pub fn content_eq(&self, other: &Lorebook) -> bool {
+        self.title == other.title
+            && self.description == other.description
+            && self.content == other.content
+            && self.cover_path == other.cover_path
+            && self.tags == other.tags
+            && self.entries == other.entries
+    }
+}

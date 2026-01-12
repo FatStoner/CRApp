@@ -243,6 +243,9 @@ pub fn render_popups(ctx: &egui::Context, app: &mut CrapApp) {
                             if let Some(c) = app.selected_character.clone() {
                                 app.pending_action = Some(target.clone());
                                 app.save_character(c);
+                            } else if let Some(book) = app.selected_lorebook.clone() {
+                                app.pending_action = Some(target.clone());
+                                app.save_lorebook(book);
                             }
                             app.popup_state = PopupState::None;
                         }
@@ -257,6 +260,16 @@ pub fn render_popups(ctx: &egui::Context, app: &mut CrapApp) {
                                         app.characters.iter().find(|c| c.id == selected.id)
                                     {
                                         app.selected_character = Some(original.clone());
+                                    }
+                                }
+                            } else if let Some(selected_book) = &app.selected_lorebook {
+                                if selected_book.id == 0 {
+                                    app.selected_lorebook = None;
+                                } else {
+                                    if let Some(original) =
+                                        app.lorebooks.iter().find(|l| l.id == selected_book.id)
+                                    {
+                                        app.selected_lorebook = Some(original.clone());
                                     }
                                 }
                             }

@@ -13,9 +13,26 @@ pub fn render_lorebook_editor(app: &mut CrapApp, ui: &mut egui::Ui) {
                     
                     let mut status_update: Option<(String, egui::Color32)> = None;
                     
+                     // Check Dirty State
+                    let is_dirty = if book.id == 0 {
+                         !book.content_eq(&crate::models::Lorebook::default())
+                    } else {
+                         if let Some(original) = app.lorebooks.iter().find(|b| b.id == book.id) {
+                             !book.content_eq(original)
+                         } else {
+                             false
+                         }
+                    };
+
+                    // Check for Ctrl+S (Global scope for editor)
+                    if ui.input_mut(|i| i.consume_key(egui::Modifiers::CTRL, egui::Key::S)) {
+                         save_lore_req = Some(book.clone());
+                    }
+
                     ui.horizontal(|ui| {
                         if ui.button("⬅ Back").clicked() {
-                            back_history_req = true;
+                           // Use app.request_back() to handle checks
+                           back_history_req = true;
                         }
                         
                         // Handle Esc key for Back navigation
@@ -33,12 +50,20 @@ pub fn render_lorebook_editor(app: &mut CrapApp, ui: &mut egui::Ui) {
                             ui.add_enabled(false, egui::Button::new("IMPORT"));
 
                             // SAVE
-                            if ui.add(egui::Button::new(egui::RichText::new("SAVE").strong())).clicked() {
+                            let mut save_color = ui.visuals().widgets.inactive.bg_fill;
+                            if is_dirty {
+                                 save_color = egui::Color32::from_rgb(200, 100, 50); // Orange/Red
+                            }
+                            
+                            if ui.add(egui::Button::new(egui::RichText::new("SAVE").strong()).fill(save_color)).clicked() {
                                 save_lore_req = Some(book.clone());
                             }
                             
+                            // Status Notification
                             if let Some((msg, color)) = &app.status_message {
-                                ui.colored_label(*color, msg);
+                                if msg.contains("Saved") {
+                                     ui.label(egui::RichText::new(msg).color(*color).italics());
+                                }
                             }
                         });
                     });
@@ -455,10 +480,10 @@ pub fn render_lorebook_editor(app: &mut CrapApp, ui: &mut egui::Ui) {
 
                     
                     // Restore ownership
+                    app.selected_lorebook = Some(book);
+                    
                     if back_history_req {
                         app.request_back();
-                    } else {
-                        app.selected_lorebook = Some(book);
                     }
 
                 } else {

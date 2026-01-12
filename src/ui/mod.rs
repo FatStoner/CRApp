@@ -71,6 +71,7 @@ pub enum SortDirection {
 pub enum AppAction {
     SwitchCharacter(i64),
     SwitchCollection(Option<i64>),
+    SwitchLorebook(i64),
     SwitchToAll,
     Exit,
     GoBack,
@@ -969,6 +970,16 @@ impl CrapApp {
                     false
                 }
             }
+        } else if let Some(selected_book) = &self.selected_lorebook {
+            if selected_book.id == 0 {
+                !selected_book.content_eq(&Lorebook::default())
+            } else {
+                if let Some(original) = self.lorebooks.iter().find(|l| l.id == selected_book.id) {
+                    !selected_book.content_eq(original)
+                } else {
+                    false
+                }
+            }
         } else {
             false
         }
@@ -996,6 +1007,16 @@ impl CrapApp {
             };
         } else {
             self.load_character(id);
+        }
+    }
+
+    pub fn request_lorebook_switch(&mut self, id: i64) {
+        if self.has_unsaved_changes() {
+            self.popup_state = PopupState::UnsavedChanges {
+                target: AppAction::SwitchLorebook(id),
+            };
+        } else {
+            self.load_lorebook(id);
         }
     }
 
@@ -1066,6 +1087,7 @@ impl CrapApp {
                 self.selected_character = None;
                 self.reload_collections();
             }
+            AppAction::SwitchLorebook(id) => self.load_lorebook(id),
             AppAction::SwitchToAll => {
                 self.viewing_all_characters = true;
                 self.selected_collection_id = None;
@@ -1692,8 +1714,16 @@ impl eframe::App for CrapApp {
                         Ok(l) => {
                             self.selected_lorebook = Some(l);
                             self.set_status("Lorebook Saved!".to_string(), egui::Color32::GREEN);
+
+                            // Handle pending action if any (Fix for Save & Continue)
+                            if let Some(action) = self.pending_action.take() {
+                                self.perform_action(action, &ctx);
+                            }
                         }
-                        Err(e) => self.set_status(format!("Save Error: {}", e), egui::Color32::RED),
+                        Err(e) => {
+                            self.set_status(format!("Save Error: {}", e), egui::Color32::RED);
+                            self.pending_action = None;
+                        }
                     }
                 }
                 UiEvent::CollectionSaved(res) => {

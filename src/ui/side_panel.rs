@@ -246,16 +246,12 @@ pub fn render_side_panel(app: &mut CrapApp, ctx: &egui::Context) {
                                 });
 
                                 if resp.clicked() {
-                                    lorebook_to_select = Some(book.clone());
+                                    lorebook_to_select = Some(book.id);
                                 }
                             }
 
-                            if let Some(book) = lorebook_to_select {
-                                app.push_history();
-                                app.selected_lorebook = Some(book.clone());
-                                app.load_lorebook_entries(book.id);
-                                app.load_lorebook_tags(book.id);
-                                app.selected_character = None;
+                            if let Some(book_id) = lorebook_to_select {
+                                app.request_lorebook_switch(book_id);
                             }
 
                             if let Some((id, title)) = delete_req {
