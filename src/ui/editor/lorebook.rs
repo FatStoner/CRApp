@@ -133,15 +133,19 @@ pub fn render_lorebook_editor(app: &mut CrapApp, ui: &mut egui::Ui) {
                         .max_height(ui.available_height() * 0.45)
                         .id_salt("lorebook_metadata_scroll")
                         .show(ui, |ui| {
-                            ui.columns(2, |columns| {
+                            let total_width = ui.available_width();
+                            let right_width = (total_width * 0.35).max(160.0).min(300.0);
+                            let left_width = total_width - right_width - ui.spacing().item_spacing.x;
+
+                            ui.horizontal_top(|ui| {
                                 // Left Column: Basic Data
-                                columns[0].vertical(|ui| {
+                                ui.allocate_ui_with_layout(egui::vec2(left_width, 10.0), egui::Layout::top_down(egui::Align::Min), |ui| {
                                     ui.label("Title");
                                     if app.editor_search_query.len() >= 3 {
                                         let mut layouter = crate::ui::text_highlight::create_highlight_layouter(app.editor_search_query.clone());
-                                        ui.add(egui::TextEdit::singleline(&mut book.title).layouter(&mut layouter));
+                                        ui.add(egui::TextEdit::singleline(&mut book.title).desired_width(f32::INFINITY).layouter(&mut layouter));
                                     } else {
-                                        ui.text_edit_singleline(&mut book.title);
+                                        ui.add(egui::TextEdit::singleline(&mut book.title).desired_width(f32::INFINITY));
                                     }
                                     ui.add_space(8.0);
                                     
@@ -150,7 +154,7 @@ pub fn render_lorebook_editor(app: &mut CrapApp, ui: &mut egui::Ui) {
                                         let mut layouter = crate::ui::text_highlight::create_highlight_layouter(app.editor_search_query.clone());
                                         ui.add(egui::TextEdit::multiline(&mut book.content).desired_width(f32::INFINITY).layouter(&mut layouter));
                                     } else {
-                                        ui.text_edit_multiline(&mut book.content);
+                                        ui.add(egui::TextEdit::multiline(&mut book.content).desired_width(f32::INFINITY));
                                     }
                                     ui.add_space(8.0);
 
@@ -169,7 +173,7 @@ pub fn render_lorebook_editor(app: &mut CrapApp, ui: &mut egui::Ui) {
                                         }
                                     });
                                     ui.horizontal(|ui| {
-                                        let response = ui.text_edit_singleline(&mut app.app_tag_input);
+                                        let response = ui.add(egui::TextEdit::singleline(&mut app.app_tag_input).desired_width(120.0));
                                         if (ui.button("Add").clicked() || (response.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)))) && !app.app_tag_input.is_empty() {
                                             tag_add_request = Some((book.id, app.app_tag_input.clone()));
                                             app.app_tag_input.clear();
@@ -177,13 +181,11 @@ pub fn render_lorebook_editor(app: &mut CrapApp, ui: &mut egui::Ui) {
                                         }
                                     });
                                     
-                                    ui.add_space(16.0);
-                                    // Old Save Button removed
-
+                                    ui.add_space(8.0);
                                 });
 
                                 // Right Column: Cover Image
-                                columns[1].vertical(|ui| {
+                                ui.allocate_ui_with_layout(egui::vec2(right_width, 10.0), egui::Layout::top_down(egui::Align::Min), |ui| {
                                     let max_total_h = ui.ctx().screen_rect().height() * 0.333;
                                     ui.set_max_height(max_total_h);
 
