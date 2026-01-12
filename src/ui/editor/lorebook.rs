@@ -184,64 +184,75 @@ pub fn render_lorebook_editor(app: &mut CrapApp, ui: &mut egui::Ui) {
 
                                 // Right Column: Cover Image
                                 columns[1].vertical(|ui| {
-                                    ui.group(|ui| {
-                                        ui.label("Cover Image");
-                                        let mut cover_path_str = book.cover_path.clone().unwrap_or_default();
-                                        if ui.text_edit_singleline(&mut cover_path_str).changed() {
-                                             if cover_path_str.trim().is_empty() {
-                                                 book.cover_path = None;
-                                             } else {
-                                                 book.cover_path = Some(cover_path_str.clone());
-                                             }
-                                        }
-                                        if let Some(path_str) = &book.cover_path {
-                                            ui.add_space(4.0);
-                                             let uri = if path_str.contains("://") { path_str.clone() } else {
-                                                 if let Ok(abs_path) = std::fs::canonicalize(path_str) {
-                                                      format!("file://{}", abs_path.to_string_lossy())
-                                                 } else { path_str.clone() }
-                                             };
-                                             let preview_width = ui.available_width() - 8.0;
-                                             ui.add(egui::Image::new(uri).rounding(egui::Rounding::same(4.0)).fit_to_original_size(0.5).max_width(preview_width));
-                                         }
-                                        ui.add_space(8.0);
-                                        ui.vertical(|ui| {
-                                            if ui.button("Browse Image").clicked() {
-                                                if let Some(path) = rfd::FileDialog::new().add_filter("image", &["png", "jpg", "jpeg"]).pick_file() {
-                                                      let dest_dir = std::path::Path::new("data/covers");
-                                                      let _ = std::fs::create_dir_all(dest_dir);
-                                                      if let Some(name) = path.file_name() {
-                                                          let dest = dest_dir.join(name);
-                                                          let _ = std::fs::copy(&path, &dest);
-                                                          book.cover_path = Some(dest.to_string_lossy().to_string());
-                                                      }
-                                                }
+                                    ui.label(egui::RichText::new("Cover Image").strong());
+                                    
+                                    if let Some(path_str) = &book.cover_path {
+                                        let uri = crate::ui::get_image_uri(path_str);
+                                        
+                                        let max_height = ui.ctx().screen_rect().height() * 0.5;
+                                        let preview_width = ui.available_width();
+                                        
+                                        ui.add(
+                                            egui::Image::new(uri)
+                                                .rounding(egui::Rounding::same(4.0))
+                                                .max_height(max_height)
+                                                .max_width(preview_width)
+                                        );
+                                        
+                                        ui.add_space(4.0);
+                                        ui.horizontal_wrapped(|ui| {
+                                            ui.spacing_mut().item_spacing.x = 0.0;
+                                            ui.label(egui::RichText::new("Path: ").weak());
+                                            ui.label(egui::RichText::new(path_str).weak().italics());
+                                        });
+                                    } else {
+                                        // Empty state placeholder
+                                        let (rect, _) = ui.allocate_exact_size(egui::vec2(100.0, 100.0), egui::Sense::hover());
+                                        ui.painter().rect_stroke(rect, 4.0, (1.0, egui::Color32::from_gray(60)));
+                                        ui.painter().text(rect.center(), egui::Align2::CENTER_CENTER, "No Cover", egui::FontId::proportional(14.0), egui::Color32::from_gray(100));
+                                    }
+
+                                    ui.add_space(8.0);
+                                    ui.vertical(|ui| {
+                                        if ui.button("Browse Image").clicked() {
+                                            if let Some(path) = rfd::FileDialog::new().add_filter("image", &["png", "jpg", "jpeg"]).pick_file() {
+                                                  let dest_dir = std::path::Path::new("data/covers");
+                                                  let _ = std::fs::create_dir_all(dest_dir);
+                                                  if let Some(name) = path.file_name() {
+                                                      let dest = dest_dir.join(name);
+                                                      let _ = std::fs::copy(&path, &dest);
+                                                      book.cover_path = Some(dest.to_string_lossy().to_string());
+                                                  }
                                             }
-                                            if ui.button("Paste from Clipboard").clicked() {
-                                                // (Simplified for brevity, assuming existing logic works)
-                                                 match arboard::Clipboard::new() {
-                                                      Ok(mut clipboard) => {
-                                                          if let Ok(img_data) = clipboard.get_image() {
-                                                              let width = img_data.width as u32;
-                                                              let height = img_data.height as u32;
-                                                              let bytes = img_data.bytes.into_owned();
-                                                              if let Some(image_buffer) = image::ImageBuffer::<image::Rgba<u8>, Vec<u8>>::from_raw(width, height, bytes) {
-                                                                  let timestamp = chrono::Utc::now().timestamp_millis();
-                                                                  let filename = format!("pasted_cover_{}.png", timestamp);
-                                                                  let dest_dir = std::path::Path::new("data/covers");
-                                                                  let _ = std::fs::create_dir_all(dest_dir);
-                                                                  let dest_path = dest_dir.join(&filename);
-                                                                  if let Ok(_) = image_buffer.save(&dest_path) {
-                                                                      book.cover_path = Some(dest_path.to_string_lossy().to_string());
-                                                                      status_update = Some(("Cover pasted!".to_string(), egui::Color32::GREEN));
-                                                                  }
+                                        }
+                                        if ui.button("Paste from Clipboard").clicked() {
+                                             match arboard::Clipboard::new() {
+                                                  Ok(mut clipboard) => {
+                                                      if let Ok(img_data) = clipboard.get_image() {
+                                                          let width = img_data.width as u32;
+                                                          let height = img_data.height as u32;
+                                                          let bytes = img_data.bytes.into_owned();
+                                                          if let Some(image_buffer) = image::ImageBuffer::<image::Rgba<u8>, Vec<u8>>::from_raw(width, height, bytes) {
+                                                              let timestamp = chrono::Utc::now().timestamp_millis();
+                                                              let filename = format!("pasted_cover_{}.png", timestamp);
+                                                              let dest_dir = std::path::Path::new("data/covers");
+                                                              let _ = std::fs::create_dir_all(dest_dir);
+                                                              let dest_path = dest_dir.join(&filename);
+                                                              if let Ok(_) = image_buffer.save(&dest_path) {
+                                                                  book.cover_path = Some(dest_path.to_string_lossy().to_string());
+                                                                  status_update = Some(("Cover pasted!".to_string(), egui::Color32::GREEN));
                                                               }
                                                           }
-                                                      },
-                                                      Err(_) => {}
-                                                 }
+                                                      }
+                                                  },
+                                                  Err(_) => {}
+                                             }
+                                        }
+                                        if book.cover_path.is_some() {
+                                            if ui.button("Remove Cover").clicked() {
+                                                book.cover_path = None;
                                             }
-                                        });
+                                        }
                                     });
                                 });
                             });
