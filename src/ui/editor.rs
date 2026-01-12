@@ -325,35 +325,59 @@ pub fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                                      ui.allocate_ui_with_layout(egui::vec2(left_width, ui.available_height()), egui::Layout::top_down(egui::Align::Min), |ui| {
                                          ui.label("Name (File Name)");
                                          // File Name (character.name) with search highlight
-                                         if app.editor_search_query.len() >= 3 {
-                                              let mut layouter = crate::ui::text_highlight::create_highlight_layouter(app.editor_search_query.clone());
-                                              ui.add(egui::TextEdit::singleline(&mut character.name).layouter(&mut *layouter));
-                                         } else {
-                                              ui.add(egui::TextEdit::singleline(&mut character.name).desired_width(f32::INFINITY));
-                                         }
+                                          if app.editor_search_query.len() >= 3 {
+                                               let mut layouter = crate::ui::text_highlight::create_highlight_layouter(app.editor_search_query.clone());
+                                               let response = ui.add(egui::TextEdit::singleline(&mut character.name).layouter(&mut *layouter));
+                                               crate::ui::widgets::track_text_selection(ui, &response);
+                                               response.context_menu(|ui| {
+                                                   crate::ui::widgets::text_context_menu(ui, &mut character.name, response.id);
+                                               });
+                                          } else {
+                                               let response = ui.add(egui::TextEdit::singleline(&mut character.name).desired_width(f32::INFINITY));
+                                               crate::ui::widgets::track_text_selection(ui, &response);
+                                               response.context_menu(|ui| {
+                                                   crate::ui::widgets::text_context_menu(ui, &mut character.name, response.id);
+                                               });
+                                          }
+
 
                                          ui.label("Character Name");
                                          // Character Name (character.char_name) with search highlight
-                                         if app.editor_search_query.len() >= 3 {
-                                              let mut layouter = crate::ui::text_highlight::create_highlight_layouter(app.editor_search_query.clone());
-                                              ui.add(egui::TextEdit::singleline(&mut character.char_name).layouter(&mut *layouter));
-                                         } else {
-                                              ui.add(egui::TextEdit::singleline(&mut character.char_name).desired_width(f32::INFINITY));
-                                         }
+                                          if app.editor_search_query.len() >= 3 {
+                                               let mut layouter = crate::ui::text_highlight::create_highlight_layouter(app.editor_search_query.clone());
+                                               let response = ui.add(egui::TextEdit::singleline(&mut character.char_name).layouter(&mut *layouter));
+                                               crate::ui::widgets::track_text_selection(ui, &response);
+                                               response.context_menu(|ui| {
+                                                   crate::ui::widgets::text_context_menu(ui, &mut character.char_name, response.id);
+                                               });
+                                          } else {
+                                               let response = ui.add(egui::TextEdit::singleline(&mut character.char_name).desired_width(f32::INFINITY));
+                                               crate::ui::widgets::track_text_selection(ui, &response);
+                                               response.context_menu(|ui| {
+                                                   crate::ui::widgets::text_context_menu(ui, &mut character.char_name, response.id);
+                                               });
+                                          }
 
-                                         ui.label("Title");
                                          // Title (character.char_title) with search highlight AND auto-resize
                                          // Changed to multiline with min_rows(1) for auto-resize behavior
                                          let title_edit = egui::TextEdit::multiline(&mut character.char_title)
                                              .desired_width(f32::INFINITY)
                                              .desired_rows(1);
-                                         
-                                         if app.editor_search_query.len() >= 3 {
-                                             let mut layouter = crate::ui::text_highlight::create_highlight_layouter(app.editor_search_query.clone());
-                                             ui.add(title_edit.layouter(&mut *layouter));
-                                         } else {
-                                             ui.add(title_edit);
-                                         }
+                                                                                  if app.editor_search_query.len() >= 3 {
+                                              let mut layouter = crate::ui::text_highlight::create_highlight_layouter(app.editor_search_query.clone());
+                                              let response = ui.add(title_edit.layouter(&mut *layouter));
+                                              crate::ui::widgets::track_text_selection(ui, &response);
+                                              response.context_menu(|ui| {
+                                                   crate::ui::widgets::text_context_menu(ui, &mut character.char_title, response.id);
+                                               });
+                                          } else {
+                                              let response = ui.add(title_edit);
+                                              crate::ui::widgets::track_text_selection(ui, &response);
+                                               response.context_menu(|ui| {
+                                                   crate::ui::widgets::text_context_menu(ui, &mut character.char_title, response.id);
+                                               });
+                                          }
+
 
                                          ui.add_space(8.0);
                                          
@@ -392,11 +416,19 @@ pub fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                                                               layout_job.append(&text[last_end..], 0.0, default_format);
                                                           }
                                                           layout_job.wrap.max_width = wrap_width;
-                                                          ui.fonts(|f| f.layout_job(layout_job))
+                                                      ui.fonts(|f| f.layout_job(layout_job))
                                                       };
-                                                      ui.add(text_edit.layouter(&mut my_layouter));
+                                                      let response = ui.add(text_edit.layouter(&mut my_layouter));
+                                                      crate::ui::widgets::track_text_selection(ui, &response);
+                                                      response.context_menu(|ui| {
+                                                          crate::ui::widgets::text_context_menu(ui, &mut character.first_message, response.id);
+                                                      });
                                                   } else {
-                                                      ui.add(text_edit);
+                                                      let response = ui.add(text_edit);
+                                                      crate::ui::widgets::track_text_selection(ui, &response);
+                                                      response.context_menu(|ui| {
+                                                          crate::ui::widgets::text_context_menu(ui, &mut character.first_message, response.id);
+                                                      });
                                                   }
                                                  ui.horizontal(|ui| {
                                                      ui.label(egui::RichText::new(format!("Tokens: {} | Chars: {}", count_tokens(&character.first_message), character.first_message.chars().count())).size(12.0).color(egui::Color32::GRAY));
@@ -447,9 +479,17 @@ pub fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                                                           layout_job.wrap.max_width = wrap_width;
                                                           ui.fonts(|f| f.layout_job(layout_job))
                                                       };
-                                                      ui.add(text_edit.layouter(&mut my_layouter));
+                                                      let response = ui.add(text_edit.layouter(&mut my_layouter));
+                                                      crate::ui::widgets::track_text_selection(ui, &response);
+                                                      response.context_menu(|ui| {
+                                                          crate::ui::widgets::text_context_menu(ui, &mut character.personality, response.id);
+                                                      });
                                                   } else {
-                                                      ui.add(text_edit);
+                                                      let response = ui.add(text_edit);
+                                                      crate::ui::widgets::track_text_selection(ui, &response);
+                                                      response.context_menu(|ui| {
+                                                          crate::ui::widgets::text_context_menu(ui, &mut character.personality, response.id);
+                                                      });
                                                   }
                                                  ui.horizontal(|ui| {
                                                      ui.label(egui::RichText::new(format!("Tokens: {} | Chars: {}", count_tokens(&character.personality), character.personality.chars().count())).size(12.0).color(egui::Color32::GRAY));
@@ -499,9 +539,17 @@ pub fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                                                           layout_job.wrap.max_width = wrap_width;
                                                           ui.fonts(|f| f.layout_job(layout_job))
                                                       };
-                                                      ui.add(text_edit.layouter(&mut my_layouter));
+                                                      let response = ui.add(text_edit.layouter(&mut my_layouter));
+                                                      crate::ui::widgets::track_text_selection(ui, &response);
+                                                      response.context_menu(|ui| {
+                                                          crate::ui::widgets::text_context_menu(ui, &mut character.scenario, response.id);
+                                                      });
                                                   } else {
-                                                      ui.add(text_edit);
+                                                      let response = ui.add(text_edit);
+                                                      crate::ui::widgets::track_text_selection(ui, &response);
+                                                      response.context_menu(|ui| {
+                                                          crate::ui::widgets::text_context_menu(ui, &mut character.scenario, response.id);
+                                                      });
                                                   }
                                                  ui.horizontal(|ui| {
                                                      ui.label(egui::RichText::new(format!("Tokens: {} | Chars: {}", count_tokens(&character.scenario), character.scenario.chars().count())).size(12.0).color(egui::Color32::GRAY));
@@ -551,9 +599,17 @@ pub fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                                                           layout_job.wrap.max_width = wrap_width;
                                                           ui.fonts(|f| f.layout_job(layout_job))
                                                       };
-                                                      ui.add(text_edit.layouter(&mut my_layouter));
+                                                      let response = ui.add(text_edit.layouter(&mut my_layouter));
+                                                      crate::ui::widgets::track_text_selection(ui, &response);
+                                                      response.context_menu(|ui| {
+                                                          crate::ui::widgets::text_context_menu(ui, &mut character.example_dialogue, response.id);
+                                                      });
                                                   } else {
-                                                      ui.add(text_edit);
+                                                      let response = ui.add(text_edit);
+                                                      crate::ui::widgets::track_text_selection(ui, &response);
+                                                      response.context_menu(|ui| {
+                                                          crate::ui::widgets::text_context_menu(ui, &mut character.example_dialogue, response.id);
+                                                      });
                                                   }
                                                  ui.horizontal(|ui| {
                                                      ui.label(egui::RichText::new(format!("Tokens: {} | Chars: {}", count_tokens(&character.example_dialogue), character.example_dialogue.chars().count())).size(12.0).color(egui::Color32::GRAY));
@@ -845,9 +901,17 @@ pub fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                                           layout_job.wrap.max_width = wrap_width;
                                           ui.fonts(|f| f.layout_job(layout_job))
                                       };
-                                      ui.add(text_edit.layouter(&mut my_layouter));
+                                      let response = ui.add(text_edit.layouter(&mut my_layouter));
+                                      crate::ui::widgets::track_text_selection(ui, &response);
+                                      response.context_menu(|ui| {
+                                          crate::ui::widgets::text_context_menu(ui, &mut character.author_notes, response.id);
+                                      });
                                   } else {
-                                      ui.add(text_edit);
+                                      let response = ui.add(text_edit);
+                                      crate::ui::widgets::track_text_selection(ui, &response);
+                                      response.context_menu(|ui| {
+                                          crate::ui::widgets::text_context_menu(ui, &mut character.author_notes, response.id);
+                                      });
                                   }
 
                                  ui.add_space(16.0);

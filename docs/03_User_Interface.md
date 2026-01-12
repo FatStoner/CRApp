@@ -29,9 +29,7 @@ Handles the "Gallery" or "Browser" view where characters are listed.
 Handles the detailed editing interfaces.
 -   **Character Editor**:
     -   **Fields**: Name, Title, Personality, Scenario, Examples, etc.
-    -   **Avatars**: Image preview, clipboard pasting, file browsing.
-    -   **Tags**: Management of App and External tags.
-    -   **Lorebooks**: Selection of linked lorebooks with "Go to Lorebook" navigation button.
+    -   **Context Menu**: Custom Cut/Copy/Paste actions with selection persistence.
     -   **Export**: Export to .crapp (Native), .json (SpicyChat), .md, or .png (Card).
 -   **Lorebook Editor**:
     -   **Metadata**: Title, Description (Content), Tags, and Cover management.
@@ -60,6 +58,13 @@ The left-hand navigation bar.
         -   **Lorebook Matching**: Searches Title, Description/Content, Tags, and all Entry fields.
         -   **Folder Filter**: Ability to limit search to a specific Collection and all its descendants.
         -   **Safe Snippets**: Contextual snippet extraction with UTF-8 boundary protection.
+
+### 6. Reusable Components (`ui/widgets.rs`)
+Shared UI elements and helper functions.
+-   **Text Context Menu**: Custom right-click menu for `TextEdit` fields providing Cut, Copy, and Paste functionality.
+    -   **Selection Persistence**: Implements a "sticky selection" mechanism using `egui` temporary data to ensure Cut/Copy operations work even when the text field loses focus due to the menu opening.
+-   **Avatar Crop Rendering**: Unified logic for painting 1:1 cropped images with "Zoom/Cover" effects.
+-   **Snippet Extraction**: Heuristic logic for extracting search result snippets from large text blocks.
 
 ## UI Event Loop & State
 The `CrapApp` struct (in `ui/mod.rs`) holds all the transient UI state:

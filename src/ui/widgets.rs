@@ -1,4 +1,192 @@
+use arboard::Clipboard;
 use eframe::egui;
+
+// Helper struct for arbitrary data storage
+#[derive(Clone, Copy, Debug, Default)]
+struct TextSelection((usize, usize));
+
+pub fn track_text_selection(ui: &egui::Ui, response: &egui::Response) {
+    let id = response.id;
+    if let Some(state) = egui::TextEdit::load_state(ui.ctx(), id) {
+        if let Some(range) = state.cursor.char_range() {
+            // If we have a selection (range width > 0)
+            if range.primary.index != range.secondary.index {
+                let sel = TextSelection((range.primary.index, range.secondary.index));
+                ui.data_mut(|d| d.insert_temp(id, sel));
+                eprintln!("DEBUG: Stored selection {:?}", sel);
+            } else {
+                // No selection (width 0).
+                // We clear the cache ONLY if the user actively interacts to "clear" it:
+                // 1. Left Click (re-position cursor freely)
+                // 2. Typing/Change (modifying text clears selection context)
+                // We DO NOT clear on Right Click (Secondary) or simple Focus (which might be transient).
+                if response.clicked_by(egui::PointerButton::Primary) || response.changed() {
+                    ui.data_mut(|d| d.remove_temp::<TextSelection>(id));
+                    eprintln!("DEBUG: CLEARING cache (Primary Click or Text Change)");
+                } else {
+                    // eprintln!("DEBUG: Preserving cache (No disruptive action)");
+                }
+            }
+        }
+    }
+}
+
+pub fn text_context_menu(ui: &mut egui::Ui, text: &mut String, id: egui::Id) {
+    // Try to get current realtime state
+    let mut current_cursor_range = None;
+    if let Some(state) = egui::TextEdit::load_state(ui.ctx(), id) {
+        if let Some(range) = state.cursor.char_range() {
+            current_cursor_range = Some((range.primary.index, range.secondary.index));
+        }
+    }
+
+    eprintln!(
+        "DEBUG: Menu Open. Realtime Range: {:?}",
+        current_cursor_range
+    );
+
+    // If realtime state is just a cursor (no selection), check if we have a stored ("sticky") selection
+    if let Some((start, end)) = current_cursor_range {
+        if start == end {
+            // active selection is empty (just cursor), check cache
+            if let Some(stored) = ui.data(|d| d.get_temp::<TextSelection>(id)) {
+                eprintln!("DEBUG: Using Cached Selection: {:?}", stored);
+                current_cursor_range = Some(stored.0);
+            } else {
+                eprintln!("DEBUG: No Cached Selection found.");
+            }
+        } else {
+            eprintln!("DEBUG: Using Realtime Selection.");
+        }
+    } else {
+        // No cursor info at all? Check cache.
+        if let Some(stored) = ui.data(|d| d.get_temp::<TextSelection>(id)) {
+            eprintln!("DEBUG: No Realtime State, Using Cached: {:?}", stored);
+            current_cursor_range = Some(stored.0);
+        } else {
+            eprintln!("DEBUG: No Realtime State, No Cache.");
+        }
+    }
+
+    if ui.button("✂ Cut").clicked() {
+        let mut clipboard = Clipboard::new().ok();
+
+        if let Some((start, end)) = current_cursor_range {
+            let (min, max) = if start < end {
+                (start, end)
+            } else {
+                (end, start)
+            };
+
+            if min != max {
+                // Selection exists
+                if let Some((byte_start, _)) = text.char_indices().nth(min) {
+                    if let Some((byte_end, _)) = text.char_indices().nth(max) {
+                        let slice = &text[byte_start..byte_end];
+                        if let Some(cb) = &mut clipboard {
+                            let _ = cb.set_text(slice.to_string());
+                        }
+                        text.replace_range(byte_start..byte_end, "");
+                    } else if max == text.chars().count() {
+                        let slice = &text[byte_start..];
+                        if let Some(cb) = &mut clipboard {
+                            let _ = cb.set_text(slice.to_string());
+                        }
+                        text.replace_range(byte_start.., "");
+                    }
+
+                    // Restore focus and cursor
+                    ui.memory_mut(|m| m.request_focus(id));
+                    if let Some(mut state) = egui::TextEdit::load_state(ui.ctx(), id) {
+                        state
+                            .cursor
+                            .set_char_range(Some(eframe::egui::text::CCursorRange::one(
+                                eframe::egui::text::CCursor::new(min),
+                            )));
+                        state.store(ui.ctx(), id);
+                    }
+                }
+            }
+        }
+        // Removed fallback "Cut All" to prevent accidents
+        ui.close_menu();
+    }
+
+    if ui.button("📋 Copy").clicked() {
+        let mut clipboard = Clipboard::new().ok();
+
+        if let Some((start, end)) = current_cursor_range {
+            let (min, max) = if start < end {
+                (start, end)
+            } else {
+                (end, start)
+            };
+
+            if min != max {
+                let chars: Vec<(usize, char)> = text.char_indices().collect();
+                let byte_start = chars.get(min).map(|(i, _)| *i);
+                let byte_end = chars.get(max).map(|(i, _)| *i).or_else(|| Some(text.len()));
+
+                if let (Some(s), Some(e)) = (byte_start, byte_end) {
+                    let slice = &text[s..e];
+                    if let Some(cb) = &mut clipboard {
+                        let _ = cb.set_text(slice.to_string());
+                    }
+                }
+            }
+        }
+        // Removed fallback "Copy All"
+        ui.close_menu();
+    }
+
+    if ui.button("📋 Paste").clicked() {
+        let mut clipboard = Clipboard::new().ok();
+        if let Some(cb) = &mut clipboard {
+            if let Ok(content) = cb.get_text() {
+                let content_len_chars = content.chars().count();
+                let mut insert_index = 0;
+
+                // For paste, we prefer the "current" cursor if it exists, even if it's just a point.
+                // But if we have a stored SELECTION, we should probably overwrite it?
+                // Standard behavior: If I have a selection, Paste replaces it.
+                // So we prioritize selection range over cursor point.
+
+                let target_range = current_cursor_range;
+
+                if let Some((start, end)) = target_range {
+                    let (min, max) = if start < end {
+                        (start, end)
+                    } else {
+                        (end, start)
+                    };
+                    insert_index = min;
+
+                    let chars: Vec<(usize, char)> = text.char_indices().collect();
+                    let byte_start = chars.get(min).map(|(i, _)| *i).unwrap_or(text.len());
+                    let byte_end = chars.get(max).map(|(i, _)| *i).unwrap_or(text.len());
+
+                    text.replace_range(byte_start..byte_end, &content);
+                } else {
+                    // Fallback: Append
+                    insert_index = text.chars().count();
+                    text.push_str(&content);
+                }
+
+                ui.memory_mut(|m| m.request_focus(id));
+                if let Some(mut state) = egui::TextEdit::load_state(ui.ctx(), id) {
+                    let new_index = insert_index + content_len_chars;
+                    state
+                        .cursor
+                        .set_char_range(Some(eframe::egui::text::CCursorRange::one(
+                            eframe::egui::text::CCursor::new(new_index),
+                        )));
+                    state.store(ui.ctx(), id);
+                }
+            }
+        }
+        ui.close_menu();
+    }
+}
 
 // Heuristic snippet extractor for search
 pub fn extract_snippets(text: &str, query: &str) -> Vec<String> {
