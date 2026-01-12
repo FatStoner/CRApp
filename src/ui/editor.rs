@@ -1072,6 +1072,65 @@ pub fn render_lorebook_editor(app: &mut CrapApp, ui: &mut egui::Ui) {
                     
                     ui.heading("Edit Lorebook");
                     ui.add_space(4.0);
+
+                    // --- In-editor search ---
+                    ui.horizontal(|ui| {
+                        ui.label("🔍 Search:");
+                        ui.add(
+                            egui::TextEdit::singleline(&mut app.editor_search_query)
+                                .hint_text("Type 3+ chars to highlight/jump...")
+                                .desired_width(200.0),
+                        );
+
+                        if !app.editor_search_query.is_empty() {
+                            if ui.small_button("✖").clicked() {
+                                app.editor_search_query.clear();
+                            }
+
+                            ui.label(
+                                egui::RichText::new(format!(
+                                    "Highlighting: '{}'",
+                                    app.editor_search_query
+                                ))
+                                .size(11.0)
+                                .color(egui::Color32::GRAY),
+                            );
+                        }
+                    });
+                    ui.separator();
+
+                    // --- Auto-selection logic ---
+                    if app.editor_search_query.len() >= 3 {
+                        let query_lower = app.editor_search_query.to_lowercase();
+
+                        // 1. Check if metadata already matches (stay where we are)
+                        let metadata_match = book.title.to_lowercase().contains(&query_lower)
+                            || book.content.to_lowercase().contains(&query_lower);
+
+                        if !metadata_match {
+                            // 2. Check if currently selected entry matches
+                            let current_match = if let Some(e) = &app.selected_entry {
+                                e.name.to_lowercase().contains(&query_lower)
+                                    || e.keywords.to_lowercase().contains(&query_lower)
+                                    || e.content.to_lowercase().contains(&query_lower)
+                            } else {
+                                false
+                            };
+
+                            if !current_match {
+                                // 3. Find first matching entry
+                                if let Some(matching_entry) = book.entries.iter().find(|e| {
+                                    e.name.to_lowercase().contains(&query_lower)
+                                        || e.keywords.to_lowercase().contains(&query_lower)
+                                        || e.content.to_lowercase().contains(&query_lower)
+                                }) {
+                                    app.selected_entry = Some(matching_entry.clone());
+                                    // Switch to Entries tab if not already there
+                                    app.active_lorebook_tab = crate::ui::LorebookTab::Entries;
+                                }
+                            }
+                        }
+                    }
                     
                     // --- Top Section: Metadata ---
                     egui::ScrollArea::vertical()
@@ -1082,11 +1141,21 @@ pub fn render_lorebook_editor(app: &mut CrapApp, ui: &mut egui::Ui) {
                                 // Left Column: Basic Data
                                 columns[0].vertical(|ui| {
                                     ui.label("Title");
-                                    ui.text_edit_singleline(&mut book.title);
+                                    if app.editor_search_query.len() >= 3 {
+                                        let mut layouter = crate::ui::text_highlight::create_highlight_layouter(app.editor_search_query.clone());
+                                        ui.add(egui::TextEdit::singleline(&mut book.title).layouter(&mut layouter));
+                                    } else {
+                                        ui.text_edit_singleline(&mut book.title);
+                                    }
                                     ui.add_space(8.0);
                                     
                                     ui.label("Description");
-                                    ui.text_edit_multiline(&mut book.content);
+                                    if app.editor_search_query.len() >= 3 {
+                                        let mut layouter = crate::ui::text_highlight::create_highlight_layouter(app.editor_search_query.clone());
+                                        ui.add(egui::TextEdit::multiline(&mut book.content).desired_width(f32::INFINITY).layouter(&mut layouter));
+                                    } else {
+                                        ui.text_edit_multiline(&mut book.content);
+                                    }
                                     ui.add_space(8.0);
 
                                     // Tags Section
@@ -1214,17 +1283,32 @@ pub fn render_lorebook_editor(app: &mut CrapApp, ui: &mut egui::Ui) {
                                          if let Some(entry) = &mut app.selected_entry {
                                              // Ensure we are editing an entry belonging to this lorebook
                                              if entry.lorebook_id == book.id {
-                                                 ui.heading("Edit Entry");
-                                                 ui.label("Name");
-                                                 ui.text_edit_singleline(&mut entry.name);
-                                                 
-                                                 ui.label("Keywords (comma separated)");
-                                                 ui.text_edit_singleline(&mut entry.keywords);
-                                                 
-                                                 ui.label("Content");
-                                                 egui::ScrollArea::vertical().id_source("entry_content_scroll").show(ui, |ui| {
-                                                       ui.add(egui::TextEdit::multiline(&mut entry.content).desired_width(f32::INFINITY));
-                                                 });
+                                                  ui.heading("Edit Entry");
+                                                  ui.label("Name");
+                                                  if app.editor_search_query.len() >= 3 {
+                                                      let mut layouter = crate::ui::text_highlight::create_highlight_layouter(app.editor_search_query.clone());
+                                                      ui.add(egui::TextEdit::singleline(&mut entry.name).layouter(&mut layouter));
+                                                  } else {
+                                                      ui.text_edit_singleline(&mut entry.name);
+                                                  }
+                                                  
+                                                  ui.label("Keywords (comma separated)");
+                                                  if app.editor_search_query.len() >= 3 {
+                                                      let mut layouter = crate::ui::text_highlight::create_highlight_layouter(app.editor_search_query.clone());
+                                                      ui.add(egui::TextEdit::singleline(&mut entry.keywords).layouter(&mut layouter));
+                                                  } else {
+                                                      ui.text_edit_singleline(&mut entry.keywords);
+                                                  }
+                                                  
+                                                  ui.label("Content");
+                                                  egui::ScrollArea::vertical().id_source("entry_content_scroll").show(ui, |ui| {
+                                                      if app.editor_search_query.len() >= 3 {
+                                                          let mut layouter = crate::ui::text_highlight::create_highlight_layouter(app.editor_search_query.clone());
+                                                          ui.add(egui::TextEdit::multiline(&mut entry.content).desired_width(f32::INFINITY).layouter(&mut layouter));
+                                                      } else {
+                                                          ui.add(egui::TextEdit::multiline(&mut entry.content).desired_width(f32::INFINITY));
+                                                      }
+                                                  });
         
                                                  ui.add_space(8.0);
                                                  ui.horizontal(|ui| {
@@ -1264,12 +1348,38 @@ pub fn render_lorebook_editor(app: &mut CrapApp, ui: &mut egui::Ui) {
                                          ui.separator();
                                          egui::ScrollArea::vertical().id_source("entries_list_scroll").show(ui, |ui| {
                                              ui.set_width(ui.available_width());
-                                             for entry in &book.entries {
-                                                 let selected = app.selected_entry.as_ref().map(|e| e.id) == Some(entry.id);
-                                                 if ui.selectable_label(selected, &entry.name).clicked() {
-                                                     app.selected_entry = Some(entry.clone());
-                                                 }
-                                             }
+                                              for entry in &book.entries {
+                                                  let selected = app.selected_entry.as_ref().map(|e| e.id) == Some(entry.id);
+                                                  
+                                                  let is_match = if app.editor_search_query.len() >= 3 {
+                                                      let q = app.editor_search_query.to_lowercase();
+                                                      entry.name.to_lowercase().contains(&q)
+                                                          || entry.keywords.to_lowercase().contains(&q)
+                                                          || entry.content.to_lowercase().contains(&q)
+                                                  } else {
+                                                      false
+                                                  };
+
+                                                  ui.horizontal(|ui| {
+                                                      ui.spacing_mut().item_spacing.x = 2.0;
+                                                      if is_match {
+                                                          ui.label(egui::RichText::new("🔍").size(10.0).color(egui::Color32::from_rgb(255, 215, 0))); // Gold
+                                                      } else {
+                                                          // Add empty space to align with matched items
+                                                          ui.add_space(12.0);
+                                                      }
+                                                      
+                                                      let label_text = if is_match {
+                                                          egui::RichText::new(&entry.name).color(egui::Color32::from_rgb(255, 215, 0))
+                                                      } else {
+                                                          egui::RichText::new(&entry.name)
+                                                      };
+
+                                                      if ui.selectable_label(selected, label_text).clicked() {
+                                                          app.selected_entry = Some(entry.clone());
+                                                      }
+                                                  });
+                                              }
                                          });
                                      });
                                  });

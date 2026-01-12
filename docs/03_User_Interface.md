@@ -41,6 +41,7 @@ Handles the detailed editing interfaces.
         -   **Characters Tab**: Gallery view of all characters linked to this lorebook with dynamic count badge.
     -   **Sync**: Automatically keeps description and content columns in sync.
     -   **Safety**: Delete confirmation for lore entries.
+    -   **Quick Search**: In-editor search bar that highlights matches and automatically jumps to matching entries.
 
 ### 4. Parsing (`ui/parsing.rs`)
 Dedicated logic for parsing character data from external text sources (clipboard).
