@@ -870,6 +870,18 @@ pub fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                                          ui.label(egui::RichText::new(format!("Total Tokens: {} (Permanent: {})", total_tokens, perm_tokens))
                                              .strong()
                                              .color(egui::Color32::WHITE));
+                                         
+                                         let c_first = character.first_message.chars().count();
+                                         let c_pers = character.personality.chars().count();
+                                         let c_scen = character.scenario.chars().count();
+                                         let c_ex = character.example_dialogue.chars().count();
+                                         
+                                         let total_chars = c_first + c_pers + c_scen + c_ex;
+                                         let perm_chars = c_pers + c_scen;
+
+                                         ui.label(egui::RichText::new(format!("Total Chars: {} (Permanent: {})", total_chars, perm_chars))
+                                             .strong()
+                                             .color(egui::Color32::WHITE));
                                      });
                                  });
                              },
