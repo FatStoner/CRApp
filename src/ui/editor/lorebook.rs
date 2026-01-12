@@ -184,18 +184,23 @@ pub fn render_lorebook_editor(app: &mut CrapApp, ui: &mut egui::Ui) {
 
                                 // Right Column: Cover Image
                                 columns[1].vertical(|ui| {
+                                    let max_total_h = ui.ctx().screen_rect().height() * 0.5;
+                                    ui.set_max_height(max_total_h);
+
                                     ui.label(egui::RichText::new("Cover Image").strong());
                                     
                                     if let Some(path_str) = &book.cover_path {
                                         let uri = crate::ui::get_image_uri(path_str);
                                         
-                                        let max_height = ui.ctx().screen_rect().height() * 0.5;
+                                        // Total height is limited to 50% of screen. 
+                                        // Subtracting ~80px for labels and buttons.
+                                        let image_max_h = (max_total_h - 80.0).max(100.0);
                                         let preview_width = ui.available_width();
                                         
                                         ui.add(
                                             egui::Image::new(uri)
                                                 .rounding(egui::Rounding::same(4.0))
-                                                .max_height(max_height)
+                                                .max_height(image_max_h)
                                                 .max_width(preview_width)
                                         );
                                         
@@ -213,8 +218,8 @@ pub fn render_lorebook_editor(app: &mut CrapApp, ui: &mut egui::Ui) {
                                     }
 
                                     ui.add_space(8.0);
-                                    ui.vertical(|ui| {
-                                        if ui.button("Browse Image").clicked() {
+                                    ui.horizontal(|ui| {
+                                        if ui.button("Browse...").clicked() {
                                             if let Some(path) = rfd::FileDialog::new().add_filter("image", &["png", "jpg", "jpeg"]).pick_file() {
                                                   let dest_dir = std::path::Path::new("data/covers");
                                                   let _ = std::fs::create_dir_all(dest_dir);
@@ -225,7 +230,7 @@ pub fn render_lorebook_editor(app: &mut CrapApp, ui: &mut egui::Ui) {
                                                   }
                                             }
                                         }
-                                        if ui.button("Paste from Clipboard").clicked() {
+                                        if ui.button("Paste").clicked() {
                                              match arboard::Clipboard::new() {
                                                   Ok(mut clipboard) => {
                                                       if let Ok(img_data) = clipboard.get_image() {
@@ -249,7 +254,7 @@ pub fn render_lorebook_editor(app: &mut CrapApp, ui: &mut egui::Ui) {
                                              }
                                         }
                                         if book.cover_path.is_some() {
-                                            if ui.button("Remove Cover").clicked() {
+                                            if ui.button("Remove").clicked() {
                                                 book.cover_path = None;
                                             }
                                         }
