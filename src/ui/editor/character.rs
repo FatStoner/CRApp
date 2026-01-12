@@ -358,6 +358,7 @@ pub fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                                                });
                                           }
 
+                                         ui.label("Title / Description");
                                          // Title (character.char_title) with search highlight AND auto-resize
                                          // Changed to multiline with min_rows(1) for auto-resize behavior
                                          let title_edit = egui::TextEdit::multiline(&mut character.char_title)
