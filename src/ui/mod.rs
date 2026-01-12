@@ -11,15 +11,19 @@ use tokio::sync::mpsc;
 use std::collections::{HashMap, HashSet};
 use std::time::{Duration, Instant};
 
+pub mod browser;
 pub mod central_panel;
+pub mod editor;
 pub mod global_search;
+pub mod popups;
 pub mod side_panel;
+pub mod text_highlight;
 pub mod widgets;
 
-pub mod browser;
-pub mod editor;
+pub use global_search::{CharacterSearchFieldFilters, LorebookSearchFieldFilters};
+pub use popups::PopupState;
+
 pub mod parsing;
-pub mod text_highlight;
 
 // Re-export specific items if needed
 pub use parsing::ParsedCharacterData;
@@ -71,132 +75,7 @@ pub enum AppAction {
     Exit,
 }
 
-#[derive(Clone, Debug)]
-pub struct CharacterSearchFieldFilters {
-    pub name: bool,
-    pub char_title: bool,
-    pub personality: bool,
-    pub scenario: bool,
-    pub first_message: bool,
-    pub example_dialogue: bool,
-    pub author_notes: bool,
-    pub urls: bool,
-    pub tags: bool,
-}
-
-impl Default for CharacterSearchFieldFilters {
-    fn default() -> Self {
-        Self {
-            name: true,
-            char_title: true,
-            personality: true,
-            scenario: true,
-            first_message: true,
-            example_dialogue: true,
-            author_notes: true,
-            urls: true,
-            tags: true,
-        }
-    }
-}
-
-impl CharacterSearchFieldFilters {
-    pub fn all_enabled() -> Self {
-        Self::default()
-    }
-
-    pub fn all_disabled() -> Self {
-        Self {
-            name: false,
-            char_title: false,
-            personality: false,
-            scenario: false,
-            first_message: false,
-            example_dialogue: false,
-            author_notes: false,
-            urls: false,
-            tags: false,
-        }
-    }
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct LorebookSearchFieldFilters {
-    pub title: bool,
-    pub description: bool,
-    pub tags: bool,
-    pub entry_name: bool,
-    pub entry_keywords: bool,
-    pub entry_content: bool,
-}
-
-impl Default for LorebookSearchFieldFilters {
-    fn default() -> Self {
-        Self {
-            title: true,
-            description: true,
-            tags: true,
-            entry_name: true,
-            entry_keywords: true,
-            entry_content: true,
-        }
-    }
-}
-
-impl LorebookSearchFieldFilters {
-    pub fn all_enabled() -> Self {
-        Self::default()
-    }
-
-    pub fn all_disabled() -> Self {
-        Self {
-            title: false,
-            description: false,
-            tags: false,
-            entry_name: false,
-            entry_keywords: false,
-            entry_content: false,
-        }
-    }
-}
-
-#[derive(Clone)]
-pub enum PopupState {
-    None,
-    Renaming {
-        id: i64,
-        name: String,
-    },
-    DeleteConfirmation {
-        id: i64,
-    },
-    DeleteWarning {
-        id: i64,
-        count: usize,
-    },
-    DeleteCharacterConfirmation {
-        id: i64,
-        name: String,
-    },
-    DeleteLorebookEntryConfirmation {
-        id: i64,
-        lorebook_id: i64,
-        name: String,
-    },
-    DeleteLorebookConfirmation {
-        id: i64,
-        title: String,
-    },
-    UnsavedChanges {
-        target: AppAction,
-    },
-    ImportDbWarning,
-    CollectionIconConfirmation {
-        id: i64,
-        path: String,
-        preview_texture: Option<egui::TextureHandle>,
-    },
-}
+// PopupState moved to popups.rs
 
 pub enum UiEvent {
     UiRepaint, // Generic repaint signal
@@ -291,6 +170,9 @@ pub struct CrapApp {
     pub viewing_all_characters: bool,
     pub viewing_favorites: bool,
     pub pending_action: Option<AppAction>,
+
+    // Preferences
+    pub count_title_in_total: bool,
 }
 
 impl CrapApp {
@@ -347,6 +229,8 @@ impl CrapApp {
             pending_action: None,
             theme: ThemeMode::System,
             ui_scale: 1.0,
+
+            count_title_in_total: false,
         };
 
         // Initial Scale Load
@@ -742,6 +626,21 @@ impl CrapApp {
                 ctx.request_repaint();
             }
         });
+    }
+
+    pub fn update_collection_icon(&self, id: i64, path: Option<String>) {
+        if let Some(col) = self.collections.iter().find(|c| c.id == id).cloned() {
+            let mut new_col = col.clone();
+            new_col.image_path = path;
+
+            let tx = self.tx.clone();
+            let db = self.db.clone();
+            tokio::spawn(async move {
+                let _ = db.upsert_collection(&new_col).await;
+                // We reuse CollectionSaved event to trigger reload
+                let _ = tx.send(UiEvent::CollectionSaved(Ok(id))).await;
+            });
+        }
     }
 
     pub fn create_new_lorebook(&mut self) {
@@ -1986,390 +1885,7 @@ impl eframe::App for CrapApp {
         central_panel::render_central_panel(self, ctx);
 
         // Global Popups
-        if let PopupState::UnsavedChanges { target } = self.popup_state.clone() {
-            egui::Window::new("Unsaved Changes")
-                .collapsible(false)
-                .resizable(false)
-                .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
-                .show(ctx, |ui| {
-                    ui.label("You have unsaved changes.");
-                    ui.label("What would you like to do?");
-                    ui.add_space(10.0);
-
-                    ui.horizontal(|ui| {
-                        if ui.button("Save & Continue").clicked() {
-                            if let Some(c) = self.selected_character.clone() {
-                                self.pending_action = Some(target.clone());
-                                self.save_character(c);
-                            }
-                            self.popup_state = PopupState::None;
-                        }
-
-                        if ui.button("Discard Changes").clicked() {
-                            // Revert changes
-                            if let Some(selected) = &self.selected_character {
-                                if selected.id == 0 {
-                                    self.selected_character = None;
-                                } else {
-                                    if let Some(original) =
-                                        self.characters.iter().find(|c| c.id == selected.id)
-                                    {
-                                        self.selected_character = Some(original.clone());
-                                    }
-                                }
-                            }
-                            self.perform_action(target.clone(), ctx);
-                            self.popup_state = PopupState::None;
-                        }
-
-                        if ui.button("Cancel").clicked() {
-                            self.popup_state = PopupState::None;
-                        }
-                    });
-                });
-        }
-
-        if let PopupState::DeleteWarning { id: _, count } = self.popup_state {
-            let mut close = false;
-            egui::Window::new("Cannot Delete Folder")
-                .collapsible(false)
-                .resizable(false)
-                .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
-                .show(ctx, |ui| {
-                    ui.colored_label(egui::Color32::RED, "Warning: Folder is not empty.");
-                    ui.add_space(5.0);
-                    ui.label(format!(
-                        "This folder contains {} character(s) or subfolder(s).",
-                        count
-                    ));
-                    ui.label("You must move or delete all contents before deleting this folder.");
-                    ui.add_space(10.0);
-
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
-                        if ui.button("OK").clicked() {
-                            close = true;
-                        }
-                    });
-                });
-            if close {
-                self.popup_state = PopupState::None;
-            }
-        }
-
-        if let PopupState::DeleteLorebookEntryConfirmation {
-            id,
-            lorebook_id,
-            name,
-        } = self.popup_state.clone()
-        {
-            let mut close = false;
-            egui::Window::new("Delete Entry?")
-                .collapsible(false)
-                .resizable(false)
-                .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
-                .show(ctx, |ui| {
-                    ui.label(format!("Are you sure you want to delete '{}'?", name));
-                    ui.colored_label(egui::Color32::RED, "This action cannot be undone.");
-                    ui.add_space(10.0);
-
-                    ui.horizontal(|ui| {
-                        if ui.button("Yes, Delete").clicked() {
-                            let tx = self.tx.clone();
-                            let db = self.db.clone();
-                            let entry_id = id;
-                            let lid = lorebook_id;
-                            tokio::spawn(async move {
-                                match db.delete_lorebook_entry(entry_id).await {
-                                    Ok(_) => {
-                                        let _ = tx
-                                            .send(UiEvent::LorebookEntryDeleted(Ok(entry_id)))
-                                            .await;
-                                    }
-                                    Err(e) => {
-                                        let _ = tx
-                                            .send(UiEvent::LorebookEntryDeleted(Err(e.to_string())))
-                                            .await;
-                                    }
-                                }
-                                // Trigger reload of entries for this lorebook
-                                if let Ok(entries) = db.get_entries_for_lorebook(lid).await {
-                                    let _ = tx
-                                        .send(UiEvent::LorebookEntriesLoaded(Ok((lid, entries))))
-                                        .await;
-                                }
-                            });
-                            close = true;
-                        }
-                        if ui.button("Cancel").clicked() {
-                            close = true;
-                        }
-                    });
-                });
-            if close {
-                self.popup_state = PopupState::None;
-            }
-        }
-
-        // Collection Icon Confirmation
-        let mut icon_confirm_action = None;
-        if let PopupState::CollectionIconConfirmation {
-            id,
-            mut path,
-            preview_texture: _,
-        } = self.popup_state.clone()
-        {
-            let mut close = false;
-            let mut new_path = None;
-
-            egui::Window::new("Change Collection Icon")
-                .collapsible(false)
-                .resizable(false)
-                .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
-                .show(ctx, |ui| {
-                    ui.horizontal(|ui| {
-                        if ui.button("📂 Browse Image...").clicked() {
-                            if let Some(file) = rfd::FileDialog::new()
-                                .add_filter("Images", &["png", "jpg", "jpeg", "webp"])
-                                .pick_file()
-                            {
-                                if let Some(processed) =
-                                    crate::image_utils::process_collection_image(
-                                        file.to_str().unwrap(),
-                                    )
-                                {
-                                    new_path = Some(processed);
-                                }
-                            }
-                        }
-
-                        if ui.button("📋 Paste from Clipboard").clicked() {
-                            // Try to get image from clipboard
-                            // Using arboard or similar? We need to add it to dependencies?
-                            // Checking Cargo.toml would be wise, but assuming we can use what we have or adding it.
-                            // Does crate::image_utils have clipboard support? No, only processing.
-                            // I should probably add clipboard support to image_utils or just use arboard here if available.
-                            // Attempting to read from arboard if clean.
-                            // Actually, let's defer clipboard to `image_utils` to keep this clean.
-                            if let Some(processed) = crate::image_utils::process_clipboard_image() {
-                                new_path = Some(processed);
-                            }
-                        }
-                    });
-
-                    ui.add_space(10.0);
-
-                    // Preview
-                    if !path.is_empty() {
-                        // We need to load texture if not loaded?
-                        // Eggy generic way: Use egui::Image with file URI
-                        let uri = if path.contains("://") {
-                            path.clone()
-                        } else {
-                            if let Ok(abs) = std::fs::canonicalize(&path) {
-                                format!("file://{}", abs.to_string_lossy())
-                            } else {
-                                path.clone()
-                            }
-                        };
-
-                        ui.label("Preview:");
-                        ui.add(
-                            egui::Image::new(uri)
-                                .fit_to_original_size(0.5)
-                                .max_size(egui::vec2(200.0, 200.0)),
-                        );
-                    } else {
-                        ui.label("No image selected");
-                    }
-
-                    ui.add_space(20.0);
-
-                    ui.horizontal(|ui| {
-                        if ui.button("✅ Confirm").clicked() {
-                            icon_confirm_action = Some((id, path.clone()));
-                            close = true;
-                        }
-                        if ui.button("❌ Cancel").clicked() {
-                            close = true;
-                        }
-                        if ui.button("🗑 Remove Icon").clicked() {
-                            icon_confirm_action = Some((id, String::new()));
-                            close = true;
-                        }
-                    });
-                });
-
-            if let Some(p) = new_path {
-                // Update state with new path
-                self.popup_state = PopupState::CollectionIconConfirmation {
-                    id,
-                    path: p,
-                    preview_texture: None, // Let Image widget handle loading via URI
-                };
-                ctx.request_repaint();
-            }
-
-            if close {
-                if icon_confirm_action.is_none() {
-                    self.popup_state = PopupState::None;
-                }
-            }
-        }
-
-        // Execute action outside show closure to avoid borrow issues
-        if let Some((id, final_path)) = icon_confirm_action {
-            self.popup_state = PopupState::None;
-
-            // Check if we need to remove old?
-            // We can just update for now.
-            // TODO: Cleanup old image if replacing?
-
-            let tx = self.tx.clone();
-            let db = self.db.clone();
-
-            // Update Collection in DB
-            // We need to fetch, update path, save.
-            // Helper method for this?
-            // Accessing self.collections here is valid.
-            if let Some(col) = self.collections.iter().find(|c| c.id == id).cloned() {
-                let mut new_col = col.clone();
-                if final_path.is_empty() {
-                    new_col.image_path = None;
-                } else {
-                    new_col.image_path = Some(final_path);
-                }
-
-                tokio::spawn(async move {
-                    // We use upsert_collection
-                    let _ = db.upsert_collection(&new_col).await;
-                    // Send event to reload
-                    let _ = tx.send(UiEvent::CollectionSaved(Ok(id))).await;
-                });
-            }
-        }
-
-        if let PopupState::DeleteLorebookConfirmation { id, title } = self.popup_state.clone() {
-            let mut close = false;
-            egui::Window::new("Delete Lorebook?")
-                .collapsible(false)
-                .resizable(false)
-                .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
-                .show(ctx, |ui| {
-                    ui.label(format!("Are you sure you want to delete '{}'?", title));
-                    ui.colored_label(egui::Color32::RED, "This action cannot be undone.");
-                    ui.add_space(10.0);
-
-                    ui.horizontal(|ui| {
-                        if ui.button("Yes, Delete").clicked() {
-                            self.delete_lorebook(id);
-                            close = true;
-                        }
-                        if ui.button("Cancel").clicked() {
-                            close = true;
-                        }
-                    });
-                });
-            if close {
-                self.popup_state = PopupState::None;
-            }
-        }
-
-        if let PopupState::DeleteCharacterConfirmation { id, name } = self.popup_state.clone() {
-            let mut close = false;
-            egui::Window::new("Delete Character?")
-                .collapsible(false)
-                .resizable(false)
-                .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
-                .show(ctx, |ui| {
-                    ui.label(format!("Are you sure you want to delete '{}'?", name));
-                    ui.colored_label(egui::Color32::RED, "This action cannot be undone.");
-                    ui.add_space(10.0);
-
-                    ui.horizontal(|ui| {
-                        if ui.button("Yes, Delete").clicked() {
-                            self.delete_character(id);
-                            close = true;
-                        }
-                        if ui.button("Cancel").clicked() {
-                            close = true;
-                        }
-                    });
-                });
-            if close {
-                self.popup_state = PopupState::None;
-            }
-        }
-
-        let mut rename_request = None;
-        if let PopupState::Renaming { id, name } = &mut self.popup_state {
-            let coll_id = *id;
-            let mut close = false;
-            egui::Window::new("Rename Folder")
-                .collapsible(false)
-                .resizable(false)
-                .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
-                .show(ctx, |ui| {
-                    ui.label("Enter new folder name:");
-                    ui.text_edit_singleline(name);
-                    ui.add_space(10.0);
-
-                    ui.horizontal(|ui| {
-                        if ui.button("Save").clicked() {
-                            rename_request = Some((coll_id, name.clone()));
-                            close = true;
-                        }
-                        if ui.button("Cancel").clicked() {
-                            close = true;
-                        }
-                    });
-                });
-            if close {
-                self.popup_state = PopupState::None;
-            }
-        }
-
-        if let PopupState::ImportDbWarning = self.popup_state {
-            let mut close = false;
-            let mut proceed = false;
-            egui::Window::new("Import Database Warning")
-                .collapsible(false)
-                .resizable(false)
-                .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
-                .show(ctx, |ui| {
-                    ui.colored_label(
-                        egui::Color32::RED,
-                        "Warning: This action will replace your existing database.",
-                    );
-                    ui.label("You should export your current database before proceeding.");
-                    ui.add_space(10.0);
-
-                    ui.horizontal(|ui| {
-                        if ui.button("OK").clicked() {
-                            proceed = true;
-                            close = true;
-                        }
-                        if ui.button("Cancel").clicked() {
-                            close = true;
-                        }
-                    });
-                });
-
-            if close {
-                self.popup_state = PopupState::None;
-                if proceed {
-                    self.trigger_db_import();
-                }
-            }
-        }
-
-        if let Some((id, new_name)) = rename_request {
-            let parent_id = self
-                .collections
-                .iter()
-                .find(|c| c.id == id)
-                .and_then(|c| c.parent_id);
-            self.save_collection(id, new_name, parent_id);
-        }
+        popups::render_popups(ctx, self);
 
         // Watermark: The Library of Snailexandria
         if ctx.screen_rect().width() > 300.0 {

@@ -367,6 +367,7 @@ pub fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                                                           ui.output_mut(|o| o.copied_text = character.char_title.clone());
                                                           status_update = Some(("Copied Title to clipboard".to_string(), egui::Color32::GREEN));
                                                       }
+                                                      ui.toggle_value(&mut app.count_title_in_total, "count in total");
                                                       ui.label(egui::RichText::new(format!("Tokens: {} | Chars: {}", count_tokens(&character.char_title), character.char_title.chars().count())).size(12.0).color(egui::Color32::GRAY));
                                                   });
                                               })
@@ -877,8 +878,9 @@ pub fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                                          let t_pers = count_tokens(&character.personality);
                                          let t_scen = count_tokens(&character.scenario);
                                          let t_ex = count_tokens(&character.example_dialogue);
+                                         let t_title = if app.count_title_in_total { count_tokens(&character.char_title) } else { 0 };
                                          
-                                         let total_tokens = t_first + t_pers + t_scen + t_ex;
+                                         let total_tokens = t_first + t_pers + t_scen + t_ex + t_title;
                                          let perm_tokens = t_pers + t_scen;
                                          
                                          ui.label(egui::RichText::new(format!("Total Tokens: {} (Permanent: {})", total_tokens, perm_tokens))
@@ -889,8 +891,9 @@ pub fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                                          let c_pers = character.personality.chars().count();
                                          let c_scen = character.scenario.chars().count();
                                          let c_ex = character.example_dialogue.chars().count();
+                                         let c_title = if app.count_title_in_total { character.char_title.chars().count() } else { 0 };
                                          
-                                         let total_chars = c_first + c_pers + c_scen + c_ex;
+                                         let total_chars = c_first + c_pers + c_scen + c_ex + c_title;
                                          let perm_chars = c_pers + c_scen;
 
                                          ui.label(egui::RichText::new(format!("Total Chars: {} (Permanent: {})", total_chars, perm_chars))
