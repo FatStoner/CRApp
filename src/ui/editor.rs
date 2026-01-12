@@ -246,6 +246,17 @@ pub fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                                     ui.selectable_value(&mut character.collection_id, Some(*id), name);
                                 }
                             });
+                        
+                        ui.add_space(8.0);
+                        let fav_btn = if character.is_favorite {
+                            egui::Button::new(egui::RichText::new("\u{2764} Favorite").color(egui::Color32::WHITE)).fill(egui::Color32::from_rgb(200, 50, 50))
+                        } else {
+                             egui::Button::new("\u{2764} Favorite")
+                        };
+                        
+                        if ui.add(fav_btn).clicked() {
+                            character.is_favorite = !character.is_favorite;
+                        }
                     });
                     
                     // In-editor search
