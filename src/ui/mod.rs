@@ -80,6 +80,8 @@ pub enum AppAction {
     SwitchToAll,
     Exit,
     GoBack,
+    CreateNewCharacter(Option<i64>),
+    CreateNewLorebook,
 }
 
 // PopupState moved to popups.rs
@@ -685,6 +687,16 @@ impl CrapApp {
     }
 
     pub fn create_new_lorebook(&mut self) {
+        if self.has_unsaved_changes() {
+            self.popup_state = PopupState::UnsavedChanges {
+                target: AppAction::CreateNewLorebook,
+            };
+        } else {
+            self.perform_create_new_lorebook();
+        }
+    }
+
+    pub fn perform_create_new_lorebook(&mut self) {
         self.push_history();
         let new_book = Lorebook::default();
         // Optimistic update so UI shows it immediately
@@ -997,6 +1009,16 @@ impl CrapApp {
     }
 
     pub fn create_new_character(&mut self, collection_id: Option<i64>) {
+        if self.has_unsaved_changes() {
+            self.popup_state = PopupState::UnsavedChanges {
+                target: AppAction::CreateNewCharacter(collection_id),
+            };
+        } else {
+            self.perform_create_new_character(collection_id);
+        }
+    }
+
+    pub fn perform_create_new_character(&mut self, collection_id: Option<i64>) {
         self.push_history();
         let mut character = Character::default();
         character.collection_id = collection_id;
@@ -1112,6 +1134,12 @@ impl CrapApp {
             }
             AppAction::GoBack => {
                 self.go_back();
+            }
+            AppAction::CreateNewCharacter(coll_id) => {
+                self.perform_create_new_character(coll_id);
+            }
+            AppAction::CreateNewLorebook => {
+                self.perform_create_new_lorebook();
             }
         }
     }
