@@ -226,7 +226,7 @@ pub fn render_side_panel(app: &mut CrapApp, ctx: &egui::Context) {
                                 let is_selected =
                                     app.selected_lorebook.as_ref().map(|l| l.id) == Some(book.id);
                                 let (rect, response) = ui.allocate_exact_size(
-                                    egui::vec2(ui.available_width(), 42.0),
+                                    egui::vec2(ui.available_width(), 48.0),
                                     egui::Sense::click(),
                                 );
 
@@ -241,68 +241,66 @@ pub fn render_side_panel(app: &mut CrapApp, ctx: &egui::Context) {
                                     };
 
                                     if bg_color != egui::Color32::TRANSPARENT {
-                                        // Shrink rect vertically by 5px top/bottom to match thumbnail height (32px)
-                                        // and create a clear 10px gap between row highlights.
-                                        let highlight_rect = rect.shrink2(egui::vec2(0.0, 5.0));
+                                        // Shrink rect vertically by 2px top/bottom to match character list logic (44px high)
+                                        // and create a clear 4px gap between row highlights.
+                                        let highlight_rect = rect.shrink2(egui::vec2(0.0, 2.0));
                                         ui.painter().rect_filled(highlight_rect, 4.0, bg_color);
                                     }
 
                                     ui.allocate_new_ui(
-                                        egui::UiBuilder::new().max_rect(rect),
+                                        egui::UiBuilder::new().max_rect(rect).layout(
+                                            egui::Layout::left_to_right(egui::Align::Center),
+                                        ),
                                         |ui| {
-                                            ui.horizontal(|ui| {
-                                                ui.add_space(6.0);
-                                                // Thumbnail
-                                                let thumb_size = 32.0;
-                                                // Center the thumbnail vertically within the 42px row
-                                                let (thumb_rect, _) = ui.allocate_exact_size(
-                                                    egui::vec2(thumb_size, thumb_size),
-                                                    egui::Sense::hover(),
+                                            ui.add_space(6.0);
+                                            // Thumbnail
+                                            let thumb_size = 40.0;
+                                            let (thumb_rect, _) = ui.allocate_exact_size(
+                                                egui::vec2(thumb_size, thumb_size),
+                                                egui::Sense::hover(),
+                                            );
+
+                                            if let Some(path_str) = &book.cover_path {
+                                                let uri = crate::ui::get_image_uri(path_str);
+                                                crate::ui::widgets::paint_avatar_crop(
+                                                    ui, thumb_rect, &uri, 2.0,
                                                 );
-
-                                                if let Some(path_str) = &book.cover_path {
-                                                    let uri = crate::ui::get_image_uri(path_str);
-                                                    crate::ui::widgets::paint_avatar_crop(
-                                                        ui, thumb_rect, &uri, 2.0,
-                                                    );
-                                                } else {
-                                                    ui.painter().rect_filled(
-                                                        thumb_rect,
-                                                        2.0,
-                                                        egui::Color32::from_gray(60),
-                                                    );
-                                                    let initial = book
-                                                        .title
-                                                        .chars()
-                                                        .next()
-                                                        .unwrap_or('?')
-                                                        .to_uppercase()
-                                                        .to_string();
-                                                    ui.painter().text(
-                                                        thumb_rect.center(),
-                                                        egui::Align2::CENTER_CENTER,
-                                                        initial,
-                                                        egui::FontId::proportional(16.0),
-                                                        egui::Color32::WHITE,
-                                                    );
-                                                }
-
-                                                ui.add_space(8.0);
-
-                                                let mut label_text =
-                                                    egui::RichText::new(&book.title);
-                                                if is_selected {
-                                                    label_text = label_text
-                                                        .strong()
-                                                        .color(egui::Color32::LIGHT_BLUE);
-                                                }
-                                                // Ensure title is non-selectable and does not block clicks.
-                                                ui.add(
-                                                    egui::Label::new(label_text)
-                                                        .selectable(false)
-                                                        .sense(egui::Sense::hover()),
+                                            } else {
+                                                ui.painter().rect_filled(
+                                                    thumb_rect,
+                                                    2.0,
+                                                    egui::Color32::from_gray(60),
                                                 );
-                                            });
+                                                let initial = book
+                                                    .title
+                                                    .chars()
+                                                    .next()
+                                                    .unwrap_or('?')
+                                                    .to_uppercase()
+                                                    .to_string();
+                                                ui.painter().text(
+                                                    thumb_rect.center(),
+                                                    egui::Align2::CENTER_CENTER,
+                                                    initial,
+                                                    egui::FontId::proportional(20.0),
+                                                    egui::Color32::WHITE,
+                                                );
+                                            }
+
+                                            ui.add_space(8.0);
+
+                                            let mut label_text = egui::RichText::new(&book.title);
+                                            if is_selected {
+                                                label_text = label_text
+                                                    .strong()
+                                                    .color(egui::Color32::LIGHT_BLUE);
+                                            }
+                                            // Ensure title is non-selectable and does not block clicks.
+                                            ui.add(
+                                                egui::Label::new(label_text)
+                                                    .selectable(false)
+                                                    .sense(egui::Sense::hover()),
+                                            );
                                         },
                                     );
 
