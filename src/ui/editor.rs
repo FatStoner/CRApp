@@ -946,6 +946,12 @@ pub fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                                          } else {
                                              char_url.label = Some(label_val);
                                          }
+                                         
+                                         if !char_url.url.is_empty() {
+                                             if ui.button("🌐").on_hover_text("Open in Browser").clicked() {
+                                                 ui.ctx().open_url(egui::OpenUrl::new_tab(&char_url.url));
+                                             }
+                                         }
 
                                          // Auto-fill label logic
                                          if url_resp.changed() || url_resp.lost_focus() {
