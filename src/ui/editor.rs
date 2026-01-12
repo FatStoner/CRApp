@@ -275,9 +275,30 @@ pub fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                     ui.horizontal(|ui| {
                         ui.selectable_value(&mut app.active_char_tab, CharacterTab::MainData, "Main Data");
                         ui.selectable_value(&mut app.active_char_tab, CharacterTab::Notes, "Notes");
-                        ui.selectable_value(&mut app.active_char_tab, CharacterTab::Lorebooks, "Lorebooks");
+                    ui.selectable_value(&mut app.active_char_tab, CharacterTab::Lorebooks, "Lorebooks");
                     });
                     ui.separator();
+
+                    // Handle Drag and Drop for Avatar
+                    let dropped_files = ui.input(|i| i.raw.dropped_files.clone());
+                    if !dropped_files.is_empty() {
+                        for dropped in dropped_files {
+                            if let Some(path) = dropped.path {
+                                let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
+                                if ["png", "jpg", "jpeg", "webp"].contains(&ext.as_str()) {
+                                    let dest_dir = std::path::Path::new("data/avatars");
+                                    let _ = std::fs::create_dir_all(dest_dir);
+                                    if let Some(name) = path.file_name() {
+                                        let dest = dest_dir.join(name);
+                                        if let Ok(_) = std::fs::copy(&path, &dest) {
+                                            character.avatar_path = Some(dest.to_string_lossy().to_string());
+                                            status_update = Some(("Avatar loaded from dropped file!".to_string(), egui::Color32::GREEN));
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                     
                     let mut tag_add_request: Option<(i64, String, bool)> = None;
                     let mut tag_remove_request: Option<(i64, i64, bool)> = None;
