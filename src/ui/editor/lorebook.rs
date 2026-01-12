@@ -17,7 +17,30 @@ pub fn render_lorebook_editor(app: &mut CrapApp, ui: &mut egui::Ui) {
                         if ui.button("⬅ Back").clicked() {
                             back_history_req = true;
                         }
+                        
+                        // Handle Esc key for Back navigation
+                        if ui.memory(|m| m.focused().is_none()) && ui.input(|i| i.key_pressed(egui::Key::Escape)) {
+                            back_history_req = true;
+                        }
+
                         ui.heading("Edit Lorebook");
+
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            // EXPORT (Placeholder)
+                            ui.add_enabled(false, egui::Button::new("EXPORT"));
+                            
+                            // IMPORT (Placeholder)
+                            ui.add_enabled(false, egui::Button::new("IMPORT"));
+
+                            // SAVE
+                            if ui.add(egui::Button::new(egui::RichText::new("SAVE").strong())).clicked() {
+                                save_lore_req = Some(book.clone());
+                            }
+                            
+                            if let Some((msg, color)) = &app.status_message {
+                                ui.colored_label(*color, msg);
+                            }
+                        });
                     });
                     ui.add_space(4.0);
 
@@ -130,9 +153,8 @@ pub fn render_lorebook_editor(app: &mut CrapApp, ui: &mut egui::Ui) {
                                     });
                                     
                                     ui.add_space(16.0);
-                                    if ui.button("Save Lorebook Metadata").clicked() {
-                                         save_lore_req = Some(book.clone());
-                                    }
+                                    // Old Save Button removed
+
                                 });
 
                                 // Right Column: Cover Image
