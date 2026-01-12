@@ -216,7 +216,32 @@ pub fn render_deep_search(app: &mut CrapApp, ui: &mut egui::Ui) {
                     app.load_character(id);
                 }
                 SearchResultKind::Lorebook => {
+                    // Populate editor search query for lorebooks as well
+                    app.editor_search_query = app.deep_search_query.clone();
+
                     if let Some(l) = app.lorebooks.iter().find(|x| x.id == id).cloned() {
+                        // Smart tab selection for lorebooks
+                        if !app.editor_search_query.is_empty() {
+                            if let Some(res) = app
+                                .deep_search_results
+                                .iter()
+                                .find(|r| r.id == id && r.kind == SearchResultKind::Lorebook)
+                            {
+                                let has_entry_match = res
+                                    .matches
+                                    .iter()
+                                    .any(|(field, _)| field.starts_with("Entry"));
+                                if has_entry_match {
+                                    app.active_lorebook_tab = crate::ui::LorebookTab::Entries;
+                                } else {
+                                    // If no entry match, maybe it's in metadata. Use Entries as default if entries exist?
+                                    // Actually, if it's metadata, staying in metadata view (managed by ScrollArea in render_lorebook_editor) is fine.
+                                    // But let's check if we want to default to something. The character logic defaults to MainData.
+                                    // For lorebooks, metadata is always visible at the top.
+                                }
+                            }
+                        }
+
                         app.selected_lorebook = Some(l.clone());
                         app.load_lorebook_entries(l.id);
                         app.mode = AppMode::Lorebooks;
