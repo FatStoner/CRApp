@@ -55,6 +55,12 @@ pub fn render_popups(ctx: &egui::Context, app: &mut CrapApp) {
                     ui.horizontal(|ui| {
                         ui.label("Name:");
                         let response = ui.text_edit_singleline(&mut name);
+                        if response.changed() {
+                            app.popup_state = PopupState::Renaming {
+                                id,
+                                name: name.clone(),
+                            };
+                        }
                         if response.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
                             app.save_collection(id, name.clone(), None);
                             close = true;
