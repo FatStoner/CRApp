@@ -73,6 +73,7 @@ pub enum AppAction {
     SwitchCollection(Option<i64>),
     SwitchToAll,
     Exit,
+    GoBack,
 }
 
 // PopupState moved to popups.rs
@@ -1011,6 +1012,16 @@ impl CrapApp {
         }
     }
 
+    pub fn request_back(&mut self) {
+        if self.has_unsaved_changes() {
+            self.popup_state = PopupState::UnsavedChanges {
+                target: AppAction::GoBack,
+            };
+        } else {
+            self.go_back();
+        }
+    }
+
     pub fn request_collection_switch(&mut self, id: Option<i64>) {
         self.push_history();
         if self.has_unsaved_changes() {
@@ -1065,6 +1076,9 @@ impl CrapApp {
             }
             AppAction::Exit => {
                 ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+            }
+            AppAction::GoBack => {
+                self.go_back();
             }
         }
     }

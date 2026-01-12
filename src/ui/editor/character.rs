@@ -1080,12 +1080,9 @@ pub fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                      }
                      
                      // Restore ownership
+                     app.selected_character = Some(character);
                      if back_history_req {
-                         app.go_back();
-                         // Ideally we might want to check dirty state before? 
-                         // But users usually expect back to discard or just nav.
-                     } else {
-                         app.selected_character = Some(character);
+                         app.request_back();
                      }
 
                 } else {

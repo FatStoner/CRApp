@@ -115,7 +115,7 @@ pub fn render_browser_view(app: &mut CrapApp, ui: &mut egui::Ui) {
         // Back only if in a collection, not in "All" mode which is top level.
         if !viewing_all && collection_id.is_some() {
             if ui.button("⬅ Back").clicked() {
-                app.go_back();
+                app.request_back();
             }
             if ui.button("⬆ Up").clicked() {
                 app.request_collection_switch(parent_id);

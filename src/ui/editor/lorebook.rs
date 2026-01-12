@@ -434,7 +434,7 @@ pub fn render_lorebook_editor(app: &mut CrapApp, ui: &mut egui::Ui) {
                     
                     // Restore ownership
                     if back_history_req {
-                        app.go_back();
+                        app.request_back();
                     } else {
                         app.selected_lorebook = Some(book);
                     }
