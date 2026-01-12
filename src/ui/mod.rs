@@ -77,6 +77,17 @@ pub enum AppAction {
 
 // PopupState moved to popups.rs
 
+#[derive(Clone, Debug)]
+pub struct NavigationState {
+    pub mode: AppMode,
+    pub central_view: CentralView,
+    pub selected_character_id: Option<i64>,
+    pub selected_lorebook_id: Option<i64>,
+    pub selected_collection_id: Option<i64>,
+    pub active_char_tab: CharacterTab,
+    pub active_lorebook_tab: LorebookTab,
+}
+
 pub enum UiEvent {
     UiRepaint, // Generic repaint signal
     DeepSearchCompleted(Result<Vec<DeepSearchResult>, String>),
@@ -173,6 +184,9 @@ pub struct CrapApp {
 
     // Preferences
     pub count_title_in_total: bool,
+
+    // Navigation History
+    pub navigation_history: Vec<NavigationState>,
 }
 
 impl CrapApp {
@@ -231,6 +245,8 @@ impl CrapApp {
             ui_scale: 1.0,
 
             count_title_in_total: false,
+
+            navigation_history: Vec::new(),
         };
 
         // Initial Scale Load
@@ -505,12 +521,24 @@ impl CrapApp {
 
     // Now just a simplified helper that spawns a load
     pub fn load_character(&mut self, id: i64) {
+        self.push_history();
         // Find in logic, or reload if needed. Currently we just select from list.
         if let Some(c) = self.characters.iter().find(|c| c.id == id).cloned() {
             self.selected_character = Some(c);
             self.load_links(id);
             self.load_tags(id);
             self.mode = AppMode::Characters;
+            self.central_view = CentralView::Editor;
+        }
+    }
+
+    pub fn load_lorebook(&mut self, id: i64) {
+        self.push_history();
+        if let Some(book) = self.lorebooks.iter().find(|l| l.id == id).cloned() {
+            self.selected_lorebook = Some(book);
+            self.load_lorebook_entries(id);
+            self.load_lorebook_tags(id);
+            self.mode = AppMode::Lorebooks;
             self.central_view = CentralView::Editor;
         }
     }
@@ -644,6 +672,7 @@ impl CrapApp {
     }
 
     pub fn create_new_lorebook(&mut self) {
+        self.push_history();
         let new_book = Lorebook::default();
         // Optimistic update so UI shows it immediately
         self.selected_lorebook = Some(new_book.clone());
@@ -794,6 +823,65 @@ impl CrapApp {
         });
     }
 
+    pub fn push_history(&mut self) {
+        let state = NavigationState {
+            mode: self.mode,
+            central_view: self.central_view,
+            selected_character_id: self.selected_character.as_ref().map(|c| c.id),
+            selected_lorebook_id: self.selected_lorebook.as_ref().map(|l| l.id),
+            selected_collection_id: self.selected_collection_id,
+            active_char_tab: self.active_char_tab,
+            active_lorebook_tab: self.active_lorebook_tab,
+        };
+        // Avoid pushing duplicates if nothing changed
+        if let Some(last) = self.navigation_history.last() {
+            // Simplified check: if IDs and mode/view match, don't push.
+            // This prevents spamming history when clicking same thing.
+            if last.mode == state.mode
+                && last.central_view == state.central_view
+                && last.selected_character_id == state.selected_character_id
+                && last.selected_lorebook_id == state.selected_lorebook_id
+                && last.selected_collection_id == state.selected_collection_id
+            {
+                return;
+            }
+        }
+        self.navigation_history.push(state);
+    }
+
+    pub fn go_back(&mut self) {
+        if let Some(state) = self.navigation_history.pop() {
+            self.mode = state.mode;
+            self.central_view = state.central_view;
+            self.selected_collection_id = state.selected_collection_id;
+            self.active_char_tab = state.active_char_tab;
+            self.active_lorebook_tab = state.active_lorebook_tab;
+
+            // Restore Selection
+            if let Some(char_id) = state.selected_character_id {
+                // Manually set selection instead of load_character to avoid side effects or re-pushing history
+                if let Some(c) = self.characters.iter().find(|c| c.id == char_id).cloned() {
+                    self.selected_character = Some(c);
+                    // We might need to reload tabs/links if they aren't cached or if we want to ensure freshness
+                    self.load_links(char_id);
+                    self.load_tags(char_id);
+                }
+            } else {
+                self.selected_character = None;
+            }
+
+            if let Some(lore_id) = state.selected_lorebook_id {
+                if let Some(book) = self.lorebooks.iter().find(|l| l.id == lore_id).cloned() {
+                    self.selected_lorebook = Some(book);
+                    self.load_lorebook_entries(lore_id);
+                    self.load_lorebook_tags(lore_id);
+                }
+            } else {
+                self.selected_lorebook = None;
+            }
+        }
+    }
+
     pub fn get_collection_path(&self, mut col_id: i64) -> String {
         let mut path = Vec::new();
         for _ in 0..10 {
@@ -886,6 +974,7 @@ impl CrapApp {
     }
 
     pub fn create_new_character(&mut self, collection_id: Option<i64>) {
+        self.push_history();
         let mut character = Character::default();
         character.collection_id = collection_id;
 
@@ -923,6 +1012,7 @@ impl CrapApp {
     }
 
     pub fn request_collection_switch(&mut self, id: Option<i64>) {
+        self.push_history();
         if self.has_unsaved_changes() {
             self.popup_state = PopupState::UnsavedChanges {
                 target: AppAction::SwitchCollection(id),

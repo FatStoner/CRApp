@@ -1,6 +1,95 @@
 use crate::ui::{AppMode, CrapApp, SearchResultKind};
 use eframe::egui;
 
+#[derive(Clone, Debug, PartialEq)]
+pub struct CharacterSearchFieldFilters {
+    pub name: bool,
+    pub char_title: bool,
+    pub personality: bool,
+    pub scenario: bool,
+    pub first_message: bool,
+    pub example_dialogue: bool,
+    pub author_notes: bool,
+    pub urls: bool,
+    pub tags: bool,
+}
+
+impl Default for CharacterSearchFieldFilters {
+    fn default() -> Self {
+        Self {
+            name: true,
+            char_title: true,
+            personality: true,
+            scenario: true,
+            first_message: true,
+            example_dialogue: true,
+            author_notes: true,
+            urls: true,
+            tags: true,
+        }
+    }
+}
+
+impl CharacterSearchFieldFilters {
+    pub fn all_enabled() -> Self {
+        Self::default()
+    }
+
+    pub fn all_disabled() -> Self {
+        Self {
+            name: false,
+            char_title: false,
+            personality: false,
+            scenario: false,
+            first_message: false,
+            example_dialogue: false,
+            author_notes: false,
+            urls: false,
+            tags: false,
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct LorebookSearchFieldFilters {
+    pub title: bool,
+    pub description: bool,
+    pub tags: bool,
+    pub entry_name: bool,
+    pub entry_keywords: bool,
+    pub entry_content: bool,
+}
+
+impl Default for LorebookSearchFieldFilters {
+    fn default() -> Self {
+        Self {
+            title: true,
+            description: true,
+            tags: true,
+            entry_name: true,
+            entry_keywords: true,
+            entry_content: true,
+        }
+    }
+}
+
+impl LorebookSearchFieldFilters {
+    pub fn all_enabled() -> Self {
+        Self::default()
+    }
+
+    pub fn all_disabled() -> Self {
+        Self {
+            title: false,
+            description: false,
+            tags: false,
+            entry_name: false,
+            entry_keywords: false,
+            entry_content: false,
+        }
+    }
+}
+
 pub fn render_deep_search(app: &mut CrapApp, ui: &mut egui::Ui) {
     ui.heading("Deep Global Search");
     ui.horizontal(|ui| {

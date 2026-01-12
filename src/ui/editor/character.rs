@@ -10,6 +10,7 @@ pub fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
     let mut save_req = None;
     let mut toggle_requests = Vec::<(i64, i64, bool)>::new();
     let mut status_update = None;
+    let mut back_history_req = false;
     let mut back_req = None;
 
     // Check Dirty State (before taking ownership, or logic moved down? We can do it on the owned copy too)
@@ -41,6 +42,9 @@ pub fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                      
                      ui.horizontal(|ui| {
                         if ui.button("⬅ Back").clicked() {
+                            back_history_req = true;
+                        }
+                        if ui.button("⬆ Up").clicked() {
                             back_req = Some(character.collection_id);
                         }
                         // Handle Esc key for Back navigation
@@ -1044,9 +1048,10 @@ pub fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                                  }
                                  
                                  if let Some(target_lore) = go_to_lorebook {
-                                     app.selected_lorebook = Some(target_lore);
-                                     app.mode = crate::ui::AppMode::Lorebooks;
-                                     app.central_view = crate::ui::CentralView::Editor;
+                                     // Temporarily restore character ownership so push_history sees it
+                                     app.selected_character = Some(character.clone());
+                                     app.load_lorebook(target_lore.id);
+                                     // Navigation complete, mode switched.
                                  }
                              }
                          }
@@ -1075,7 +1080,13 @@ pub fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                      }
                      
                      // Restore ownership
-                     app.selected_character = Some(character);
+                     if back_history_req {
+                         app.go_back();
+                         // Ideally we might want to check dirty state before? 
+                         // But users usually expect back to discard or just nav.
+                     } else {
+                         app.selected_character = Some(character);
+                     }
 
                 } else {
                     ui.label("Select a character to edit.");

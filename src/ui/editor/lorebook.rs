@@ -7,12 +7,18 @@ pub fn render_lorebook_editor(app: &mut CrapApp, ui: &mut egui::Ui) {
                     let mut tag_add_request = None;
                     let mut tag_remove_request = None;
                     let mut entry_save_req = None;
+                    let mut back_history_req = false;
 
                     let mut entry_add_req = false;
                     
                     let mut status_update: Option<(String, egui::Color32)> = None;
                     
-                    ui.heading("Edit Lorebook");
+                    ui.horizontal(|ui| {
+                        if ui.button("⬅ Back").clicked() {
+                            back_history_req = true;
+                        }
+                        ui.heading("Edit Lorebook");
+                    });
                     ui.add_space(4.0);
 
                     // --- In-editor search ---
@@ -392,6 +398,12 @@ pub fn render_lorebook_editor(app: &mut CrapApp, ui: &mut egui::Ui) {
                                               preview_texture: None,
                                           };
                                       }
+                                      crate::ui::browser::BrowserAction::OpenCharacter(id) => {
+                                           // Temporarily restore ownership so push_history sees it
+                                           app.selected_lorebook = Some(book.clone());
+                                           app.load_character(id);
+                                           // Note: We don't need to unset it because we are navigating away entirely.
+                                      }
                                  }
                              }
                         }
@@ -421,7 +433,11 @@ pub fn render_lorebook_editor(app: &mut CrapApp, ui: &mut egui::Ui) {
 
                     
                     // Restore ownership
-                    app.selected_lorebook = Some(book);
+                    if back_history_req {
+                        app.go_back();
+                    } else {
+                        app.selected_lorebook = Some(book);
+                    }
 
                 } else {
                     ui.label("Select a lorebook.");

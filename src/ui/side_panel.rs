@@ -219,6 +219,9 @@ pub fn render_side_panel(app: &mut CrapApp, ctx: &egui::Context) {
                         }
                         AppMode::Lorebooks => {
                             // Simple list for Lorebooks for now (no implementation in original for tree)
+                            let mut lorebook_to_select = None;
+                            let mut delete_req = None;
+
                             for book in &app.lorebooks {
                                 let mut label = if app.selected_lorebook.as_ref().map(|l| l.id)
                                     == Some(book.id)
@@ -237,21 +240,27 @@ pub fn render_side_panel(app: &mut CrapApp, ctx: &egui::Context) {
 
                                 resp.context_menu(|ui| {
                                     if ui.button("Delete").clicked() {
-                                        app.popup_state =
-                                            crate::ui::PopupState::DeleteLorebookConfirmation {
-                                                id: book.id,
-                                                title: book.title.clone(),
-                                            };
+                                        delete_req = Some((book.id, book.title.clone()));
                                         ui.close_menu();
                                     }
                                 });
 
                                 if resp.clicked() {
-                                    app.selected_lorebook = Some(book.clone());
-                                    app.load_lorebook_entries(book.id);
-                                    app.load_lorebook_tags(book.id);
+                                    lorebook_to_select = Some(book.clone());
                                 }
-                                app.selected_character = None; // Deselect char
+                            }
+
+                            if let Some(book) = lorebook_to_select {
+                                app.push_history();
+                                app.selected_lorebook = Some(book.clone());
+                                app.load_lorebook_entries(book.id);
+                                app.load_lorebook_tags(book.id);
+                                app.selected_character = None;
+                            }
+
+                            if let Some((id, title)) = delete_req {
+                                app.popup_state =
+                                    crate::ui::PopupState::DeleteLorebookConfirmation { id, title };
                             }
                         }
                         _ => {}

@@ -11,6 +11,7 @@ pub enum BrowserAction {
     CreateCollection(Option<i64>),
     ToggleFavorite(i64),
     UpdateCollectionIcon(i64),
+    OpenCharacter(i64),
 }
 
 pub fn render_collection_move_menu(
@@ -113,6 +114,9 @@ pub fn render_browser_view(app: &mut CrapApp, ui: &mut egui::Ui) {
     ui.horizontal(|ui| {
         // Back only if in a collection, not in "All" mode which is top level.
         if !viewing_all && collection_id.is_some() {
+            if ui.button("⬅ Back").clicked() {
+                app.go_back();
+            }
             if ui.button("⬆ Up").clicked() {
                 app.request_collection_switch(parent_id);
             }
@@ -397,10 +401,7 @@ pub fn render_browser_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                                     );
 
                                     if response.clicked() {
-                                        app.selected_character = Some(char.clone());
-                                        app.central_view = crate::ui::CentralView::Editor;
-                                        app.load_tags(char.id);
-                                        app.load_links(char.id);
+                                        actions.push(BrowserAction::OpenCharacter(char.id));
                                     }
 
                                     // Avatar Painting
@@ -553,6 +554,9 @@ pub fn render_browser_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                     preview_texture: None,
                 };
             }
+            BrowserAction::OpenCharacter(id) => {
+                app.load_character(id);
+            }
         }
     }
 
@@ -595,12 +599,7 @@ pub fn render_character_card(
 
     // Interaction
     if response.clicked() {
-        app.selected_character = Some(char.clone());
-        app.central_view = crate::ui::CentralView::Editor;
-        app.load_tags(char.id);
-        app.load_links(char.id);
-        // FORCE SWITCH MODE to Characters so sidebar and other UI elements align
-        app.mode = crate::ui::AppMode::Characters;
+        actions.push(BrowserAction::OpenCharacter(char.id));
     }
 
     response.context_menu(|ui| {
