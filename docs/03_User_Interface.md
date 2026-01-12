@@ -28,11 +28,13 @@ Handles the "Gallery" or "Browser" view where characters are listed.
 ### 3. Editor View (`ui/editor.rs`)
 Handles the detailed editing interfaces.
 -   **Character Editor**:
+    -   **Header**: Displays the character's internal name (`name` field) in parentheses next to the title for easy identification across tabs.
     -   **Fields**: Name, Title, Personality, Scenario, Examples, etc.
         -   **Context Menu**: Custom Cut/Copy/Paste actions with selection persistence.
     -   **Avatars**: Image preview, clipboard pasting, file browsing.
     -   **Tags**: Management of App and External tags.
     -   **Lorebooks**: Selection of linked lorebooks with "Go to Lorebook" navigation button.
+    -   **Navigation**: "Back" and "Up" buttons with **Unsaved Changes Protection**.
     -   **Export**: Export to .crapp (Native), .json (SpicyChat), .md, or .png (Card).
 -   **Lorebook Editor**:
     -   **Metadata**: Title, Description (Content), Tags, and Cover management.
@@ -87,7 +89,8 @@ To manage ownership in the immediate mode loop, complex views (like `render_edit
 The application supports the following keyboard shortcuts for improved efficiency:
 -   **Ctrl + S**: Save the current character (in Editor view).
 -   **Enter**: Add a tag when the input field is focused (in Editor view).
--   **Esc**: Navigate back (Browser/Editor). Returns to previous view or parent folder. Triggers unsaved changes warning in Editor. Only works when no text field is focused.
+-   **Esc**: Navigate back. Acts identical to the **Back button**. Returns to previous view or parent folder. Triggers "Unsaved Changes" warning in Editor (Character/Lorebook). Only works when no text field is focused.
+-   **Back / Up Buttons**: Utilize `request_back` and `request_collection_switch` to ensure state is saved before navigating.
 
 ## Performance & Optimization
 To ensure a responsive UI, especially with large numbers of characters (thousands), several optimizations are implemented:

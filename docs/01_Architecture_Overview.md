@@ -34,13 +34,17 @@ src/
 ├── models.rs       # Data structures
 ├── card_v2.rs      # Export/Import format compatibility
 └── ui/             # User Interface Logic
-    ├── mod.rs      # CrapApp struct and event definitions
-    ├── main.rs     # (Not used, UI logic matches files below)
+    ├── mod.rs      # CrapApp struct and navigation logic
     ├── central_panel.rs  # Main content area router
-    ├── side_panel.rs     # Left navigation bar
-    ├── browser.rs        # Character Grid/List view
-    ├── editor.rs         # Character/Lorebook Editor
+    ├── side_panel.rs     # Left navigation bar (with culling)
+    ├── browser.rs        # Character Grid/List view (with culling)
+    ├── editor/           # Sub-modules for editors
+    │   ├── mod.rs        # Editor orchestration
+    │   ├── character.rs  # Character Editor
+    │   └── lorebook.rs   # Lorebook Editor
     ├── parsing.rs        # Text parsing logic
     ├── global_search.rs  # Global Deep Search
+    ├── popups.rs         # Unified modal handling
+    ├── text_highlight.rs # Search highlight logic
     └── widgets.rs        # Reusable UI components
 ```
