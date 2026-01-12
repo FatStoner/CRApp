@@ -223,30 +223,92 @@ pub fn render_side_panel(app: &mut CrapApp, ctx: &egui::Context) {
                             let mut delete_req = None;
 
                             for book in &app.lorebooks {
-                                let mut label = if app.selected_lorebook.as_ref().map(|l| l.id)
-                                    == Some(book.id)
-                                {
-                                    egui::RichText::new(&book.title)
-                                        .strong()
-                                        .color(egui::Color32::LIGHT_BLUE)
-                                } else {
-                                    egui::RichText::new(&book.title)
-                                };
-
-                                let resp = ui.selectable_label(
-                                    app.selected_lorebook.as_ref().map(|l| l.id) == Some(book.id),
-                                    label,
+                                let is_selected =
+                                    app.selected_lorebook.as_ref().map(|l| l.id) == Some(book.id);
+                                let (rect, response) = ui.allocate_exact_size(
+                                    egui::vec2(ui.available_width(), 32.0),
+                                    egui::Sense::click(),
                                 );
 
-                                resp.context_menu(|ui| {
-                                    if ui.button("Delete").clicked() {
-                                        delete_req = Some((book.id, book.title.clone()));
-                                        ui.close_menu();
-                                    }
-                                });
+                                // Culling
+                                if ui.is_rect_visible(rect) {
+                                    let bg_color = if is_selected {
+                                        ui.visuals().widgets.active.bg_fill
+                                    } else if response.hovered() {
+                                        ui.visuals().widgets.hovered.bg_fill
+                                    } else {
+                                        egui::Color32::TRANSPARENT
+                                    };
 
-                                if resp.clicked() {
-                                    lorebook_to_select = Some(book.id);
+                                    if bg_color != egui::Color32::TRANSPARENT {
+                                        ui.painter().rect_filled(rect, 4.0, bg_color);
+                                    }
+
+                                    ui.allocate_new_ui(
+                                        egui::UiBuilder::new().max_rect(rect),
+                                        |ui| {
+                                            ui.horizontal(|ui| {
+                                                ui.add_space(4.0);
+                                                // Thumbnail
+                                                let thumb_size = 24.0;
+                                                let thumb_rect = ui
+                                                    .allocate_exact_size(
+                                                        egui::vec2(thumb_size, thumb_size),
+                                                        egui::Sense::hover(),
+                                                    )
+                                                    .0;
+
+                                                if let Some(path_str) = &book.cover_path {
+                                                    let uri = crate::ui::get_image_uri(path_str);
+                                                    crate::ui::widgets::paint_avatar_crop(
+                                                        ui, thumb_rect, &uri, 2.0,
+                                                    );
+                                                } else {
+                                                    ui.painter().rect_filled(
+                                                        thumb_rect,
+                                                        2.0,
+                                                        egui::Color32::from_gray(60),
+                                                    );
+                                                    let initial = book
+                                                        .title
+                                                        .chars()
+                                                        .next()
+                                                        .unwrap_or('?')
+                                                        .to_uppercase()
+                                                        .to_string();
+                                                    ui.painter().text(
+                                                        thumb_rect.center(),
+                                                        egui::Align2::CENTER_CENTER,
+                                                        initial,
+                                                        egui::FontId::proportional(14.0),
+                                                        egui::Color32::WHITE,
+                                                    );
+                                                }
+
+                                                ui.add_space(4.0);
+
+                                                let mut label_text =
+                                                    egui::RichText::new(&book.title);
+                                                if is_selected {
+                                                    label_text = label_text
+                                                        .strong()
+                                                        .color(egui::Color32::LIGHT_BLUE);
+                                                }
+                                                ui.label(label_text);
+                                            });
+                                        },
+                                    );
+
+                                    response.context_menu(|ui| {
+                                        if ui.button("Delete").clicked() {
+                                            delete_req = Some((book.id, book.title.clone()));
+                                            ui.close_menu();
+                                        }
+                                    });
+
+                                    if response.clicked() {
+                                        lorebook_to_select = Some(book.id);
+                                    }
                                 }
                             }
 
