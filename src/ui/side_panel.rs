@@ -226,7 +226,7 @@ pub fn render_side_panel(app: &mut CrapApp, ctx: &egui::Context) {
                                 let is_selected =
                                     app.selected_lorebook.as_ref().map(|l| l.id) == Some(book.id);
                                 let (rect, response) = ui.allocate_exact_size(
-                                    egui::vec2(ui.available_width(), 32.0),
+                                    egui::vec2(ui.available_width(), 40.0),
                                     egui::Sense::click(),
                                 );
 
@@ -242,6 +242,7 @@ pub fn render_side_panel(app: &mut CrapApp, ctx: &egui::Context) {
 
                                     if bg_color != egui::Color32::TRANSPARENT {
                                         // Shrink rect vertically to create a gap between highlights
+                                        // 40.0 - 2.0*2.0 = 36.0 height highlight for 32.0 thumbnail
                                         let highlight_rect = rect.shrink2(egui::vec2(0.0, 2.0));
                                         ui.painter().rect_filled(highlight_rect, 4.0, bg_color);
                                     }
@@ -252,7 +253,7 @@ pub fn render_side_panel(app: &mut CrapApp, ctx: &egui::Context) {
                                             ui.horizontal(|ui| {
                                                 ui.add_space(6.0);
                                                 // Thumbnail
-                                                let thumb_size = 24.0;
+                                                let thumb_size = 32.0;
                                                 let thumb_rect = ui
                                                     .allocate_exact_size(
                                                         egui::vec2(thumb_size, thumb_size),
@@ -282,12 +283,12 @@ pub fn render_side_panel(app: &mut CrapApp, ctx: &egui::Context) {
                                                         thumb_rect.center(),
                                                         egui::Align2::CENTER_CENTER,
                                                         initial,
-                                                        egui::FontId::proportional(14.0),
+                                                        egui::FontId::proportional(16.0),
                                                         egui::Color32::WHITE,
                                                     );
                                                 }
 
-                                                ui.add_space(4.0);
+                                                ui.add_space(8.0);
 
                                                 let mut label_text =
                                                     egui::RichText::new(&book.title);
