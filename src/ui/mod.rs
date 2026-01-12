@@ -2,8 +2,7 @@ use crate::db::Database;
 use eframe::egui;
 
 use crate::models::{
-    count_tokens, Character, Collection, DeepSearchResult, Lorebook, SearchResultKind, Tag,
-    ThemeMode,
+    Character, Collection, DeepSearchResult, Lorebook, SearchResultKind, Tag, ThemeMode,
 };
 
 use tokio::sync::mpsc;
