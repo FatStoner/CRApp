@@ -820,6 +820,34 @@ impl Database {
         Ok(())
     }
 
+    pub async fn delete_lorebook(&self, id: i64) -> Result<(), sqlx::Error> {
+        // 1. Delete Entries
+        sqlx::query("DELETE FROM lorebook_entries WHERE lorebook_id = ?")
+            .bind(id)
+            .execute(&self.pool)
+            .await?;
+
+        // 2. Delete Tags Link
+        sqlx::query("DELETE FROM lorebook_tags WHERE lorebook_id = ?")
+            .bind(id)
+            .execute(&self.pool)
+            .await?;
+
+        // 3. Delete Character Links
+        sqlx::query("DELETE FROM character_lore_link WHERE lore_id = ?")
+            .bind(id)
+            .execute(&self.pool)
+            .await?;
+
+        // 4. Delete Lorebook
+        sqlx::query("DELETE FROM lorebooks WHERE id = ?")
+            .bind(id)
+            .execute(&self.pool)
+            .await?;
+
+        Ok(())
+    }
+
     // Returns a List of Lorebook IDs linked to the character
     pub async fn get_lore_links(
         &self,

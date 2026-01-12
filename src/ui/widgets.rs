@@ -13,7 +13,6 @@ pub fn track_text_selection(ui: &egui::Ui, response: &egui::Response) {
             if range.primary.index != range.secondary.index {
                 let sel = TextSelection((range.primary.index, range.secondary.index));
                 ui.data_mut(|d| d.insert_temp(id, sel));
-                eprintln!("DEBUG: Stored selection {:?}", sel);
             } else {
                 // No selection (width 0).
                 // We clear the cache ONLY if the user actively interacts to "clear" it:
@@ -22,9 +21,6 @@ pub fn track_text_selection(ui: &egui::Ui, response: &egui::Response) {
                 // We DO NOT clear on Right Click (Secondary) or simple Focus (which might be transient).
                 if response.clicked_by(egui::PointerButton::Primary) || response.changed() {
                     ui.data_mut(|d| d.remove_temp::<TextSelection>(id));
-                    eprintln!("DEBUG: CLEARING cache (Primary Click or Text Change)");
-                } else {
-                    // eprintln!("DEBUG: Preserving cache (No disruptive action)");
                 }
             }
         }
@@ -40,31 +36,18 @@ pub fn text_context_menu(ui: &mut egui::Ui, text: &mut String, id: egui::Id) {
         }
     }
 
-    eprintln!(
-        "DEBUG: Menu Open. Realtime Range: {:?}",
-        current_cursor_range
-    );
-
     // If realtime state is just a cursor (no selection), check if we have a stored ("sticky") selection
     if let Some((start, end)) = current_cursor_range {
         if start == end {
             // active selection is empty (just cursor), check cache
             if let Some(stored) = ui.data(|d| d.get_temp::<TextSelection>(id)) {
-                eprintln!("DEBUG: Using Cached Selection: {:?}", stored);
                 current_cursor_range = Some(stored.0);
-            } else {
-                eprintln!("DEBUG: No Cached Selection found.");
             }
-        } else {
-            eprintln!("DEBUG: Using Realtime Selection.");
         }
     } else {
         // No cursor info at all? Check cache.
         if let Some(stored) = ui.data(|d| d.get_temp::<TextSelection>(id)) {
-            eprintln!("DEBUG: No Realtime State, Using Cached: {:?}", stored);
             current_cursor_range = Some(stored.0);
-        } else {
-            eprintln!("DEBUG: No Realtime State, No Cache.");
         }
     }
 

@@ -3,9 +3,11 @@
 *.db-shm
 *.db-wal
 *.db.bak
+*.db.old
 *.exe
 data/avatars/
 data/covers/
+data/collection_images
 Docs/
 *.crapp
 *.json

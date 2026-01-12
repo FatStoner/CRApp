@@ -220,19 +220,38 @@ pub fn render_side_panel(app: &mut CrapApp, ctx: &egui::Context) {
                         AppMode::Lorebooks => {
                             // Simple list for Lorebooks for now (no implementation in original for tree)
                             for book in &app.lorebooks {
-                                if ui
-                                    .selectable_label(
-                                        app.selected_lorebook.as_ref().map(|l| l.id)
-                                            == Some(book.id),
-                                        &book.title,
-                                    )
-                                    .clicked()
+                                let mut label = if app.selected_lorebook.as_ref().map(|l| l.id)
+                                    == Some(book.id)
                                 {
+                                    egui::RichText::new(&book.title)
+                                        .strong()
+                                        .color(egui::Color32::LIGHT_BLUE)
+                                } else {
+                                    egui::RichText::new(&book.title)
+                                };
+
+                                let resp = ui.selectable_label(
+                                    app.selected_lorebook.as_ref().map(|l| l.id) == Some(book.id),
+                                    label,
+                                );
+
+                                resp.context_menu(|ui| {
+                                    if ui.button("Delete").clicked() {
+                                        app.popup_state =
+                                            crate::ui::PopupState::DeleteLorebookConfirmation {
+                                                id: book.id,
+                                                title: book.title.clone(),
+                                            };
+                                        ui.close_menu();
+                                    }
+                                });
+
+                                if resp.clicked() {
                                     app.selected_lorebook = Some(book.clone());
                                     app.load_lorebook_entries(book.id);
-                                    app.mode = AppMode::Lorebooks; // Ensure mode
-                                    app.selected_character = None; // Deselect char
+                                    app.load_lorebook_tags(book.id);
                                 }
+                                app.selected_character = None; // Deselect char
                             }
                         }
                         _ => {}

@@ -143,6 +143,10 @@ pub enum PopupState {
         lorebook_id: i64,
         name: String,
     },
+    DeleteLorebookConfirmation {
+        id: i64,
+        title: String,
+    },
     UnsavedChanges {
         target: AppAction,
     },
@@ -178,6 +182,7 @@ pub enum UiEvent {
     LorebookEntrySaved(Result<(), String>),
     LorebookEntryDeleted(Result<i64, String>),
     LorebookEntryAdded(Result<i64, String>), // Returns new ID
+    LorebookDeleted(Result<i64, String>),
 
     ImportFileLoaded(Result<String, String>),
     ThemeLoaded(Result<ThemeMode, String>),
@@ -743,6 +748,21 @@ impl CrapApp {
                 }
                 ctx.request_repaint();
             }
+        });
+    }
+
+    pub fn delete_lorebook(&self, id: i64) {
+        let tx = self.tx.clone();
+        let db = self.db.clone();
+        let ctx = self.ctx.clone();
+        tokio::spawn(async move {
+            let res = db.delete_lorebook(id).await;
+            let _ = tx
+                .send(UiEvent::LorebookDeleted(
+                    res.map(|_| id).map_err(|e| e.to_string()),
+                ))
+                .await;
+            ctx.request_repaint();
         });
     }
 
@@ -1751,6 +1771,18 @@ impl eframe::App for CrapApp {
                     Err(e) => self
                         .set_status(format!("Failed to delete entry: {}", e), egui::Color32::RED),
                 },
+                UiEvent::LorebookDeleted(res) => match res {
+                    Ok(id) => {
+                        self.set_status("Lorebook Deleted".to_string(), egui::Color32::GREEN);
+                        self.lorebooks.retain(|b| b.id != id);
+                        if let Some(selected) = &self.selected_lorebook {
+                            if selected.id == id {
+                                self.selected_lorebook = None;
+                            }
+                        }
+                    }
+                    Err(e) => self.set_status(format!("Delete Error: {}", e), egui::Color32::RED),
+                },
                 UiEvent::DeepSearchCompleted(res) => {
                     self.is_deep_searching = false;
                     match res {
@@ -2184,6 +2216,32 @@ impl eframe::App for CrapApp {
                     // Send event to reload
                     let _ = tx.send(UiEvent::CollectionSaved(Ok(id))).await;
                 });
+            }
+        }
+
+        if let PopupState::DeleteLorebookConfirmation { id, title } = self.popup_state.clone() {
+            let mut close = false;
+            egui::Window::new("Delete Lorebook?")
+                .collapsible(false)
+                .resizable(false)
+                .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
+                .show(ctx, |ui| {
+                    ui.label(format!("Are you sure you want to delete '{}'?", title));
+                    ui.colored_label(egui::Color32::RED, "This action cannot be undone.");
+                    ui.add_space(10.0);
+
+                    ui.horizontal(|ui| {
+                        if ui.button("Yes, Delete").clicked() {
+                            self.delete_lorebook(id);
+                            close = true;
+                        }
+                        if ui.button("Cancel").clicked() {
+                            close = true;
+                        }
+                    });
+                });
+            if close {
+                self.popup_state = PopupState::None;
             }
         }
 

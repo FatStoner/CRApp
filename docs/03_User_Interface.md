@@ -61,6 +61,9 @@ The left-hand navigation bar.
         -   **Lorebook Matching**: Searches Title, Description/Content, Tags, and all Entry fields.
         -   **Folder Filter**: Ability to limit search to a specific Collection and all its descendants.
         -   **Safe Snippets**: Contextual snippet extraction with UTF-8 boundary protection.
+    -   **Lorebooks**:
+        -   **Context Menu**: Right-click actions (Delete).
+
 
 ### 6. Reusable Components (`ui/widgets.rs`)
 Shared UI elements and helper functions.
