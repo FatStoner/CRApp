@@ -221,6 +221,7 @@ pub fn render_lorebook_editor(app: &mut CrapApp, ui: &mut egui::Ui) {
 
                                     ui.add_space(8.0);
                                     ui.horizontal(|ui| {
+                                        ui.spacing_mut().item_spacing.x = 8.0;
                                         if ui.button("Browse...").clicked() {
                                             if let Some(path) = rfd::FileDialog::new().add_filter("image", &["png", "jpg", "jpeg"]).pick_file() {
                                                   let dest_dir = std::path::Path::new("data/covers");
