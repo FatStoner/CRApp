@@ -509,6 +509,32 @@ pub fn render_browser_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                                                             ui.hyperlink(&url.url);
                                                         });
                                                     }
+
+                                                    ui.add_space(8.0);
+
+                                                    // Token & Char Counts
+                                                    app.ensure_token_count(char);
+                                                    if let Some((tokens, chars)) =
+                                                        app.token_cache.get(&char.id)
+                                                    {
+                                                        ui.label(
+                                                            egui::RichText::new(format!(
+                                                                "Tokens: {} | Chars: {}",
+                                                                tokens, chars
+                                                            ))
+                                                            .size(11.0)
+                                                            .color(egui::Color32::from_gray(100)),
+                                                        );
+                                                    } else {
+                                                        ui.label(
+                                                            egui::RichText::new("Calculating...")
+                                                                .size(11.0)
+                                                                .italics()
+                                                                .color(egui::Color32::from_gray(
+                                                                    80,
+                                                                )),
+                                                        );
+                                                    }
                                                 }
                                                 _ => {} // Grid handled above
                                             }

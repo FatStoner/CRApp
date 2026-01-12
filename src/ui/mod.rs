@@ -126,8 +126,10 @@ pub enum UiEvent {
     ScaleLoaded(Result<f32, String>),
     DbExportFinished(Result<String, String>),
     DbReloaded(Result<Database, String>),
+
     LoreLinksBulkLoaded(HashMap<i64, Vec<i64>>),
     CollectionIconUpdated(Result<i64, String>),
+    TokenCountCalculated(i64, usize, usize), // (CharId, Tokens, Chars)
 }
 
 pub struct CrapApp {
@@ -142,6 +144,8 @@ pub struct CrapApp {
     pub collections: Vec<Collection>,
     pub lore_links: HashSet<i64>,
     pub char_lore_map: HashMap<i64, Vec<i64>>,
+    pub token_cache: HashMap<i64, (usize, usize)>,
+    pub token_calc_in_progress: HashSet<i64>,
 
     // State
     pub mode: AppMode,
@@ -211,6 +215,8 @@ impl CrapApp {
             collections: Vec::new(),
             lore_links: HashSet::new(),
             char_lore_map: HashMap::new(),
+            token_cache: HashMap::new(),
+            token_calc_in_progress: HashSet::new(),
             mode: AppMode::Characters,
             selected_character: None,
             selected_lorebook: None,
@@ -1641,6 +1647,42 @@ impl CrapApp {
             let _ = db.set_setting("ui_scale", &val).await;
         });
     }
+    pub fn ensure_token_count(&mut self, character: &Character) {
+        if self.token_cache.contains_key(&character.id) {
+            return;
+        }
+        if self.token_calc_in_progress.contains(&character.id) {
+            return;
+        }
+
+        self.token_calc_in_progress.insert(character.id);
+        let tx = self.tx.clone();
+        let char_clone = character.clone();
+        let include_title = self.count_title_in_total;
+
+        tokio::spawn(async move {
+            let mut total_text = String::new();
+            total_text.push_str(&char_clone.name);
+            if include_title {
+                total_text.push_str(&char_clone.char_title);
+            }
+            total_text.push_str(&char_clone.personality);
+            total_text.push_str(&char_clone.scenario);
+            total_text.push_str(&char_clone.example_dialogue);
+            total_text.push_str(&char_clone.first_message);
+
+            let char_count = total_text.len();
+            let token_count = crate::models::count_tokens(&total_text);
+
+            let _ = tx
+                .send(UiEvent::TokenCountCalculated(
+                    char_clone.id,
+                    token_count,
+                    char_count,
+                ))
+                .await;
+        });
+    }
 }
 
 impl eframe::App for CrapApp {
@@ -1990,6 +2032,10 @@ impl eframe::App for CrapApp {
                         self.set_status(format!("Icon Update Error: {}", e), egui::Color32::RED)
                     }
                 },
+                UiEvent::TokenCountCalculated(id, tokens, chars) => {
+                    self.token_cache.insert(id, (tokens, chars));
+                    self.token_calc_in_progress.remove(&id);
+                }
             }
         }
 
