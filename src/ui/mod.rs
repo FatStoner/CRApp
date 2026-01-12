@@ -2120,3 +2120,24 @@ fn cleanup_avatar(path_str: &str) {
         }
     }
 }
+
+static CURRENT_DIR: std::sync::OnceLock<std::path::PathBuf> = std::sync::OnceLock::new();
+
+pub fn get_image_uri(path: &str) -> String {
+    if path.starts_with("file://") || path.contains("://") {
+        return path.to_string();
+    }
+
+    // Check if absolute
+    let path_obj = std::path::Path::new(path);
+    if path_obj.is_absolute() {
+        return format!("file://{}", path);
+    }
+
+    // Relative path: Resolve against cached current dir
+    let cwd = CURRENT_DIR
+        .get_or_init(|| std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from(".")));
+
+    let abs = cwd.join(path);
+    format!("file://{}", abs.to_string_lossy())
+}

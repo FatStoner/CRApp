@@ -638,6 +638,11 @@ pub fn render_tree(
             actions.push(TreeAction::SelectChar(char.clone()));
         }
 
+        // Culling: If the item is not visible, skip painting to save huge amounts of resources
+        if !ui.is_rect_visible(rect) {
+            continue;
+        }
+
         // Cursor change on hover removed per user request.
         // if response.hovered() {
         //    ui.ctx().set_cursor_icon(egui::CursorIcon::Grab);
@@ -665,15 +670,7 @@ pub fn render_tree(
         );
 
         if let Some(path_str) = &char.avatar_path {
-            let uri = if path_str.contains("://") {
-                path_str.clone()
-            } else {
-                if let Ok(abs_path) = std::fs::canonicalize(path_str) {
-                    format!("file://{}", abs_path.to_string_lossy())
-                } else {
-                    path_str.clone()
-                }
-            };
+            let uri = crate::ui::get_image_uri(path_str);
 
             crate::ui::widgets::paint_avatar_crop(ui, thumb_rect, &uri, 4.0);
         } else {

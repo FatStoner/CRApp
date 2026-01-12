@@ -88,3 +88,20 @@ The application supports the following keyboard shortcuts for improved efficienc
 -   **Ctrl + S**: Save the current character (in Editor view).
 -   **Enter**: Add a tag when the input field is focused (in Editor view).
 -   **Esc**: Navigate back (Browser/Editor). Returns to previous view or parent folder. Triggers unsaved changes warning in Editor. Only works when no text field is focused.
+
+## Performance & Optimization
+To ensure a responsive UI, especially with large numbers of characters (thousands), several optimizations are implemented:
+
+### 1. Asynchronous Image Loading
+-   **Old Approach**: Blocking `std::fs` calls and synchronous image decoding on the main thread.
+-   **Current Approach**: Leverages `egui`'s asynchronous image loader. Path resolution uses a custom helper `crate::ui::get_image_uri` which:
+    -   Converts paths to `file://` URIs efficiently.
+    -   Caches the current working directory using `OnceLock` to avoid repeated system calls.
+
+### 2. View Culling (Virtualization)
+Renders and processes only the items currently visible in the viewport.
+-   **Sidebar**: `render_tree` checks `ui.is_rect_visible(rect)` before painting avatars or text.
+-   **Browser Grid**: Skips processing and rendering for cards outside the scroll area.
+-   **Browser List**: Skips expensive avatar painting for non-visible rows.
+
+This prevents the application from issuing thousands of image load requests simultaneously when opening large folders, eliminating UI freezes.

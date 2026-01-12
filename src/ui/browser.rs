@@ -43,46 +43,52 @@ pub fn render_browser_view(app: &mut CrapApp, ui: &mut egui::Ui) {
     let mut actions = Vec::new();
 
     // Background Image
-    if let Ok(abs_path) = std::fs::canonicalize("data/background/default.png") {
-        // Attempt to read dimensions to calculate aspect ratio
-        if let Ok(reader) = image::io::Reader::open(&abs_path) {
-            if let Ok(dims) = reader.into_dimensions() {
-                let (img_w, img_h) = dims;
-                if img_w > 0 && img_h > 0 {
-                    let uri = format!("file://{}", abs_path.to_string_lossy());
-                    let rect = ui.available_rect_before_wrap();
+    // Background Image
+    let bg_path = "data/background/default.png";
+    let bg_uri = crate::ui::get_image_uri(bg_path);
 
-                    let avail_w = rect.width();
-                    let avail_h = rect.height();
+    // Async load check
+    match ui
+        .ctx()
+        .try_load_image(bg_uri.as_str().into(), Default::default())
+    {
+        Ok(egui::load::ImagePoll::Ready { image }) => {
+            let (img_w, img_h) = (image.size[0] as f32, image.size[1] as f32);
+            if img_w > 0.0 && img_h > 0.0 {
+                let rect = ui.available_rect_before_wrap();
+                let avail_w = rect.width();
+                let avail_h = rect.height();
 
-                    let img_aspect = img_w as f32 / img_h as f32;
-                    let avail_aspect = avail_w / avail_h;
+                let img_aspect = img_w / img_h;
+                let avail_aspect = avail_w / avail_h;
 
-                    // We want to CONTAIN the image (fit inside), so we take the smaller scale
-                    // But then we also want it 10% smaller than that, so 0.9 scale.
-                    let scale_factor = if avail_aspect > img_aspect {
-                        // Available is wider than image, so height is the limiting factor
-                        avail_h / img_h as f32
-                    } else {
-                        // Available is taller than image, so width is the limiting factor
-                        avail_w / img_w as f32
-                    };
+                // We want to CONTAIN the image (fit inside), so we take the smaller scale
+                // But then we also want it 10% smaller than that, so 0.9 scale.
+                let scale_factor = if avail_aspect > img_aspect {
+                    // Available is wider than image, so height is the limiting factor
+                    avail_h / img_h
+                } else {
+                    // Available is taller than image, so width is the limiting factor
+                    avail_w / img_w
+                };
 
-                    let final_scale = scale_factor * 0.9;
+                let final_scale = scale_factor * 0.9;
 
-                    let final_w = img_w as f32 * final_scale;
-                    let final_h = img_h as f32 * final_scale;
+                let final_w = img_w * final_scale;
+                let final_h = img_h * final_scale;
 
-                    let center = rect.center();
-                    let final_rect =
-                        egui::Rect::from_center_size(center, egui::vec2(final_w, final_h));
+                let center = rect.center();
+                let final_rect = egui::Rect::from_center_size(center, egui::vec2(final_w, final_h));
 
-                    egui::Image::new(uri)
-                        .tint(egui::Color32::WHITE.gamma_multiply(0.5))
-                        .paint_at(ui, final_rect);
-                }
+                egui::Image::new(bg_uri)
+                    .tint(egui::Color32::WHITE.gamma_multiply(0.5))
+                    .paint_at(ui, final_rect);
             }
         }
+        Ok(egui::load::ImagePoll::Pending { .. }) => {
+            // Just wait, egui will repaint when loaded
+        }
+        _ => {}
     }
 
     // Clone collections for context menu usage
@@ -400,42 +406,46 @@ pub fn render_browser_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                                         egui::Sense::click(),
                                     );
 
-                                    if response.clicked() {
-                                        actions.push(BrowserAction::OpenCharacter(char.id));
-                                    }
-
-                                    // Avatar Painting
-                                    if let Some(path_str) = &char.avatar_path {
-                                        let uri = if path_str.contains("://") {
-                                            path_str.clone()
-                                        } else {
-                                            if let Ok(abs_path) = std::fs::canonicalize(path_str) {
-                                                format!("file://{}", abs_path.to_string_lossy())
-                                            } else {
-                                                path_str.clone()
-                                            }
-                                        };
-                                        crate::ui::widgets::paint_avatar_crop(ui, rect, &uri, 4.0);
+                                    // Culling for List View
+                                    if !ui.is_rect_visible(rect) {
+                                        ui.add_space(10.0);
+                                        // Still need to layout the rest of the horizontal content or just skip it?
+                                        // In horizontal layout, we can't easily skip the rest without messing up the cursor.
+                                        // But we can skip painting.
+                                        // Actually, since we are inside `ui.horizontal`, skipping might be tricky if we don't allocate the rest.
+                                        // Let's at least skip the avatar painting.
                                     } else {
-                                        ui.painter().rect_filled(
-                                            rect,
-                                            4.0,
-                                            egui::Color32::from_gray(60),
-                                        );
-                                        let initial = char
-                                            .name
-                                            .chars()
-                                            .next()
-                                            .unwrap_or('?')
-                                            .to_uppercase()
-                                            .to_string();
-                                        ui.painter().text(
-                                            rect.center(),
-                                            egui::Align2::CENTER_CENTER,
-                                            initial,
-                                            egui::FontId::proportional(32.0),
-                                            egui::Color32::WHITE,
-                                        );
+                                        if response.clicked() {
+                                            actions.push(BrowserAction::OpenCharacter(char.id));
+                                        }
+
+                                        // Avatar Painting
+                                        if let Some(path_str) = &char.avatar_path {
+                                            let uri = crate::ui::get_image_uri(path_str);
+                                            crate::ui::widgets::paint_avatar_crop(
+                                                ui, rect, &uri, 4.0,
+                                            );
+                                        } else {
+                                            ui.painter().rect_filled(
+                                                rect,
+                                                4.0,
+                                                egui::Color32::from_gray(60),
+                                            );
+                                            let initial = char
+                                                .name
+                                                .chars()
+                                                .next()
+                                                .unwrap_or('?')
+                                                .to_uppercase()
+                                                .to_string();
+                                            ui.painter().text(
+                                                rect.center(),
+                                                egui::Align2::CENTER_CENTER,
+                                                initial,
+                                                egui::FontId::proportional(32.0),
+                                                egui::Color32::WHITE,
+                                            );
+                                        }
                                     }
 
                                     ui.add_space(10.0);
@@ -586,6 +596,11 @@ pub fn render_character_card(
     let (rect, response) =
         ui.allocate_exact_size(egui::vec2(card_width, card_height), egui::Sense::click());
 
+    // Culling for Grid View
+    if !ui.is_rect_visible(rect) {
+        return;
+    }
+
     // Hover Effect
     let bg_color = if response.hovered() {
         ui.visuals().widgets.hovered.bg_fill
@@ -639,15 +654,7 @@ pub fn render_character_card(
         egui::Rect::from_min_size(content_rect.min, egui::vec2(avatar_size, avatar_size));
 
     if let Some(path_str) = &char.avatar_path {
-        let uri = if path_str.contains("://") {
-            path_str.clone()
-        } else {
-            if let Ok(abs_path) = std::fs::canonicalize(path_str) {
-                format!("file://{}", abs_path.to_string_lossy())
-            } else {
-                path_str.clone()
-            }
-        };
+        let uri = crate::ui::get_image_uri(path_str);
         crate::ui::widgets::paint_avatar_crop(ui, avatar_rect, &uri, 4.0);
     } else {
         ui.painter()
