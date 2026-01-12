@@ -65,58 +65,144 @@ pub fn render_deep_search(app: &mut CrapApp, ui: &mut egui::Ui) {
         ui.label("Search in:");
 
         if ui.button("All").clicked() {
-            app.deep_search_field_filters = crate::ui::SearchFieldFilters::all_enabled();
+            app.deep_search_char_field_filters =
+                crate::ui::CharacterSearchFieldFilters::all_enabled();
+            app.deep_search_lore_field_filters =
+                crate::ui::LorebookSearchFieldFilters::all_enabled();
             if !app.deep_search_query.trim().is_empty() {
                 app.perform_deep_search();
             }
         }
 
         if ui.button("None").clicked() {
-            app.deep_search_field_filters = crate::ui::SearchFieldFilters::all_disabled();
+            app.deep_search_char_field_filters =
+                crate::ui::CharacterSearchFieldFilters::all_disabled();
+            app.deep_search_lore_field_filters =
+                crate::ui::LorebookSearchFieldFilters::all_disabled();
             if !app.deep_search_query.trim().is_empty() {
                 app.perform_deep_search();
             }
         }
     });
 
+    ui.add_space(4.0);
+    ui.horizontal(|ui| {
+        ui.label(egui::RichText::new("Character Fields:").strong());
+        ui.add_space(8.0);
+        if ui.button("All").clicked() {
+            app.deep_search_char_field_filters =
+                crate::ui::CharacterSearchFieldFilters::all_enabled();
+            if !app.deep_search_query.trim().is_empty() {
+                app.perform_deep_search();
+            }
+        }
+        if ui.button("None").clicked() {
+            app.deep_search_char_field_filters =
+                crate::ui::CharacterSearchFieldFilters::all_disabled();
+            if !app.deep_search_query.trim().is_empty() {
+                app.perform_deep_search();
+            }
+        }
+    });
     ui.horizontal_wrapped(|ui| {
         let mut changed = false;
 
         changed |= ui
-            .checkbox(&mut app.deep_search_field_filters.name, "Name")
+            .checkbox(&mut app.deep_search_char_field_filters.name, "Name")
             .changed();
         changed |= ui
-            .checkbox(&mut app.deep_search_field_filters.char_title, "Title")
+            .checkbox(&mut app.deep_search_char_field_filters.char_title, "Title")
             .changed();
         changed |= ui
             .checkbox(
-                &mut app.deep_search_field_filters.personality,
+                &mut app.deep_search_char_field_filters.personality,
                 "Personality",
             )
             .changed();
         changed |= ui
-            .checkbox(&mut app.deep_search_field_filters.scenario, "Scenario")
+            .checkbox(&mut app.deep_search_char_field_filters.scenario, "Scenario")
             .changed();
         changed |= ui
             .checkbox(
-                &mut app.deep_search_field_filters.first_message,
+                &mut app.deep_search_char_field_filters.first_message,
                 "First Message",
             )
             .changed();
         changed |= ui
             .checkbox(
-                &mut app.deep_search_field_filters.example_dialogue,
+                &mut app.deep_search_char_field_filters.example_dialogue,
                 "Example Dialogue",
             )
             .changed();
         changed |= ui
-            .checkbox(&mut app.deep_search_field_filters.author_notes, "Notes")
+            .checkbox(
+                &mut app.deep_search_char_field_filters.author_notes,
+                "Notes",
+            )
             .changed();
         changed |= ui
-            .checkbox(&mut app.deep_search_field_filters.urls, "URLs")
+            .checkbox(&mut app.deep_search_char_field_filters.urls, "URLs")
             .changed();
         changed |= ui
-            .checkbox(&mut app.deep_search_field_filters.tags, "Tags")
+            .checkbox(&mut app.deep_search_char_field_filters.tags, "Tags")
+            .changed();
+
+        if changed && !app.deep_search_query.trim().is_empty() {
+            app.perform_deep_search();
+        }
+    });
+
+    ui.add_space(4.0);
+    ui.horizontal(|ui| {
+        ui.label(egui::RichText::new("Lorebook Fields:").strong());
+        ui.add_space(8.0);
+        if ui.button("All").clicked() {
+            app.deep_search_lore_field_filters =
+                crate::ui::LorebookSearchFieldFilters::all_enabled();
+            if !app.deep_search_query.trim().is_empty() {
+                app.perform_deep_search();
+            }
+        }
+        if ui.button("None").clicked() {
+            app.deep_search_lore_field_filters =
+                crate::ui::LorebookSearchFieldFilters::all_disabled();
+            if !app.deep_search_query.trim().is_empty() {
+                app.perform_deep_search();
+            }
+        }
+    });
+    ui.horizontal_wrapped(|ui| {
+        let mut changed = false;
+
+        changed |= ui
+            .checkbox(&mut app.deep_search_lore_field_filters.title, "Title")
+            .changed();
+        changed |= ui
+            .checkbox(
+                &mut app.deep_search_lore_field_filters.description,
+                "Description",
+            )
+            .changed();
+        changed |= ui
+            .checkbox(&mut app.deep_search_lore_field_filters.tags, "Tags")
+            .changed();
+        changed |= ui
+            .checkbox(
+                &mut app.deep_search_lore_field_filters.entry_name,
+                "Entry Name",
+            )
+            .changed();
+        changed |= ui
+            .checkbox(
+                &mut app.deep_search_lore_field_filters.entry_keywords,
+                "Entry Keywords",
+            )
+            .changed();
+        changed |= ui
+            .checkbox(
+                &mut app.deep_search_lore_field_filters.entry_content,
+                "Entry Content",
+            )
             .changed();
 
         if changed && !app.deep_search_query.trim().is_empty() {

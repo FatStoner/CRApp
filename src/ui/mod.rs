@@ -72,7 +72,7 @@ pub enum AppAction {
 }
 
 #[derive(Clone, Debug)]
-pub struct SearchFieldFilters {
+pub struct CharacterSearchFieldFilters {
     pub name: bool,
     pub char_title: bool,
     pub personality: bool,
@@ -84,7 +84,7 @@ pub struct SearchFieldFilters {
     pub tags: bool,
 }
 
-impl Default for SearchFieldFilters {
+impl Default for CharacterSearchFieldFilters {
     fn default() -> Self {
         Self {
             name: true,
@@ -100,7 +100,7 @@ impl Default for SearchFieldFilters {
     }
 }
 
-impl SearchFieldFilters {
+impl CharacterSearchFieldFilters {
     pub fn all_enabled() -> Self {
         Self::default()
     }
@@ -116,6 +116,46 @@ impl SearchFieldFilters {
             author_notes: false,
             urls: false,
             tags: false,
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct LorebookSearchFieldFilters {
+    pub title: bool,
+    pub description: bool,
+    pub tags: bool,
+    pub entry_name: bool,
+    pub entry_keywords: bool,
+    pub entry_content: bool,
+}
+
+impl Default for LorebookSearchFieldFilters {
+    fn default() -> Self {
+        Self {
+            title: true,
+            description: true,
+            tags: true,
+            entry_name: true,
+            entry_keywords: true,
+            entry_content: true,
+        }
+    }
+}
+
+impl LorebookSearchFieldFilters {
+    pub fn all_enabled() -> Self {
+        Self::default()
+    }
+
+    pub fn all_disabled() -> Self {
+        Self {
+            title: false,
+            description: false,
+            tags: false,
+            entry_name: false,
+            entry_keywords: false,
+            entry_content: false,
         }
     }
 }
@@ -230,10 +270,11 @@ pub struct CrapApp {
     pub loading_error: Option<String>,
 
     // Search
-    pub search_query: String,                          // Side panel filter
-    pub deep_search_query: String,                     // Global
-    pub deep_search_filter_collection: Option<i64>,    // None = All Folders
-    pub deep_search_field_filters: SearchFieldFilters, // Field selection
+    pub search_query: String,                       // Side panel filter
+    pub deep_search_query: String,                  // Global
+    pub deep_search_filter_collection: Option<i64>, // None = All Folders
+    pub deep_search_char_field_filters: CharacterSearchFieldFilters, // Character field selection
+    pub deep_search_lore_field_filters: LorebookSearchFieldFilters, // Lorebook field selection
     pub deep_search_results: Vec<DeepSearchResult>,
     pub is_deep_searching: bool,
     pub editor_search_query: String, // In-editor search
@@ -289,7 +330,8 @@ impl CrapApp {
             search_query: String::new(),
             deep_search_query: String::new(),
             deep_search_filter_collection: None,
-            deep_search_field_filters: SearchFieldFilters::default(),
+            deep_search_char_field_filters: CharacterSearchFieldFilters::default(),
+            deep_search_lore_field_filters: LorebookSearchFieldFilters::default(),
             deep_search_results: Vec::new(),
             is_deep_searching: false,
             editor_search_query: String::new(),
@@ -1281,10 +1323,11 @@ impl CrapApp {
 
         let query = self.deep_search_query.clone();
         let filter_collection = self.deep_search_filter_collection;
-        let field_filters = self.deep_search_field_filters.clone();
+        let char_filters = self.deep_search_char_field_filters.clone();
         let all_collections = self.collections.clone();
         let tx = self.tx.clone();
         let db = self.db.clone();
+        let lore_filters = self.deep_search_lore_field_filters.clone();
 
         let ctx = self.ctx.clone();
         tokio::spawn(async move {
@@ -1302,7 +1345,7 @@ impl CrapApp {
 
             // 2. Search Tags
             let mut tag_matches: Vec<(i64, String, bool)> = Vec::new();
-            if field_filters.tags {
+            if char_filters.tags {
                 if let Ok(tags) = db.search_tags_matching(&query).await {
                     tag_matches = tags;
                 }
@@ -1325,7 +1368,7 @@ impl CrapApp {
             }
 
             // 3.5. Fetch URLs for result candidates
-            if field_filters.urls && !char_map.is_empty() {
+            if char_filters.urls && !char_map.is_empty() {
                 if let Ok(urls) = db.get_all_character_urls_flat().await {
                     for u in urls {
                         if let Some(c) = char_map.get_mut(&u.character_id) {
@@ -1336,49 +1379,50 @@ impl CrapApp {
             }
 
             // 4. Build Character Results
+
             for (_, c) in char_map {
                 let mut matches = Vec::new();
 
                 // Use widget helper
                 use crate::ui::widgets::extract_snippets;
 
-                if field_filters.name {
+                if char_filters.name {
                     for s in extract_snippets(&c.name, &query) {
                         matches.push(("Name".to_string(), s));
                     }
                 }
-                if field_filters.char_title {
+                if char_filters.char_title {
                     for s in extract_snippets(&c.char_title, &query) {
                         matches.push(("Title".to_string(), s));
                     }
                 }
-                if field_filters.personality {
+                if char_filters.personality {
                     for s in extract_snippets(&c.personality, &query) {
                         matches.push(("Personality".to_string(), s));
                     }
                 }
-                if field_filters.scenario {
+                if char_filters.scenario {
                     for s in extract_snippets(&c.scenario, &query) {
                         matches.push(("Scenario".to_string(), s));
                     }
                 }
-                if field_filters.example_dialogue {
+                if char_filters.example_dialogue {
                     for s in extract_snippets(&c.example_dialogue, &query) {
                         matches.push(("Example Dialogue".to_string(), s));
                     }
                 }
-                if field_filters.first_message {
+                if char_filters.first_message {
                     for s in extract_snippets(&c.first_message, &query) {
                         matches.push(("First Message".to_string(), s));
                     }
                 }
-                if field_filters.author_notes {
+                if char_filters.author_notes {
                     for s in extract_snippets(&c.author_notes, &query) {
                         matches.push(("Notes".to_string(), s));
                     }
                 }
 
-                if field_filters.urls {
+                if char_filters.urls {
                     for url in &c.urls {
                         for s in extract_snippets(&url.url, &query) {
                             matches.push(("URL".to_string(), s));
@@ -1391,7 +1435,7 @@ impl CrapApp {
                     }
                 }
 
-                if field_filters.tags {
+                if char_filters.tags {
                     for (tid, tname, is_ext) in &tag_matches {
                         if *tid == c.id {
                             let label = if *is_ext { "Ext. Tag" } else { "App Tag" };
@@ -1463,34 +1507,46 @@ impl CrapApp {
                 let mut matches = Vec::new();
 
                 // 5.5.1 Lorebook Text Matches
-                for s in extract_snippets(&lb.title, &query) {
-                    matches.push(("Title".to_string(), s));
+                if lore_filters.title {
+                    for s in extract_snippets(&lb.title, &query) {
+                        matches.push(("Title".to_string(), s));
+                    }
                 }
-                for s in extract_snippets(&lb.description, &query) {
-                    matches.push(("Description".to_string(), s));
-                }
-                for s in extract_snippets(&lb.content, &query) {
-                    matches.push(("Content".to_string(), s));
+                if lore_filters.description {
+                    for s in extract_snippets(&lb.description, &query) {
+                        matches.push(("Description".to_string(), s));
+                    }
+                    for s in extract_snippets(&lb.content, &query) {
+                        matches.push(("Content".to_string(), s));
+                    }
                 }
 
                 // 5.5.2 Tag Matches
-                for (lid, tname) in &lb_tag_matches {
-                    if *lid == lb.id {
-                        matches.push(("Tag".to_string(), tname.clone()));
+                if lore_filters.tags {
+                    for (lid, tname) in &lb_tag_matches {
+                        if *lid == lb.id {
+                            matches.push(("Tag".to_string(), tname.clone()));
+                        }
                     }
                 }
 
                 // 5.5.3 Entry Matches
                 for entry in &entry_matches {
                     if entry.lorebook_id == lb.id {
-                        for s in extract_snippets(&entry.name, &query) {
-                            matches.push((format!("Entry: {}", entry.name), s));
+                        if lore_filters.entry_name {
+                            for s in extract_snippets(&entry.name, &query) {
+                                matches.push((format!("Entry: {}", entry.name), s));
+                            }
                         }
-                        for s in extract_snippets(&entry.keywords, &query) {
-                            matches.push((format!("Entry Keywords: {}", entry.name), s));
+                        if lore_filters.entry_keywords {
+                            for s in extract_snippets(&entry.keywords, &query) {
+                                matches.push((format!("Entry Keywords: {}", entry.name), s));
+                            }
                         }
-                        for s in extract_snippets(&entry.content, &query) {
-                            matches.push((format!("Entry Content: {}", entry.name), s));
+                        if lore_filters.entry_content {
+                            for s in extract_snippets(&entry.content, &query) {
+                                matches.push((format!("Entry Content: {}", entry.name), s));
+                            }
                         }
                     }
                 }
