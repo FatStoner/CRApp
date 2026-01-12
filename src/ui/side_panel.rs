@@ -226,7 +226,7 @@ pub fn render_side_panel(app: &mut CrapApp, ctx: &egui::Context) {
                                 let is_selected =
                                     app.selected_lorebook.as_ref().map(|l| l.id) == Some(book.id);
                                 let (rect, response) = ui.allocate_exact_size(
-                                    egui::vec2(ui.available_width(), 34.0),
+                                    egui::vec2(ui.available_width(), 32.0),
                                     egui::Sense::click(),
                                 );
 
@@ -241,7 +241,9 @@ pub fn render_side_panel(app: &mut CrapApp, ctx: &egui::Context) {
                                     };
 
                                     if bg_color != egui::Color32::TRANSPARENT {
-                                        ui.painter().rect_filled(rect, 4.0, bg_color);
+                                        // Shrink rect vertically to create a gap between highlights
+                                        let highlight_rect = rect.shrink2(egui::vec2(0.0, 2.0));
+                                        ui.painter().rect_filled(highlight_rect, 4.0, bg_color);
                                     }
 
                                     ui.allocate_new_ui(
@@ -294,8 +296,11 @@ pub fn render_side_panel(app: &mut CrapApp, ctx: &egui::Context) {
                                                         .strong()
                                                         .color(egui::Color32::LIGHT_BLUE);
                                                 }
+                                                // Use Label directly to ensure non-selectability and hover-only sense
                                                 ui.add(
-                                                    egui::Label::new(label_text).selectable(false),
+                                                    egui::Label::new(label_text)
+                                                        .selectable(false)
+                                                        .sense(egui::Sense::hover()),
                                                 );
                                             });
                                         },
