@@ -1277,33 +1277,6 @@ impl CrapApp {
         });
     }
 
-    pub fn delete_lorebook_entry(&self, entry_id: i64, lorebook_id: i64) {
-        let tx = self.tx.clone();
-        let db = self.db.clone();
-        let ctx = self.ctx.clone();
-        tokio::spawn(async move {
-            match db.delete_lorebook_entry(entry_id).await {
-                Ok(_) => {
-                    let _ = tx.send(UiEvent::LorebookEntryDeleted(Ok(entry_id))).await;
-                    match db.get_entries_for_lorebook(lorebook_id).await {
-                        Ok(entries) => {
-                            let _ = tx
-                                .send(UiEvent::LorebookEntriesLoaded(Ok((lorebook_id, entries))))
-                                .await;
-                        }
-                        Err(_) => {}
-                    }
-                }
-                Err(e) => {
-                    let _ = tx
-                        .send(UiEvent::LorebookEntryDeleted(Err(e.to_string())))
-                        .await;
-                }
-            }
-            ctx.request_repaint();
-        });
-    }
-
     pub fn perform_deep_search(&mut self) {
         // ... (This logically could be here or in global_search module if it was purely logic,
         // but it modifies App state heavily.

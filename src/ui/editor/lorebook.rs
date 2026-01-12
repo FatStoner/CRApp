@@ -1,0 +1,429 @@
+use eframe::egui;
+use crate::ui::CrapApp;
+
+pub fn render_lorebook_editor(app: &mut CrapApp, ui: &mut egui::Ui) {
+                if let Some(mut book) = app.selected_lorebook.take() {
+                    let mut save_lore_req = None;
+                    let mut tag_add_request = None;
+                    let mut tag_remove_request = None;
+                    let mut entry_save_req = None;
+
+                    let mut entry_add_req = false;
+                    
+                    let mut status_update: Option<(String, egui::Color32)> = None;
+                    
+                    ui.heading("Edit Lorebook");
+                    ui.add_space(4.0);
+
+                    // --- In-editor search ---
+                    ui.horizontal(|ui| {
+                        ui.label("🔍 Search:");
+                        ui.add(
+                            egui::TextEdit::singleline(&mut app.editor_search_query)
+                                .hint_text("Type 3+ chars to highlight/jump...")
+                                .desired_width(200.0),
+                        );
+
+                        if !app.editor_search_query.is_empty() {
+                            if ui.small_button("✖").clicked() {
+                                app.editor_search_query.clear();
+                            }
+
+                            ui.label(
+                                egui::RichText::new(format!(
+                                    "Highlighting: '{}'",
+                                    app.editor_search_query
+                                ))
+                                .size(11.0)
+                                .color(egui::Color32::GRAY),
+                            );
+                        }
+                    });
+                    ui.separator();
+
+                    // --- Auto-selection logic ---
+                    if app.editor_search_query.len() >= 3 {
+                        let query_lower = app.editor_search_query.to_lowercase();
+
+                        // 1. Check if metadata already matches (stay where we are)
+                        let metadata_match = book.title.to_lowercase().contains(&query_lower)
+                            || book.content.to_lowercase().contains(&query_lower);
+
+                        if !metadata_match {
+                            // 2. Check if currently selected entry matches
+                            let current_match = if let Some(e) = &app.selected_entry {
+                                e.name.to_lowercase().contains(&query_lower)
+                                    || e.keywords.to_lowercase().contains(&query_lower)
+                                    || e.content.to_lowercase().contains(&query_lower)
+                            } else {
+                                false
+                            };
+
+                            if !current_match {
+                                // 3. Find first matching entry
+                                if let Some(matching_entry) = book.entries.iter().find(|e| {
+                                    e.name.to_lowercase().contains(&query_lower)
+                                        || e.keywords.to_lowercase().contains(&query_lower)
+                                        || e.content.to_lowercase().contains(&query_lower)
+                                }) {
+                                    app.selected_entry = Some(matching_entry.clone());
+                                    // Switch to Entries tab if not already there
+                                    app.active_lorebook_tab = crate::ui::LorebookTab::Entries;
+                                }
+                            }
+                        }
+                    }
+                    
+                    // --- Top Section: Metadata ---
+                    egui::ScrollArea::vertical()
+                        .max_height(ui.available_height() * 0.45)
+                        .id_salt("lorebook_metadata_scroll")
+                        .show(ui, |ui| {
+                            ui.columns(2, |columns| {
+                                // Left Column: Basic Data
+                                columns[0].vertical(|ui| {
+                                    ui.label("Title");
+                                    if app.editor_search_query.len() >= 3 {
+                                        let mut layouter = crate::ui::text_highlight::create_highlight_layouter(app.editor_search_query.clone());
+                                        ui.add(egui::TextEdit::singleline(&mut book.title).layouter(&mut layouter));
+                                    } else {
+                                        ui.text_edit_singleline(&mut book.title);
+                                    }
+                                    ui.add_space(8.0);
+                                    
+                                    ui.label("Description");
+                                    if app.editor_search_query.len() >= 3 {
+                                        let mut layouter = crate::ui::text_highlight::create_highlight_layouter(app.editor_search_query.clone());
+                                        ui.add(egui::TextEdit::multiline(&mut book.content).desired_width(f32::INFINITY).layouter(&mut layouter));
+                                    } else {
+                                        ui.text_edit_multiline(&mut book.content);
+                                    }
+                                    ui.add_space(8.0);
+
+                                    // Tags Section
+                                    ui.label("Tags:");
+                                    ui.horizontal_wrapped(|ui| {
+                                        for tag in &book.tags {
+                                            ui.group(|ui| {
+                                                ui.horizontal(|ui| {
+                                                    ui.label(egui::RichText::new(&tag.name).color(egui::Color32::WHITE).size(12.0));
+                                                    if ui.small_button("x").clicked() {
+                                                        tag_remove_request = Some((book.id, tag.id));
+                                                    }
+                                                });
+                                            });
+                                        }
+                                    });
+                                    ui.horizontal(|ui| {
+                                        let response = ui.text_edit_singleline(&mut app.app_tag_input);
+                                        if (ui.button("Add").clicked() || (response.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)))) && !app.app_tag_input.is_empty() {
+                                            tag_add_request = Some((book.id, app.app_tag_input.clone()));
+                                            app.app_tag_input.clear();
+                                            response.request_focus();
+                                        }
+                                    });
+                                    
+                                    ui.add_space(16.0);
+                                    if ui.button("Save Lorebook Metadata").clicked() {
+                                         save_lore_req = Some(book.clone());
+                                    }
+                                });
+
+                                // Right Column: Cover Image
+                                columns[1].vertical(|ui| {
+                                    ui.group(|ui| {
+                                        ui.label("Cover Image");
+                                        let mut cover_path_str = book.cover_path.clone().unwrap_or_default();
+                                        if ui.text_edit_singleline(&mut cover_path_str).changed() {
+                                             if cover_path_str.trim().is_empty() {
+                                                 book.cover_path = None;
+                                             } else {
+                                                 book.cover_path = Some(cover_path_str.clone());
+                                             }
+                                        }
+                                        if let Some(path_str) = &book.cover_path {
+                                            ui.add_space(4.0);
+                                             let uri = if path_str.contains("://") { path_str.clone() } else {
+                                                 if let Ok(abs_path) = std::fs::canonicalize(path_str) {
+                                                      format!("file://{}", abs_path.to_string_lossy())
+                                                 } else { path_str.clone() }
+                                             };
+                                             let preview_width = ui.available_width() - 8.0;
+                                             ui.add(egui::Image::new(uri).rounding(egui::Rounding::same(4.0)).fit_to_original_size(0.5).max_width(preview_width));
+                                         }
+                                        ui.add_space(8.0);
+                                        ui.vertical(|ui| {
+                                            if ui.button("Browse Image").clicked() {
+                                                if let Some(path) = rfd::FileDialog::new().add_filter("image", &["png", "jpg", "jpeg"]).pick_file() {
+                                                      let dest_dir = std::path::Path::new("data/covers");
+                                                      let _ = std::fs::create_dir_all(dest_dir);
+                                                      if let Some(name) = path.file_name() {
+                                                          let dest = dest_dir.join(name);
+                                                          let _ = std::fs::copy(&path, &dest);
+                                                          book.cover_path = Some(dest.to_string_lossy().to_string());
+                                                      }
+                                                }
+                                            }
+                                            if ui.button("Paste from Clipboard").clicked() {
+                                                // (Simplified for brevity, assuming existing logic works)
+                                                 match arboard::Clipboard::new() {
+                                                      Ok(mut clipboard) => {
+                                                          if let Ok(img_data) = clipboard.get_image() {
+                                                              let width = img_data.width as u32;
+                                                              let height = img_data.height as u32;
+                                                              let bytes = img_data.bytes.into_owned();
+                                                              if let Some(image_buffer) = image::ImageBuffer::<image::Rgba<u8>, Vec<u8>>::from_raw(width, height, bytes) {
+                                                                  let timestamp = chrono::Utc::now().timestamp_millis();
+                                                                  let filename = format!("pasted_cover_{}.png", timestamp);
+                                                                  let dest_dir = std::path::Path::new("data/covers");
+                                                                  let _ = std::fs::create_dir_all(dest_dir);
+                                                                  let dest_path = dest_dir.join(&filename);
+                                                                  if let Ok(_) = image_buffer.save(&dest_path) {
+                                                                      book.cover_path = Some(dest_path.to_string_lossy().to_string());
+                                                                      status_update = Some(("Cover pasted!".to_string(), egui::Color32::GREEN));
+                                                                  }
+                                                              }
+                                                          }
+                                                      },
+                                                      Err(_) => {}
+                                                 }
+                                            }
+                                        });
+                                    });
+                                });
+                            });
+                        });
+                    
+                    ui.separator();
+
+                    ui.separator();
+                    
+                    // --- Bottom Section: Tabs ---
+                    let linked_char_count = app.characters.iter()
+                        .filter(|c| app.char_lore_map.get(&c.id).map(|l| l.contains(&book.id)).unwrap_or(false))
+                        .count();
+
+                    ui.horizontal(|ui| {
+                        let entries_label = format!("Entries ({})", book.entries.len());
+                        if ui.selectable_label(app.active_lorebook_tab == crate::ui::LorebookTab::Entries, entries_label).clicked() {
+                            app.active_lorebook_tab = crate::ui::LorebookTab::Entries;
+                        }
+                        let chars_label = format!("Characters ({})", linked_char_count);
+                        if ui.selectable_label(app.active_lorebook_tab == crate::ui::LorebookTab::Characters, chars_label).clicked() {
+                            app.active_lorebook_tab = crate::ui::LorebookTab::Characters;
+                        }
+                    });
+                    ui.separator();
+
+                    match app.active_lorebook_tab {
+                        crate::ui::LorebookTab::Entries => {
+                            // --- Master-Detail Entries View ---
+                            ui.allocate_ui(ui.available_size(), |ui| {
+                                 ui.columns(2, |columns| {
+                                     // ENTRY EDITOR (Now on Left)
+                                     columns[0].vertical(|ui| {
+                                         if let Some(entry) = &mut app.selected_entry {
+                                             // Ensure we are editing an entry belonging to this lorebook
+                                             if entry.lorebook_id == book.id {
+                                                  ui.heading("Edit Entry");
+                                                  ui.label("Name");
+                                                  if app.editor_search_query.len() >= 3 {
+                                                      let mut layouter = crate::ui::text_highlight::create_highlight_layouter(app.editor_search_query.clone());
+                                                      ui.add(egui::TextEdit::singleline(&mut entry.name).layouter(&mut layouter));
+                                                  } else {
+                                                      ui.text_edit_singleline(&mut entry.name);
+                                                  }
+                                                  
+                                                  ui.label("Keywords (comma separated)");
+                                                  if app.editor_search_query.len() >= 3 {
+                                                      let mut layouter = crate::ui::text_highlight::create_highlight_layouter(app.editor_search_query.clone());
+                                                      ui.add(egui::TextEdit::singleline(&mut entry.keywords).layouter(&mut layouter));
+                                                  } else {
+                                                      ui.text_edit_singleline(&mut entry.keywords);
+                                                  }
+                                                  
+                                                  ui.label("Content");
+                                                  egui::ScrollArea::vertical().id_salt("entry_content_scroll").show(ui, |ui| {
+                                                      if app.editor_search_query.len() >= 3 {
+                                                          let mut layouter = crate::ui::text_highlight::create_highlight_layouter(app.editor_search_query.clone());
+                                                          ui.add(egui::TextEdit::multiline(&mut entry.content).desired_width(f32::INFINITY).layouter(&mut layouter));
+                                                      } else {
+                                                          ui.add(egui::TextEdit::multiline(&mut entry.content).desired_width(f32::INFINITY));
+                                                      }
+                                                  });
+        
+                                                 ui.add_space(8.0);
+                                                 ui.horizontal(|ui| {
+                                                     ui.with_layout(egui::Layout::left_to_right(egui::Align::Min), |ui| {
+                                                         if ui.button("Save Entry").clicked() {
+                                                             entry_save_req = Some(entry.clone());
+                                                         }
+                                                     });
+                                                     
+                                                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
+                                                         if ui.button(egui::RichText::new("Delete").color(egui::Color32::RED)).clicked() {
+                                                             // Trigger confirmation popup
+                                                             app.popup_state = crate::ui::PopupState::DeleteLorebookEntryConfirmation { 
+                                                                 id: entry.id, 
+                                                                 lorebook_id: book.id,
+                                                                 name: entry.name.clone() 
+                                                             };
+                                                         }
+                                                     });
+                                                 });
+                                             } else {
+                                                 ui.centered_and_justified(|ui| ui.label("Select an entry from this Lorebook."));
+                                             }
+                                         } else {
+                                             ui.centered_and_justified(|ui| ui.label("Select an entry to edit."));
+                                         }
+                                     });
+
+                                     // ENTRY LIST (Now on Right)
+                                     columns[1].vertical(|ui| {
+                                         ui.horizontal(|ui| {
+                                             ui.heading("Entries");
+                                             if ui.small_button("+").clicked() {
+                                                 entry_add_req = true;
+                                             }
+                                         });
+                                         ui.separator();
+                                         egui::ScrollArea::vertical().id_salt("entries_list_scroll").show(ui, |ui| {
+                                             ui.set_width(ui.available_width());
+                                              for entry in &book.entries {
+                                                  let selected = app.selected_entry.as_ref().map(|e| e.id) == Some(entry.id);
+                                                  
+                                                  let is_match = if app.editor_search_query.len() >= 3 {
+                                                      let q = app.editor_search_query.to_lowercase();
+                                                      entry.name.to_lowercase().contains(&q)
+                                                          || entry.keywords.to_lowercase().contains(&q)
+                                                          || entry.content.to_lowercase().contains(&q)
+                                                  } else {
+                                                      false
+                                                  };
+
+                                                  ui.horizontal(|ui| {
+                                                      ui.spacing_mut().item_spacing.x = 2.0;
+                                                      if is_match {
+                                                          ui.label(egui::RichText::new("🔍").size(10.0).color(egui::Color32::from_rgb(255, 215, 0))); // Gold
+                                                      } else {
+                                                          // Add empty space to align with matched items
+                                                          ui.add_space(12.0);
+                                                      }
+                                                      
+                                                      let label_text = if is_match {
+                                                          egui::RichText::new(&entry.name).color(egui::Color32::from_rgb(255, 215, 0))
+                                                      } else {
+                                                          egui::RichText::new(&entry.name)
+                                                      };
+
+                                                      if ui.selectable_label(selected, label_text).clicked() {
+                                                          app.selected_entry = Some(entry.clone());
+                                                      }
+                                                  });
+                                              }
+                                         });
+                                     });
+                                 });
+                            });
+                        },
+                        crate::ui::LorebookTab::Characters => {
+                             // --- Linked Characters Gallery ---
+                             ui.heading(format!("Characters Linked to '{}'", book.title));
+                             ui.add_space(8.0);
+                             
+                             let mut browser_actions = Vec::new();
+                             let all_colls = app.collections.clone(); // Clone for immutable access to collections inside loop
+                             
+                             // Filter characters
+                             let linked_chars: Vec<crate::models::Character> = app.characters.iter()
+                                .filter(|c| {
+                                    if let Some(links) = app.char_lore_map.get(&c.id) {
+                                        links.contains(&book.id)
+                                    } else {
+                                        false
+                                    }
+                                })
+                                .cloned()
+                                .collect();
+
+                             if linked_chars.is_empty() {
+                                 ui.label("No characters linked to this Lorebook.");
+                                 ui.label("Go to a Character -> Lorebooks tab to link them.");
+                             } else {
+                                 egui::ScrollArea::vertical().id_salt("lore_chars_scroll").show(ui, |ui| {
+                                     ui.horizontal_wrapped(|ui| {
+                                         for char in &linked_chars {
+                                             crate::ui::browser::render_character_card(ui, app, char, &all_colls, &mut browser_actions);
+                                         }
+                                     });
+                                 });
+                             }
+                             
+                             // Handle Browser Actions generated by cards
+                             for action in browser_actions {
+                                 match action {
+                                     crate::ui::browser::BrowserAction::MoveCharacter(char_id, target_id) => {
+                                         app.move_character(char_id, target_id);
+                                     }
+                                     crate::ui::browser::BrowserAction::ToggleFavorite(char_id) => {
+                                         app.toggle_favorite(char_id);
+                                     }
+                                     crate::ui::browser::BrowserAction::DeleteCharacter(id) => {
+                                          let name = app.characters.iter().find(|c| c.id == id).map(|c| c.name.clone()).unwrap_or_default();
+                                          app.popup_state = crate::ui::PopupState::DeleteCharacterConfirmation { id, name };
+                                     }
+                                     crate::ui::browser::BrowserAction::RenameCollection(id, name) => {
+                                         app.popup_state = crate::ui::PopupState::Renaming { id, name };
+                                     }
+                                     crate::ui::browser::BrowserAction::DeleteCollection(id) => {
+                                         app.delete_collection(id); // Simple delete call, ignoring complex warning logic for now or reusing if precise
+                                     }
+                                      crate::ui::browser::BrowserAction::CreateCharacter(cid) => {
+                                          app.create_new_character(cid);
+                                      }
+                                      crate::ui::browser::BrowserAction::CreateCollection(cid) => {
+                                          app.save_collection(0, "New Folder".to_string(), cid);
+                                      }
+                                      crate::ui::browser::BrowserAction::UpdateCollectionIcon(id) => {
+                                          app.popup_state = crate::ui::PopupState::CollectionIconConfirmation {
+                                              id,
+                                              path: String::new(),
+                                              preview_texture: None,
+                                          };
+                                      }
+                                 }
+                             }
+                        }
+                    }
+
+
+                    // --- Event Handling ---
+                    if let Some((msg, color)) = status_update {
+                        app.set_status(msg, color);
+                    }
+                    if let Some(l) = save_lore_req {
+                        app.save_lorebook(l);
+                    }
+                    if let Some((lid, name)) = tag_add_request {
+                        app.add_tag_to_lorebook(lid, name);
+                    }
+                    if let Some((lid, tid)) = tag_remove_request {
+                        app.remove_tag_from_lorebook(lid, tid);
+                    }
+                    
+                    if entry_add_req {
+                        app.add_entry_to_lorebook(book.id);
+                    }
+                    if let Some(e) = entry_save_req {
+                        app.save_lorebook_entry(e);
+                    }
+
+                    
+                    // Restore ownership
+                    app.selected_lorebook = Some(book);
+
+                } else {
+                    ui.label("Select a lorebook.");
+                }
+}
