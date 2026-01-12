@@ -184,7 +184,7 @@ pub fn render_lorebook_editor(app: &mut CrapApp, ui: &mut egui::Ui) {
 
                                 // Right Column: Cover Image
                                 columns[1].vertical(|ui| {
-                                    let max_total_h = ui.ctx().screen_rect().height() * 0.5;
+                                    let max_total_h = ui.ctx().screen_rect().height() * 0.333;
                                     ui.set_max_height(max_total_h);
 
                                     ui.label(egui::RichText::new("Cover Image").strong());
@@ -192,7 +192,7 @@ pub fn render_lorebook_editor(app: &mut CrapApp, ui: &mut egui::Ui) {
                                     if let Some(path_str) = &book.cover_path {
                                         let uri = crate::ui::get_image_uri(path_str);
                                         
-                                        // Total height is limited to 50% of screen. 
+                                        // Total height is limited to 1/3 of screen. 
                                         // Subtracting ~80px for labels and buttons.
                                         let image_max_h = (max_total_h - 80.0).max(100.0);
                                         let preview_width = ui.available_width();
