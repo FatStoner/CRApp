@@ -51,3 +51,63 @@ impl CharacterCardV2 {
         }
     }
 }
+
+// TavernAI V2 Spec compliant structure for PNG Metadata ONLY
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct TavernCardV2 {
+    pub spec: String,
+    pub spec_version: String,
+    pub data: CharacterCardData,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct CharacterCardData {
+    pub name: String,
+    pub description: String,
+    pub personality: String,
+    pub scenario: String,
+    pub first_mes: String,
+    pub mes_example: String,
+    pub creator_notes: String,
+    pub system_prompt: String,
+    pub post_history_instructions: String,
+    pub alternate_greetings: Vec<String>,
+    pub character_book: Option<serde_json::Value>,
+    pub tags: Vec<String>,
+    pub creator: String,
+    pub character_version: String,
+    pub extensions: serde_json::Map<String, serde_json::Value>,
+}
+
+impl TavernCardV2 {
+    pub fn new(
+        name: String,
+        description: String,
+        personality: String,
+        scenario: String,
+        first_mes: String,
+        mes_example: String,
+    ) -> Self {
+        Self {
+            spec: "chara_card_v2".to_string(),
+            spec_version: "2.0".to_string(),
+            data: CharacterCardData {
+                name,
+                description,
+                personality,
+                scenario,
+                first_mes,
+                mes_example,
+                creator_notes: "".to_string(),
+                system_prompt: "".to_string(),
+                post_history_instructions: "".to_string(),
+                alternate_greetings: Vec::new(),
+                character_book: None,
+                tags: Vec::new(),
+                creator: "".to_string(),
+                character_version: "".to_string(),
+                extensions: serde_json::Map::new(),
+            },
+        }
+    }
+}

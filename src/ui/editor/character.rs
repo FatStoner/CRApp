@@ -118,7 +118,7 @@ pub fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                                 if ui.button("Character Card (.png)").clicked() {
                                     if let Some(avatar_path) = &character.avatar_path {
                                         // Logic to export PNG
-                                        let v2 = CharacterCardV2::new(
+                                        let mut v2 = crate::card_v2::TavernCardV2::new(
                                             character.char_name.clone(),
                                             character.personality.clone(),
                                             character.char_title.clone(),
@@ -126,6 +126,10 @@ pub fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                                             character.first_message.clone(),
                                             character.example_dialogue.clone(),
                                         );
+                                        // Include extra fields if available in model
+                                        v2.data.creator_notes = character.author_notes.clone();
+                                        // Populate tags
+                                        v2.data.tags = character.app_tags.iter().chain(character.external_tags.iter()).map(|t| t.name.clone()).collect();
                                         
                                         if let Ok(json) = serde_json::to_string(&v2) {
                                             let b64 = BASE64.encode(json);
@@ -167,14 +171,14 @@ pub fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                                                                     _ => png::ColorType::Rgba, // Fallback
                                                                 });
                                                                 encoder.set_depth(png::BitDepth::Eight);
+                                                                // Add tEXt chunk
+                                                                // TavernAI spec requires tEXt chunk with keyword "chara" and value as base64 encoded JSON
+                                                                // add_text_chunk adds a tEXt chunk.
+                                                                encoder.add_text_chunk("chara".to_string(), b64.to_string());
                                                                                             
                                                                 let mut writer = encoder.write_header().expect("Failed to write PNG header");
-                                                                // Add tEXt chunk
-                                                                let chunk = png::text_metadata::ITXtChunk::new("chara".to_string(), b64.to_string());
-                                                                if writer.write_text_chunk(&chunk).is_ok() {
-                                                                    let _ = writer.write_image_data(&pixels);
-                                                                    let _ = writer.finish();
-                                                                }
+                                                                let _ = writer.write_image_data(&pixels);
+                                                                let _ = writer.finish();
                                                             }
                                                         }
                                                     }
