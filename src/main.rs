@@ -1,4 +1,5 @@
 mod card_v2;
+mod cleaner;
 mod db;
 mod image_utils;
 mod models;
@@ -26,6 +27,12 @@ async fn run_app() -> Result<(), Box<dyn std::error::Error>> {
     let db = Database::init()
         .await
         .map_err(|e| e as Box<dyn std::error::Error>)?;
+
+    // Clean up unused media
+    // We swallow errors here (logging them) to not crash the app on cleanup failure
+    if let Err(e) = cleaner::cleanup_unused_media(&db.pool).await {
+        eprintln!("Warning: Failed to cleanup unused media: {}", e);
+    }
 
     let options = eframe::NativeOptions {
         viewport: eframe::egui::ViewportBuilder::default().with_inner_size([1024.0, 768.0]),

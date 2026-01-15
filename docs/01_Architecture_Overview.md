@@ -32,6 +32,7 @@ src/
 ├── main.rs         # Entry point
 ├── lib.rs          # (Implicit/Optional) Shared logic
 ├── db.rs           # Database connection and queries
+├── cleaner.rs      # Unused media cleanup logic
 ├── models.rs       # Data structures
 ├── card_v2.rs      # Export/Import format compatibility
 └── ui/             # User Interface Logic

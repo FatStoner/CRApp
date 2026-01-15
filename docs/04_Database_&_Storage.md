@@ -106,7 +106,21 @@ Individual lore pieces within a book.
 Non-text data is stored on the local filesystem, with paths stored in the database.
 -   **Avatars**: Stored in `data/avatars/`.
 -   **Collection Images**: Stored in `data/collection_images/`.
+-   **Lorebook Covers**: Stored in `data/covers/`.
+-   **Gallery**: Stored in `data/gallery/` (Reserved for character galleries, managed separately).
 -   **Exports**: Saved to `exports/` (default dialog path).
+
+## Automated Media Cleanup
+
+To keep the storage clean, the application includes a **Media Cleanup** system (`src/cleaner.rs`).
+
+-   **Trigger**: Runs automatically on every application startup.
+-   **Logic**: 
+    1. Scans `data/avatars/`, `data/collection_images/`, and `data/covers/`.
+    2. Compares files on disk with paths stored in the SQLite database.
+    3. Deletes any file found on disk that is no longer referenced in the database (orphaned files).
+-   **Exclusions**: Specifically ignores `data/gallery/` to prevent data loss in managed galleries.
+-   **Safety**: If an error occurs during cleanup, it is logged, but the application startup continues.
 
 ## Async Operations
 All database operations are asynchronous (`async`/`await`). The UI thread spawns `tokio` tasks to perform DB writes or reads, preventing UI freezes. Results are communicated back via channels or by updating shared state wrapped in `Arc<Mutex>` (though `CrapApp` mostly reloads data after events).
