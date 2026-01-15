@@ -21,7 +21,7 @@ pub fn parse_clipboard(text: &str) -> ParsedCharacterData {
     let lines: Vec<&str> = text
         .lines()
         .map(|l| l.trim())
-        .filter(|l| !l.is_empty())
+        // .filter(|l| !l.is_empty()) // Don't filter empty lines, we want to preserve them for multiline content
         .collect();
 
     if lines.is_empty() {
@@ -149,6 +149,9 @@ fn parse_edit_view(lines: &[&str]) -> ParsedCharacterData {
                 data.example_dialogue.push('\n');
             }
             "tags" => {
+                if lower.is_empty() {
+                    continue;
+                }
                 // Stop if we hit the helper text
                 if lower.contains("choose tags to help people discover your bot")
                     || lower == "advanced"
@@ -177,7 +180,7 @@ fn parse_edit_view(lines: &[&str]) -> ParsedCharacterData {
 
 fn find_next_value_index(lines: &[&str], current_index: usize) -> Option<usize> {
     for i in (current_index + 1)..lines.len() {
-        if lines[i] != "*" {
+        if !lines[i].trim().is_empty() && lines[i] != "*" {
             return Some(i);
         }
     }
@@ -202,12 +205,13 @@ fn parse_profile_view(lines: &[&str]) -> ParsedCharacterData {
         if let Some(offset) = lines
             .iter()
             .skip(idx)
-            .take(3)
+            .take(10) // Was 3, increased to 10 to account for potential empty lines
             .position(|&l| l == "avatar image")
         {
             let name_idx = idx + offset + 1;
-            if name_idx < lines.len() {
-                data.name = lines[name_idx].to_string();
+            // Find first non-empty line starting from name_idx
+            if let Some(name_val) = lines.iter().skip(name_idx).find(|l| !l.trim().is_empty()) {
+                data.name = name_val.to_string();
             }
         }
     }
@@ -404,5 +408,61 @@ mod tests {
         data.cleanup();
         assert_eq!(data.scenario, "");
         assert_eq!(data.example_dialogue, "");
+    }
+
+    #[test]
+    fn test_multiline_preservation() {
+        let raw_text = "Edit Chatbot\nName\nTestBot\nPersonality\nPara 1.\n\nPara 2.\ntokens: 100";
+        let data = parse_clipboard(raw_text);
+        assert_eq!(data.name, "TestBot");
+        // We expect Para 1.\n\nPara 2.\n to be captured.
+        // Note: The logic appends \n after each line.
+        // So Para 1. -> Para 1.\n
+        // Empty line -> \n
+        // Para 2. -> Para 2.\n
+        // Result: Para 1.\n\nPara 2.\n
+        assert!(data.personality.contains("Para 1.\n\nPara 2."));
+    }
+
+    #[test]
+    fn test_edit_view_with_empty_lines() {
+        let raw_text = "Edit Chatbot\nName\n\nTestBot\nTitle\n\nThe Title\nPersonality\nDesc";
+        let data = parse_clipboard(raw_text);
+        assert_eq!(data.name, "TestBot");
+        assert_eq!(data.title, "The Title");
+    }
+
+    #[test]
+    fn test_profile_view_loose_structure_with_empty_name_gap() {
+        let raw_text = "
+        Back
+        
+        avatar image
+        
+        MyName
+        Suggest Tag
+        ";
+        let data = parse_clipboard(raw_text);
+        assert_eq!(data.name, "MyName");
+    }
+
+    #[test]
+    fn test_edit_view_tags_with_empty_lines() {
+        // "1/12" is usually the stop condition.
+        // If we have empty lines between "Tags" and the tags, or between tags, it shouldn't reset.
+        let raw_text = "
+        Edit Chatbot
+        Name
+        Bot
+        Tags
+        
+        Tag1
+        
+        Tag2
+        1/12
+        ";
+        let data = parse_clipboard(raw_text);
+        assert_eq!(data.name, "Bot");
+        assert_eq!(data.external_tags, vec!["Tag1", "Tag2"]);
     }
 }
