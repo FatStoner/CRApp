@@ -221,9 +221,11 @@ fn parse_profile_view(lines: &[&str]) -> ParsedCharacterData {
         if let Some(start) = idx_share {
             if end > start {
                 let range = &lines[(start + 1)..end];
-                let candidates: Vec<&str> = range
+                let candidates_with_indices: Vec<(usize, &str)> = range
                     .iter()
-                    .filter(|&&l| {
+                    .enumerate()
+                    .map(|(i, l)| (start + 1 + i, *l))
+                    .filter(|(_, l)| {
                         let s = l.to_lowercase();
 
                         let is_numeric_ish = |c: char| c.is_numeric() || c == ',' || c == '.';
@@ -242,16 +244,34 @@ fn parse_profile_view(lines: &[&str]) -> ParsedCharacterData {
                     !s.contains('%') &&
                     !s.contains("tokens") &&
                     !s.contains("chat now") &&
+                    !s.is_empty() && // skip empty lines for candidate check
                     s != "share" &&
                     s != "favorite"
                     })
-                    .cloned()
                     .collect();
 
-                if !candidates.is_empty() {
-                    data.title = candidates[0].to_string();
-                    for tag in candidates.iter().skip(1) {
-                        data.external_tags.push(tag.to_string());
+                if !candidates_with_indices.is_empty() {
+                    // Check for Lorebook pattern:
+                    // If we have at least 2 candidates, checks the distance between 0 and 1.
+                    // If distance is 2 (1 empty line gap), assume 0 is Lorebook and 1 is Title.
+                    let (first_idx, first_val) = candidates_with_indices[0];
+                    let start_index = if candidates_with_indices.len() >= 2 {
+                        let (second_idx, _) = candidates_with_indices[1];
+                        if second_idx - first_idx == 2 {
+                            // Lorebook Detected! Skip the first one.
+                            1
+                        } else {
+                            0
+                        }
+                    } else {
+                        0
+                    };
+
+                    if start_index < candidates_with_indices.len() {
+                        data.title = candidates_with_indices[start_index].1.to_string();
+                        for (_, tag) in candidates_with_indices.iter().skip(start_index + 1) {
+                            data.external_tags.push(tag.to_string());
+                        }
                     }
                 }
             }
@@ -444,6 +464,67 @@ mod tests {
         ";
         let data = parse_clipboard(raw_text);
         assert_eq!(data.name, "MyName");
+    }
+
+    #[test]
+    fn test_profile_with_lorebook_spacing() {
+        // Lorebook Name -> (1 empty line) -> Title -> (2 empty lines) -> Tag
+        // Indices in the range:
+        // Lorebook: i
+        // (empty): i+1
+        // Title: i+2 (delta = 2) -> SKIP Lorebook
+        let raw_text = "
+        Back
+        
+        avatar image
+        BotName
+        
+        Share
+        
+        100 tokens
+        
+        MyLorebook
+        
+        MyTitle
+        
+        
+        MyTag
+        Suggest Tag
+        ";
+        let data = parse_clipboard(raw_text);
+        assert_eq!(data.name, "BotName");
+        assert_eq!(data.title, "MyTitle");
+        assert_eq!(data.external_tags, vec!["MyTag"]);
+    }
+
+    #[test]
+    fn test_profile_without_lorebook_spacing() {
+        // Title -> (2 empty lines) -> Tag
+        // Indices:
+        // Title: i
+        // (empty): i+1
+        // (empty): i+2
+        // Tag: i+3 (delta = 3) -> No Lorebook skip
+        let raw_text = "
+        Back
+        
+        avatar image
+        BotName
+        
+        Share
+        
+        100 tokens
+        
+        MyTitle
+        
+        
+        MyTag
+        Suggest Tag
+        ";
+        let data = parse_clipboard(raw_text);
+        assert_eq!(data.name, "BotName");
+        assert_eq!(data.title, "MyTitle");
+        assert_eq!(data.external_tags, vec!["MyTag"]);
     }
 
     #[test]
