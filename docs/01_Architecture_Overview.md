@@ -44,7 +44,7 @@ src/
     │   ├── mod.rs        # Editor orchestration
     │   ├── character.rs  # Character Editor
     │   └── lorebook.rs   # Lorebook Editor
-    ├── parsing.rs        # Text parsing logic
+    ├── parsing.rs        # Text and HTML parsing logic (Clipboard & Lorebook Import)
     ├── global_search.rs  # Global Deep Search
     ├── popups.rs         # Unified modal handling
     ├── text_highlight.rs # Search highlight logic

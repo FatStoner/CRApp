@@ -1,9 +1,9 @@
-use eframe::egui;
-use crate::models::Tag;
-use crate::ui::{CrapApp, AppMode, UiEvent};
-use super::parsing::parse_clipboard;
 use super::browser::render_browser_view;
 use super::editor::{render_editor_view, render_lorebook_editor};
+use super::parsing::parse_clipboard;
+use crate::models::Tag;
+use crate::ui::{AppMode, CrapApp, UiEvent};
+use eframe::egui;
 
 // ----------------------------------------------------------------------------
 // Rendering Logic

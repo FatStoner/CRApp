@@ -36,7 +36,9 @@ Handles the detailed editing interfaces.
     -   **Lorebooks**: Selection of linked lorebooks with "Go to Lorebook" navigation button.
     -   **Navigation**: "Back" and "Up" buttons with **Unsaved Changes Protection**.
     -   **Export**: Export to .crapp (Native), .json (SpicyChat), .md, or .png (Card).
+    -   **Legacy Compat**: Supports importing V1 and V2 PNG cards.
 -   **Lorebook Editor**:
+    -   **Import**: "IMPORT" button allowing users to paste HTML source from SpicyChat (both Edit and Profile views) to automatically allow population of Title, Description, and Entries.
     -   **Metadata**: Title, Description (Content), Tags, and Cover management.
     -   **Tabbed Section**:
         -   **Entries Tab**: Master-Detail view for managing individual entries. Feature a swapped layout (Editor on Left, List on Right) and dynamic count badge.
@@ -48,7 +50,10 @@ Handles the detailed editing interfaces.
 ### 4. Parsing (`ui/parsing.rs`)
 Dedicated logic for parsing character data from external text sources (clipboard).
 -   **Function**: `parse_clipboard(text: &str) -> ParsedCharacterData`.
--   **Logic**: Heuristic parsing of unstructured text to extract Name, Persona, Scenario, etc.
+-   **Function**: `parse_spicychat_lorebook(html: &str) -> ParsedLorebookData`.
+-   **Logic**:
+    -   **Character**: Heuristic parsing of unstructured text to extract Name, Persona, Scenario, etc.
+    -   **Lorebook**: Dual-mode HTML parsing (Edit View vs Profile View) with intelligent dispatching to handle source site structure variations.
 
 ### 5. Side Panel (`ui/side_panel.rs`)
 The left-hand navigation bar.

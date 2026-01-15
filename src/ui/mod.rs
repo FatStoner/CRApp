@@ -132,6 +132,8 @@ pub enum UiEvent {
     LoreLinksBulkLoaded(HashMap<i64, Vec<i64>>),
     CollectionIconUpdated(Result<i64, String>),
     TokenCountCalculated(i64, usize, usize), // (CharId, Tokens, Chars)
+    LorebookImported(Lorebook),
+    StatusMessage(String, egui::Color32),
 }
 
 pub struct CrapApp {
@@ -2074,6 +2076,21 @@ impl eframe::App for CrapApp {
                 UiEvent::TokenCountCalculated(id, tokens, chars) => {
                     self.token_cache.insert(id, (tokens, chars));
                     self.token_calc_in_progress.remove(&id);
+                }
+                UiEvent::LorebookImported(lb) => {
+                    self.set_status(
+                        "Lorebook Imported Successfully".to_string(),
+                        egui::Color32::GREEN,
+                    );
+                    self.popup_state = PopupState::None;
+                    self.reload_lorebooks();
+                    self.selected_lorebook = Some(lb);
+                    self.selected_character = None;
+                    self.mode = AppMode::Lorebooks;
+                    self.active_lorebook_tab = LorebookTab::Entries;
+                }
+                UiEvent::StatusMessage(msg, color) => {
+                    self.set_status(msg, color);
                 }
             }
         }

@@ -1,0 +1,118 @@
+    Checking crap v0.1.4 (/home/justjam22/Projects/CRAP)
+warning: unused variable: `pid`
+   --> src/db.rs:282:33
+    |
+282 |         let query = if let Some(pid) = current.parent_id {
+    |                                 ^^^ help: if this is intentional, prefix it with an underscore: `_pid`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: use of deprecated associated function `eframe::egui::ComboBox::from_id_source`: Renamed id_salt
+   --> src/ui/browser.rs:177:29
+    |
+177 |             egui::ComboBox::from_id_source("view_mode_selector")
+    |                             ^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(deprecated)]` on by default
+
+warning: use of deprecated method `eframe::egui::ScrollArea::id_source`: Renamed id_salt
+   --> src/ui/popups.rs:404:26
+    |
+404 |                         .id_source("import_source_scroll")
+    |                          ^^^^^^^^^
+
+warning: use of deprecated method `eframe::egui::ScrollArea::id_source`: Renamed id_salt
+   --> src/ui/popups.rs:426:30
+    |
+426 | ...                   .id_source("import_preview_scroll")
+    |                        ^^^^^^^^^
+
+error[E0609]: no field `selected_lorebook_id` on type `&mut CrapApp`
+    --> src/ui/mod.rs:2087:26
+     |
+2087 |                     self.selected_lorebook_id = Some(id);
+     |                          ^^^^^^^^^^^^^^^^^^^^ unknown field
+     |
+help: a field with a similar name exists
+     |
+2087 -                     self.selected_lorebook_id = Some(id);
+2087 +                     self.selected_lorebook = Some(id);
+     |
+
+error[E0609]: no field `open_tab` on type `&mut CrapApp`
+    --> src/ui/mod.rs:2091:26
+     |
+2091 |                     self.open_tab = Tab::Lorebook;
+     |                          ^^^^^^^^ unknown field
+     |
+     = note: available fields are: `db`, `tx`, `rx`, `ctx`, `characters` ... and 44 others
+
+error[E0433]: failed to resolve: use of undeclared type `Tab`
+    --> src/ui/mod.rs:2091:37
+     |
+2091 |                     self.open_tab = Tab::Lorebook;
+     |                                     ^^^ use of undeclared type `Tab`
+     |
+help: there is an enum variant `crate::ui::egui::Key::Tab` and 1 other; try using the variant's enum
+     |
+2091 -                     self.open_tab = Tab::Lorebook;
+2091 +                     self.open_tab = crate::ui::egui::Key::Lorebook;
+     |
+2091 -                     self.open_tab = Tab::Lorebook;
+2091 +                     self.open_tab = serde_json::ser::CharEscape::Lorebook;
+     |
+help: a struct with a similar name exists
+     |
+2091 -                     self.open_tab = Tab::Lorebook;
+2091 +                     self.open_tab = Tag::Lorebook;
+     |
+
+warning: unused variable: `app`
+   --> src/ui/browser.rs:642:5
+    |
+642 |     app: &mut CrapApp,
+    |     ^^^ help: if this is intentional, prefix it with an underscore: `_app`
+
+warning: value assigned to `insert_index` is never read
+   --> src/ui/widgets.rs:130:25
+    |
+130 |                 let mut insert_index = 0;
+    |                         ^^^^^^^^^^^^
+    |
+    = help: maybe it is overwritten before being read?
+    = note: `#[warn(unused_assignments)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `content_idx`
+   --> src/ui/parsing.rs:132:21
+    |
+132 |         if let Some(content_idx) = entry_region.find("-webkit-line-clamp: 2") {
+    |                     ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_content_idx`
+
+warning: unused variable: `first_val`
+   --> src/ui/parsing.rs:368:37
+    |
+368 |                     let (first_idx, first_val) = candidates_with_indices[0];
+    |                                     ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_first_val`
+
+warning: variable does not need to be mutable
+    --> src/ui/mod.rs:1062:17
+     |
+1062 |             let mut char_clone = c.clone();
+     |                 ----^^^^^^^^^^
+     |                 |
+     |                 help: remove this `mut`
+     |
+     = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: variable does not need to be mutable
+    --> src/ui/mod.rs:1545:21
+     |
+1545 |             for (_, mut lb) in lorebook_map {
+     |                     ----^^
+     |                     |
+     |                     help: remove this `mut`
+
+Some errors have detailed explanations: E0433, E0609.
+For more information about an error, try `rustc --explain E0433`.
+warning: `crap` (bin "crap") generated 10 warnings
+error: could not compile `crap` (bin "crap") due to 3 previous errors; 10 warnings emitted
