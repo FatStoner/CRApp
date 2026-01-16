@@ -286,12 +286,17 @@ pub fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
         // In-editor search
         ui.horizontal(|ui| {
             ui.label("🔍 Search:");
-            ui.add(
+            let response = ui.add(
                 egui::TextEdit::singleline(&mut app.editor_search_query)
                     .id_salt("editor_search_field")
                     .hint_text("Type 3+ chars to highlight...")
                     .desired_width(200.0),
             );
+
+            if app.focus_search_field {
+                response.request_focus();
+                app.focus_search_field = false;
+            }
 
             if !app.editor_search_query.is_empty() {
                 if ui.small_button("✖").clicked() {

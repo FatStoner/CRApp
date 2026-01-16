@@ -212,6 +212,8 @@ pub struct CrapApp {
 
     pub scale_last_updated: Option<Instant>,
     pub last_scroll_time: Instant,
+
+    pub focus_search_field: bool,
 }
 
 impl CrapApp {
@@ -279,6 +281,7 @@ impl CrapApp {
             navigation_history: Vec::new(),
             scale_last_updated: None,
             last_scroll_time: Instant::now(),
+            focus_search_field: false,
         };
 
         // Initial Scale Load
@@ -1781,7 +1784,7 @@ impl eframe::App for CrapApp {
 
         // Search Focus Shortcut
         if ctx.input_mut(|i| i.consume_key(egui::Modifiers::CTRL, egui::Key::F)) {
-            ctx.memory_mut(|m| m.request_focus(egui::Id::from("editor_search_field")));
+            self.focus_search_field = true;
         }
 
         // Debounced Save
