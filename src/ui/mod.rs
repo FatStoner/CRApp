@@ -1748,7 +1748,8 @@ impl eframe::App for CrapApp {
         // Smoother UI Scaling with debouncing
         let zoom_factor = ctx.input(|i| i.zoom_delta());
         if (zoom_factor - 1.0).abs() > 0.001 {
-            let mut new_scale = self.ui_scale * zoom_factor;
+            let damped_delta = (zoom_factor - 1.0) * 0.2;
+            let mut new_scale = self.ui_scale * (1.0 + damped_delta);
             new_scale = (new_scale * 20.0).round() / 20.0; // Snap to 5%
             new_scale = new_scale.clamp(0.5, 2.0);
 
