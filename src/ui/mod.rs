@@ -209,6 +209,8 @@ pub struct CrapApp {
 
     // Navigation History
     pub navigation_history: Vec<NavigationState>,
+
+    pub scale_last_updated: Option<Instant>,
 }
 
 impl CrapApp {
@@ -274,6 +276,7 @@ impl CrapApp {
             count_title_in_total: false,
 
             navigation_history: Vec::new(),
+            scale_last_updated: None,
         };
 
         // Initial Scale Load
@@ -1742,27 +1745,31 @@ impl eframe::App for CrapApp {
             self.request_back();
         }
 
-        // Ctrl + Mouse Scroll for Scaling
-        let (scroll_delta, ctrl) = ctx.input(|i| (i.smooth_scroll_delta.y, i.modifiers.ctrl));
-        if ctrl && scroll_delta != 0.0 {
-            let step = 0.05;
-            let mut new_scale = self.ui_scale;
-            if scroll_delta > 0.0 {
-                new_scale += step;
-            } else {
-                new_scale -= step;
-            }
-            new_scale = (new_scale * 20.0).round() / 20.0; // Snap to 5% increments
-            new_scale = new_scale.clamp(0.5, 2.0); // Bound the scale
-            if (new_scale - self.ui_scale).abs() > 0.001 {
-                self.set_scale(new_scale);
+        // Smoother UI Scaling with debouncing
+        let zoom_factor = ctx.input(|i| i.zoom_delta());
+        if (zoom_factor - 1.0).abs() > 0.001 {
+            let mut new_scale = self.ui_scale * zoom_factor;
+            new_scale = (new_scale * 20.0).round() / 20.0; // Snap to 5%
+            new_scale = new_scale.clamp(0.5, 2.0);
 
-                // Visual feedback
+            if (new_scale - self.ui_scale).abs() > 0.001 {
+                self.ui_scale = new_scale;
+                self.ctx.set_pixels_per_point(new_scale);
+                self.scale_last_updated = Some(Instant::now());
+
                 let pct = (new_scale * 100.0).round() as i32;
                 self.set_status(
                     format!("UI Scale: {}%", pct),
                     egui::Color32::from_rgb(100, 200, 255),
                 );
+            }
+        }
+
+        // Debounced Save
+        if let Some(last_time) = self.scale_last_updated {
+            if last_time.elapsed() > Duration::from_millis(1000) {
+                self.scale_last_updated = None;
+                self.set_scale(self.ui_scale); // Triggers DB save
             }
         }
 
