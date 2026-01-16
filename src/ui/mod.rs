@@ -1741,6 +1741,31 @@ impl eframe::App for CrapApp {
         if ctx.input(|i| i.pointer.button_pressed(egui::PointerButton::Extra1)) {
             self.request_back();
         }
+
+        // Ctrl + Mouse Scroll for Scaling
+        let (scroll_delta, ctrl) = ctx.input(|i| (i.smooth_scroll_delta.y, i.modifiers.ctrl));
+        if ctrl && scroll_delta != 0.0 {
+            let step = 0.05;
+            let mut new_scale = self.ui_scale;
+            if scroll_delta > 0.0 {
+                new_scale += step;
+            } else {
+                new_scale -= step;
+            }
+            new_scale = (new_scale * 20.0).round() / 20.0; // Snap to 5% increments
+            new_scale = new_scale.clamp(0.5, 2.0); // Bound the scale
+            if (new_scale - self.ui_scale).abs() > 0.001 {
+                self.set_scale(new_scale);
+
+                // Visual feedback
+                let pct = (new_scale * 100.0).round() as i32;
+                self.set_status(
+                    format!("UI Scale: {}%", pct),
+                    egui::Color32::from_rgb(100, 200, 255),
+                );
+            }
+        }
+
         // Event Loop
         let mut received_event = false;
         while let Ok(event) = self.rx.try_recv() {
