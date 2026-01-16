@@ -1738,6 +1738,9 @@ impl CrapApp {
 
 impl eframe::App for CrapApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        if ctx.input(|i| i.pointer.button_pressed(egui::PointerButton::Extra1)) {
+            self.request_back();
+        }
         // Event Loop
         let mut received_event = false;
         while let Ok(event) = self.rx.try_recv() {

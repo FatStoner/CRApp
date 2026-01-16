@@ -581,6 +581,7 @@ pub fn render_lorebook_editor(app: &mut CrapApp, ui: &mut egui::Ui) {
                             app.load_character(id);
                             // Note: We don't need to unset it because we are navigating away entirely.
                         }
+                        crate::ui::browser::BrowserAction::OpenCollection(_) => {}
                     }
                 }
             }

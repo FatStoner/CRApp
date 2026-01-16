@@ -12,6 +12,7 @@ pub enum BrowserAction {
     ToggleFavorite(i64),
     UpdateCollectionIcon(i64),
     OpenCharacter(i64),
+    OpenCollection(i64),
 }
 
 pub fn render_collection_move_menu(
@@ -621,6 +622,9 @@ pub fn render_browser_view(app: &mut CrapApp, ui: &mut egui::Ui) {
             BrowserAction::OpenCharacter(id) => {
                 app.load_character(id);
             }
+            BrowserAction::OpenCollection(id) => {
+                app.request_collection_switch(Some(id));
+            }
         }
     }
 
@@ -918,7 +922,7 @@ pub fn render_subfolder_card(
 
     // 5. Interaction Logic
     if response.clicked() {
-        app.selected_collection_id = Some(folder.id);
+        actions.push(BrowserAction::OpenCollection(folder.id));
     }
 
     response.context_menu(|ui| {
