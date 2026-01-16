@@ -211,6 +211,7 @@ pub struct CrapApp {
     pub navigation_history: Vec<NavigationState>,
 
     pub scale_last_updated: Option<Instant>,
+    pub last_scroll_time: Instant,
 }
 
 impl CrapApp {
@@ -277,6 +278,7 @@ impl CrapApp {
 
             navigation_history: Vec::new(),
             scale_last_updated: None,
+            last_scroll_time: Instant::now(),
         };
 
         // Initial Scale Load
@@ -1746,10 +1748,20 @@ impl eframe::App for CrapApp {
         }
 
         // Smoother UI Scaling with debouncing
-        let zoom_factor = ctx.input(|i| i.zoom_delta());
-        if (zoom_factor - 1.0).abs() > 0.001 {
-            let damped_delta = (zoom_factor - 1.0) * 0.2;
-            let mut new_scale = self.ui_scale * (1.0 + damped_delta);
+        let (scroll_y, ctrl) = ctx.input(|i| (i.raw_scroll_delta.y, i.modifiers.ctrl));
+        if ctrl
+            && scroll_y.abs() > 0.01
+            && self.last_scroll_time.elapsed() > Duration::from_millis(50)
+        {
+            self.last_scroll_time = Instant::now();
+            let step = 0.05;
+            let mut new_scale = self.ui_scale;
+            if scroll_y > 0.0 {
+                new_scale += step;
+            } else {
+                new_scale -= step;
+            }
+
             new_scale = (new_scale * 20.0).round() / 20.0; // Snap to 5%
             new_scale = new_scale.clamp(0.5, 2.0);
 
@@ -1757,6 +1769,7 @@ impl eframe::App for CrapApp {
                 self.ui_scale = new_scale;
                 self.ctx.set_pixels_per_point(new_scale);
                 self.scale_last_updated = Some(Instant::now());
+                self.ctx.request_repaint(); // Snappy refresh
 
                 let pct = (new_scale * 100.0).round() as i32;
                 self.set_status(
