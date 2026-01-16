@@ -24,8 +24,8 @@ pub fn render_central_panel(app: &mut CrapApp, ctx: &egui::Context) {
                 .show(ctx, |ui| {
                     if app.parsed_data.is_none() {
                         // Phase 1: Input
-                        ui.label("Import from spicychat.ai:");
-                        ui.label(egui::RichText::new("1. Go to the character profile OR edit page on spicychat.ai\n2. Select All (Ctrl+A)\n3. Copy (Ctrl+C)\n4. Paste here (Ctrl+V)").size(11.0).color(egui::Color32::GRAY));
+                        ui.label("Import from spicychat.ai or craveu.ai:");
+                        ui.label(egui::RichText::new("1. Go to the character profile OR edit page on the service\n2. Select All (Ctrl+A)\n3. Copy (Ctrl+C)\n4. Paste here (Ctrl+V)").size(11.0).color(egui::Color32::GRAY));
                         ui.add_space(4.0);
                         
                         let footer_height = 50.0;

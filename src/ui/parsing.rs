@@ -30,6 +30,7 @@ pub struct ParsedLorebookData {
 enum ImportFormat {
     Profile,
     Edit,
+    CraveEdit,
     LorebookHtml,
     Unknown,
 }
@@ -47,6 +48,7 @@ pub fn parse_clipboard(text: &str) -> ParsedCharacterData {
 
     match detect_format(&lines) {
         ImportFormat::Edit => parse_edit_view(&lines),
+        ImportFormat::CraveEdit => parse_crave_edit_view(&lines),
         ImportFormat::Profile => parse_profile_view(&lines),
         // For LorebookHtml, we need a separate entry point or return type.
         // Since parse_clipboard returns ParsedCharacterData, we might need a separate function for Lorebooks.
@@ -247,6 +249,11 @@ fn parse_spicychat_lorebook_profile_view(html: &str) -> ParsedLorebookData {
 }
 
 fn detect_format(lines: &[&str]) -> ImportFormat {
+    // Crave specific check
+    if lines.iter().any(|l| l.contains("CraveU AI")) {
+        return ImportFormat::CraveEdit;
+    }
+
     // Edit view specific characteristic
     if lines
         .iter()
@@ -381,6 +388,119 @@ fn parse_edit_view(lines: &[&str]) -> ParsedCharacterData {
     // For now, Edit View tags might be hard to parse unless we see a populated sample.
     // The provided sample has "0/12" implying no tags.
     // Leaving tags empty for Edit View for now unless identified.
+
+    data.cleanup();
+    data
+}
+
+fn parse_crave_edit_view(lines: &[&str]) -> ParsedCharacterData {
+    let mut data = ParsedCharacterData::default();
+    let mut current_section = "";
+
+    for (i, &line) in lines.iter().enumerate() {
+        let lower = line.to_lowercase();
+
+        if lower == "character name*" {
+            if let Some(val_idx) = find_next_value_index(lines, i) {
+                data.name = lines[val_idx].to_string();
+            }
+            continue;
+        }
+
+        if lower == "introduction*" {
+            current_section = "title";
+            continue;
+        }
+
+        if lower == "personality*" {
+            current_section = "personality";
+            continue;
+        }
+
+        if lower == "tags*" {
+            current_section = "tags";
+            continue;
+        }
+
+        if lower == "initial message (greeting)*" {
+            current_section = "greeting";
+            continue;
+        }
+
+        if lower == "scenario" {
+            current_section = "scenario";
+            continue;
+        }
+
+        // Stop keywords or next section triggers
+        if lower == "type in tags..." {
+            current_section = "";
+            continue;
+        }
+
+        if lower.contains("tokens") {
+            // Check if it's a standalone token line.
+            if line.chars().all(|c| {
+                c.is_numeric()
+                    || c.is_whitespace()
+                    || c == 't'
+                    || c == 'o'
+                    || c == 'k'
+                    || c == 'e'
+                    || c == 'n'
+                    || c == 's'
+            }) {
+                current_section = "";
+                continue;
+            }
+        }
+
+        match current_section {
+            "title" => {
+                if lower == "import html code" {
+                    continue;
+                }
+                if lower.contains("markdown and html code supported!") {
+                    current_section = "";
+                    continue;
+                }
+                data.title.push_str(line);
+                data.title.push('\n');
+            }
+            "personality" => {
+                data.personality.push_str(line);
+                data.personality.push('\n');
+            }
+            "greeting" => {
+                data.first_message.push_str(line);
+                data.first_message.push('\n');
+            }
+            "scenario" => {
+                if lower.contains("outline the context and setting") {
+                    current_section = "";
+                    continue;
+                }
+                data.scenario.push_str(line);
+                data.scenario.push('\n');
+            }
+            "tags" => {
+                if !line.is_empty() && lower != "type in tags..." && lower != "tags*" {
+                    // Check if it is a single word or comma separated
+                    if line.contains(',') {
+                        for t in line.split(',') {
+                            let trimmed = t.trim();
+                            if !trimmed.is_empty() {
+                                data.external_tags.push(trimmed.to_string());
+                            }
+                        }
+                    } else {
+                        data.external_tags.push(line.to_string());
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
 
     data.cleanup();
     data
@@ -856,5 +976,38 @@ mod tests {
             vec!["profile_kw1", "profile_kw2"]
         );
         assert_eq!(parsed.entries[0].content, "Profile Content 1");
+    }
+
+    #[test]
+    fn test_parse_crave_edit_view() {
+        let raw_text = "Edit Characters | CraveU AI
+Character Name*
+Anya
+Introduction*
+The rain was coming down in sheets...
+Personality*
+ANYA{name: Anya. idea: A young woman...}
+688 tokens
+Tags*
+Female
+Adventure
+OC
+Initial Message (Greeting)*
+The rain was coming down in sheets, turning the city streets into a maze of mirrored black. {{user}} hurried along...
+Scenario
+RULES: Only user can control {{user}} actions...
+604 tokens
+Save";
+        let data = parse_clipboard(raw_text);
+        assert_eq!(data.name, "Anya");
+        assert!(data.title.contains("The rain was coming down in sheets..."));
+        assert!(data
+            .personality
+            .contains("ANYA{name: Anya. idea: A young woman...}"));
+        assert_eq!(data.external_tags, vec!["Female", "Adventure", "OC"]);
+        assert!(data
+            .first_message
+            .contains("The rain was coming down in sheets"));
+        assert!(data.scenario.contains("RULES: Only user can control"));
     }
 }

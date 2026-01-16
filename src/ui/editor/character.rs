@@ -210,7 +210,12 @@ pub fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                                     ui.close_menu();
                                 }
                                 
-                                if ui.button("Paste from Clipboard").clicked() {
+                                if ui.button("Paste from SpicyChat Clipboard").clicked() {
+                                    trigger_import = true;
+                                    ui.close_menu();
+                                }
+
+                                if ui.button("Paste from Crave AI Clipboard").clicked() {
                                     trigger_import = true;
                                     ui.close_menu();
                                 }
