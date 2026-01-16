@@ -275,3 +275,65 @@ pub fn paint_avatar_crop(ui: &mut egui::Ui, rect: egui::Rect, uri: &str, roundin
         }
     }
 }
+
+pub fn paint_gallery_image(ui: &mut egui::Ui, rect: egui::Rect, uri: &str, rounding: f32) {
+    let texture_options = egui::TextureOptions::LINEAR;
+
+    // Check cache/load status to get dimensions
+    match ui.ctx().try_load_image(uri.into(), Default::default()) {
+        Ok(poll) => {
+            match poll {
+                egui::load::ImagePoll::Ready { image } => {
+                    let w = image.size[0] as f32;
+                    let h = image.size[1] as f32;
+
+                    // Calculate "Cover" UVs (Center Crop)
+                    let img_aspect = w / h;
+                    let rect_aspect = rect.width() / rect.height();
+
+                    let uv: egui::Rect;
+
+                    if img_aspect > rect_aspect {
+                        // Image is wider than rect: Keep full height, crop width (from center)
+                        let uv_w = rect_aspect / img_aspect;
+                        let uv_x = (1.0 - uv_w) / 2.0;
+                        uv = egui::Rect::from_min_max(
+                            egui::pos2(uv_x, 0.0),
+                            egui::pos2(uv_x + uv_w, 1.0),
+                        );
+                    } else {
+                        // Image is taller than rect: Keep full width, crop height (from center)
+                        let uv_h = img_aspect / rect_aspect;
+                        let uv_y = (1.0 - uv_h) / 2.0;
+                        uv = egui::Rect::from_min_max(
+                            egui::pos2(0.0, uv_y),
+                            egui::pos2(1.0, uv_y + uv_h),
+                        );
+                    }
+
+                    egui::Image::new(uri)
+                        .uv(uv)
+                        .rounding(egui::Rounding::same(rounding))
+                        .texture_options(texture_options)
+                        .paint_at(ui, rect);
+                }
+                egui::load::ImagePoll::Pending { .. } => {
+                    ui.painter().rect_filled(
+                        rect,
+                        egui::Rounding::same(rounding),
+                        egui::Color32::from_gray(30),
+                    );
+                    ui.spinner();
+                    ui.ctx().request_repaint();
+                }
+            }
+        }
+        Err(_) => {
+            ui.painter().rect_filled(
+                rect,
+                egui::Rounding::same(rounding),
+                egui::Color32::from_gray(60),
+            );
+        }
+    }
+}
