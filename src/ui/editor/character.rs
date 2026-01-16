@@ -288,6 +288,7 @@ pub fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
             ui.label("🔍 Search:");
             ui.add(
                 egui::TextEdit::singleline(&mut app.editor_search_query)
+                    .id_salt("editor_search_field")
                     .hint_text("Type 3+ chars to highlight...")
                     .desired_width(200.0),
             );

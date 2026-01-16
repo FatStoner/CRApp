@@ -84,6 +84,7 @@ pub fn render_lorebook_editor(app: &mut CrapApp, ui: &mut egui::Ui) {
             ui.label("🔍 Search:");
             ui.add(
                 egui::TextEdit::singleline(&mut app.editor_search_query)
+                    .id_salt("editor_search_field")
                     .hint_text("Type 3+ chars to highlight/jump...")
                     .desired_width(200.0),
             );

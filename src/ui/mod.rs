@@ -1779,6 +1779,11 @@ impl eframe::App for CrapApp {
             }
         }
 
+        // Search Focus Shortcut
+        if ctx.input_mut(|i| i.consume_key(egui::Modifiers::CTRL, egui::Key::F)) {
+            ctx.memory_mut(|m| m.request_focus(egui::Id::from("editor_search_field")));
+        }
+
         // Debounced Save
         if let Some(last_time) = self.scale_last_updated {
             if last_time.elapsed() > Duration::from_millis(1000) {
