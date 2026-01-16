@@ -364,15 +364,9 @@ pub fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                                      ui.allocate_ui_with_layout(egui::vec2(left_width, ui.available_height()), egui::Layout::top_down(egui::Align::Min), |ui| {
                                          ui.label("Name (File Name)");
                                          // File Name (character.name) with search highlight
-                                          if app.editor_search_query.len() >= 3 {
-                                               let mut layouter = crate::ui::text_highlight::create_highlight_layouter(app.editor_search_query.clone());
+                                          {
+                                               let mut layouter = crate::ui::spell_layout::create_spell_check_layouter(None, app.editor_search_query.clone());
                                                let response = ui.add(egui::TextEdit::singleline(&mut character.name).layouter(&mut *layouter));
-                                               crate::ui::widgets::track_text_selection(ui, &response);
-                                               response.context_menu(|ui| {
-                                                   crate::ui::widgets::text_context_menu(ui, &mut character.name, response.id);
-                                               });
-                                          } else {
-                                               let response = ui.add(egui::TextEdit::singleline(&mut character.name).desired_width(f32::INFINITY));
                                                crate::ui::widgets::track_text_selection(ui, &response);
                                                response.context_menu(|ui| {
                                                    crate::ui::widgets::text_context_menu(ui, &mut character.name, response.id);
@@ -382,15 +376,9 @@ pub fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
 
                                          ui.label("Character Name");
                                          // Character Name (character.char_name) with search highlight
-                                          if app.editor_search_query.len() >= 3 {
-                                               let mut layouter = crate::ui::text_highlight::create_highlight_layouter(app.editor_search_query.clone());
+                                          {
+                                               let mut layouter = crate::ui::spell_layout::create_spell_check_layouter(None, app.editor_search_query.clone());
                                                let response = ui.add(egui::TextEdit::singleline(&mut character.char_name).layouter(&mut *layouter));
-                                               crate::ui::widgets::track_text_selection(ui, &response);
-                                               response.context_menu(|ui| {
-                                                   crate::ui::widgets::text_context_menu(ui, &mut character.char_name, response.id);
-                                               });
-                                          } else {
-                                               let response = ui.add(egui::TextEdit::singleline(&mut character.char_name).desired_width(f32::INFINITY));
                                                crate::ui::widgets::track_text_selection(ui, &response);
                                                response.context_menu(|ui| {
                                                    crate::ui::widgets::text_context_menu(ui, &mut character.char_name, response.id);
@@ -418,17 +406,11 @@ pub fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                                                  let title_edit = egui::TextEdit::multiline(&mut character.char_title)
                                                      .desired_width(f32::INFINITY)
                                                      .desired_rows(1);
-                                                 if app.editor_search_query.len() >= 3 {
-                                                      let mut layouter = crate::ui::text_highlight::create_highlight_layouter(app.editor_search_query.clone());
+                                                  {
+                                                      let mut layouter = crate::ui::spell_layout::create_spell_check_layouter(app.spell_checker.clone(), app.editor_search_query.clone());
                                                       let response = ui.add(title_edit.layouter(&mut *layouter));
                                                       crate::ui::widgets::track_text_selection(ui, &response);
                                                       response.context_menu(|ui| {
-                                                           crate::ui::widgets::text_context_menu(ui, &mut character.char_title, response.id);
-                                                       });
-                                                  } else {
-                                                      let response = ui.add(title_edit);
-                                                      crate::ui::widgets::track_text_selection(ui, &response);
-                                                       response.context_menu(|ui| {
                                                            crate::ui::widgets::text_context_menu(ui, &mut character.char_title, response.id);
                                                        });
                                                   }
@@ -452,46 +434,9 @@ pub fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                                              })
                                              .body(|ui| {
                                                  let text_edit = egui::TextEdit::multiline(&mut character.first_message).desired_width(f32::INFINITY);
-                                                  if app.editor_search_query.len() >= 3 {
-                                                      let search_query = app.editor_search_query.clone();
-                                                      let mut my_layouter = move |ui: &egui::Ui, text: &str, wrap_width: f32| {
-                                                          let mut layout_job = egui::text::LayoutJob::default();
-                                                          let search_lower = search_query.to_lowercase();
-                                                          let text_lower = text.to_lowercase();
-                                                          let mut last_end = 0;
-                                                          
-                                                          let font_id = egui::TextStyle::Body.resolve(ui.style());
-                                                          let default_format = egui::TextFormat {
-                                                              font_id: font_id.clone(),
-                                                              ..Default::default()
-                                                          };
-                                                          
-                                                          for (start, _) in text_lower.match_indices(&search_lower) {
-                                                              let end = start + search_query.len();
-                                                              if start > last_end {
-                                                                  layout_job.append(&text[last_end..start], 0.0, default_format.clone());
-                                                              }
-                                                              layout_job.append(&text[start..end], 0.0, egui::TextFormat {
-                                                                  font_id: font_id.clone(),
-                                                                  background: egui::Color32::from_rgb(255, 255, 0),
-                                                                  color: egui::Color32::BLACK,
-                                                                  ..Default::default()
-                                                              });
-                                                              last_end = end;
-                                                          }
-                                                          if last_end < text.len() {
-                                                              layout_job.append(&text[last_end..], 0.0, default_format);
-                                                          }
-                                                          layout_job.wrap.max_width = wrap_width;
-                                                      ui.fonts(|f| f.layout_job(layout_job))
-                                                      };
-                                                      let response = ui.add(text_edit.layouter(&mut my_layouter));
-                                                      crate::ui::widgets::track_text_selection(ui, &response);
-                                                      response.context_menu(|ui| {
-                                                          crate::ui::widgets::text_context_menu(ui, &mut character.first_message, response.id);
-                                                      });
-                                                  } else {
-                                                      let response = ui.add(text_edit);
+                                                  {
+                                                      let mut layouter = crate::ui::spell_layout::create_spell_check_layouter(app.spell_checker.clone(), app.editor_search_query.clone());
+                                                      let response = ui.add(text_edit.layouter(&mut *layouter));
                                                       crate::ui::widgets::track_text_selection(ui, &response);
                                                       response.context_menu(|ui| {
                                                           crate::ui::widgets::text_context_menu(ui, &mut character.first_message, response.id);
@@ -515,46 +460,9 @@ pub fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                                              })
                                              .body(|ui| {
                                                  let text_edit = egui::TextEdit::multiline(&mut character.personality).desired_width(f32::INFINITY);
-                                                  if app.editor_search_query.len() >= 3 {
-                                                      let search_query = app.editor_search_query.clone();
-                                                      let mut my_layouter = move |ui: &egui::Ui, text: &str, wrap_width: f32| {
-                                                          let mut layout_job = egui::text::LayoutJob::default();
-                                                          let search_lower = search_query.to_lowercase();
-                                                          let text_lower = text.to_lowercase();
-                                                          let mut last_end = 0;
-                                                          
-                                                          let font_id = egui::TextStyle::Body.resolve(ui.style());
-                                                          let default_format = egui::TextFormat {
-                                                              font_id: font_id.clone(),
-                                                              ..Default::default()
-                                                          };
-                                                          
-                                                          for (start, _) in text_lower.match_indices(&search_lower) {
-                                                              let end = start + search_query.len();
-                                                              if start > last_end {
-                                                                  layout_job.append(&text[last_end..start], 0.0, default_format.clone());
-                                                              }
-                                                              layout_job.append(&text[start..end], 0.0, egui::TextFormat {
-                                                                  font_id: font_id.clone(),
-                                                                  background: egui::Color32::from_rgb(255, 255, 0),
-                                                                  color: egui::Color32::BLACK,
-                                                                  ..Default::default()
-                                                              });
-                                                              last_end = end;
-                                                          }
-                                                          if last_end < text.len() {
-                                                              layout_job.append(&text[last_end..], 0.0, default_format);
-                                                          }
-                                                          layout_job.wrap.max_width = wrap_width;
-                                                          ui.fonts(|f| f.layout_job(layout_job))
-                                                      };
-                                                      let response = ui.add(text_edit.layouter(&mut my_layouter));
-                                                      crate::ui::widgets::track_text_selection(ui, &response);
-                                                      response.context_menu(|ui| {
-                                                          crate::ui::widgets::text_context_menu(ui, &mut character.personality, response.id);
-                                                      });
-                                                  } else {
-                                                      let response = ui.add(text_edit);
+                                                  {
+                                                      let mut layouter = crate::ui::spell_layout::create_spell_check_layouter(app.spell_checker.clone(), app.editor_search_query.clone());
+                                                      let response = ui.add(text_edit.layouter(&mut *layouter));
                                                       crate::ui::widgets::track_text_selection(ui, &response);
                                                       response.context_menu(|ui| {
                                                           crate::ui::widgets::text_context_menu(ui, &mut character.personality, response.id);
@@ -577,46 +485,9 @@ pub fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                                              })
                                              .body(|ui| {
                                                  let text_edit = egui::TextEdit::multiline(&mut character.scenario).desired_width(f32::INFINITY);
-                                                  if app.editor_search_query.len() >= 3 {
-                                                      let search_query = app.editor_search_query.clone();
-                                                      let mut my_layouter = move |ui: &egui::Ui, text: &str, wrap_width: f32| {
-                                                          let mut layout_job = egui::text::LayoutJob::default();
-                                                          let search_lower = search_query.to_lowercase();
-                                                          let text_lower = text.to_lowercase();
-                                                          let mut last_end = 0;
-                                                          
-                                                          let font_id = egui::TextStyle::Body.resolve(ui.style());
-                                                          let default_format = egui::TextFormat {
-                                                              font_id: font_id.clone(),
-                                                              ..Default::default()
-                                                          };
-                                                          
-                                                          for (start, _) in text_lower.match_indices(&search_lower) {
-                                                              let end = start + search_query.len();
-                                                              if start > last_end {
-                                                                  layout_job.append(&text[last_end..start], 0.0, default_format.clone());
-                                                              }
-                                                              layout_job.append(&text[start..end], 0.0, egui::TextFormat {
-                                                                  font_id: font_id.clone(),
-                                                                  background: egui::Color32::from_rgb(255, 255, 0),
-                                                                  color: egui::Color32::BLACK,
-                                                                  ..Default::default()
-                                                              });
-                                                              last_end = end;
-                                                          }
-                                                          if last_end < text.len() {
-                                                              layout_job.append(&text[last_end..], 0.0, default_format);
-                                                          }
-                                                          layout_job.wrap.max_width = wrap_width;
-                                                          ui.fonts(|f| f.layout_job(layout_job))
-                                                      };
-                                                      let response = ui.add(text_edit.layouter(&mut my_layouter));
-                                                      crate::ui::widgets::track_text_selection(ui, &response);
-                                                      response.context_menu(|ui| {
-                                                          crate::ui::widgets::text_context_menu(ui, &mut character.scenario, response.id);
-                                                      });
-                                                  } else {
-                                                      let response = ui.add(text_edit);
+                                                  {
+                                                      let mut layouter = crate::ui::spell_layout::create_spell_check_layouter(app.spell_checker.clone(), app.editor_search_query.clone());
+                                                      let response = ui.add(text_edit.layouter(&mut *layouter));
                                                       crate::ui::widgets::track_text_selection(ui, &response);
                                                       response.context_menu(|ui| {
                                                           crate::ui::widgets::text_context_menu(ui, &mut character.scenario, response.id);
@@ -639,46 +510,9 @@ pub fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                                              })
                                              .body(|ui| {
                                                  let text_edit = egui::TextEdit::multiline(&mut character.example_dialogue).desired_width(f32::INFINITY);
-                                                  if app.editor_search_query.len() >= 3 {
-                                                      let search_query = app.editor_search_query.clone();
-                                                      let mut my_layouter = move |ui: &egui::Ui, text: &str, wrap_width: f32| {
-                                                          let mut layout_job = egui::text::LayoutJob::default();
-                                                          let search_lower = search_query.to_lowercase();
-                                                          let text_lower = text.to_lowercase();
-                                                          let mut last_end = 0;
-                                                          
-                                                          let font_id = egui::TextStyle::Body.resolve(ui.style());
-                                                          let default_format = egui::TextFormat {
-                                                              font_id: font_id.clone(),
-                                                              ..Default::default()
-                                                          };
-                                                          
-                                                          for (start, _) in text_lower.match_indices(&search_lower) {
-                                                              let end = start + search_query.len();
-                                                              if start > last_end {
-                                                                  layout_job.append(&text[last_end..start], 0.0, default_format.clone());
-                                                              }
-                                                              layout_job.append(&text[start..end], 0.0, egui::TextFormat {
-                                                                  font_id: font_id.clone(),
-                                                                  background: egui::Color32::from_rgb(255, 255, 0),
-                                                                  color: egui::Color32::BLACK,
-                                                                  ..Default::default()
-                                                              });
-                                                              last_end = end;
-                                                          }
-                                                          if last_end < text.len() {
-                                                              layout_job.append(&text[last_end..], 0.0, default_format);
-                                                          }
-                                                          layout_job.wrap.max_width = wrap_width;
-                                                          ui.fonts(|f| f.layout_job(layout_job))
-                                                      };
-                                                      let response = ui.add(text_edit.layouter(&mut my_layouter));
-                                                      crate::ui::widgets::track_text_selection(ui, &response);
-                                                      response.context_menu(|ui| {
-                                                          crate::ui::widgets::text_context_menu(ui, &mut character.example_dialogue, response.id);
-                                                      });
-                                                  } else {
-                                                      let response = ui.add(text_edit);
+                                                  {
+                                                      let mut layouter = crate::ui::spell_layout::create_spell_check_layouter(app.spell_checker.clone(), app.editor_search_query.clone());
+                                                      let response = ui.add(text_edit.layouter(&mut *layouter));
                                                       crate::ui::widgets::track_text_selection(ui, &response);
                                                       response.context_menu(|ui| {
                                                           crate::ui::widgets::text_context_menu(ui, &mut character.example_dialogue, response.id);
@@ -947,45 +781,9 @@ pub fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                                  ui.label("Notes");
                                  let width = ui.ctx().screen_rect().width() * 2.0 / 3.0;
                                  let text_edit = egui::TextEdit::multiline(&mut character.author_notes).desired_width(width);
-                                  if app.editor_search_query.len() >= 3 {
-                                      let search_query = app.editor_search_query.clone();
-                                      let mut my_layouter = move |ui: &egui::Ui, text: &str, wrap_width: f32| {
-                                          let mut layout_job = egui::text::LayoutJob::default();
-                                          let search_lower = search_query.to_lowercase();
-                                          let text_lower = text.to_lowercase();
-                                          let mut last_end = 0;
-                                                          
-                                                          let font_id = egui::TextStyle::Body.resolve(ui.style());
-                                                          let default_format = egui::TextFormat {
-                                                              font_id: font_id.clone(),
-                                                              ..Default::default()
-                                                          };
-                                          for (start, _) in text_lower.match_indices(&search_lower) {
-                                              let end = start + search_query.len();
-                                              if start > last_end {
-                                                  layout_job.append(&text[last_end..start], 0.0, default_format.clone());
-                                              }
-                                              layout_job.append(&text[start..end], 0.0, egui::TextFormat {
-                                                  font_id: font_id.clone(),
-                                                  background: egui::Color32::from_rgb(255, 255, 0),
-                                                  color: egui::Color32::BLACK,
-                                                  ..Default::default()
-                                              });
-                                              last_end = end;
-                                          }
-                                          if last_end < text.len() {
-                                              layout_job.append(&text[last_end..], 0.0, default_format);
-                                          }
-                                          layout_job.wrap.max_width = wrap_width;
-                                          ui.fonts(|f| f.layout_job(layout_job))
-                                      };
-                                      let response = ui.add(text_edit.layouter(&mut my_layouter));
-                                      crate::ui::widgets::track_text_selection(ui, &response);
-                                      response.context_menu(|ui| {
-                                          crate::ui::widgets::text_context_menu(ui, &mut character.author_notes, response.id);
-                                      });
-                                  } else {
-                                      let response = ui.add(text_edit);
+                                  {
+                                      let mut layouter = crate::ui::spell_layout::create_spell_check_layouter(app.spell_checker.clone(), app.editor_search_query.clone());
+                                      let response = ui.add(text_edit.layouter(&mut *layouter));
                                       crate::ui::widgets::track_text_selection(ui, &response);
                                       response.context_menu(|ui| {
                                           crate::ui::widgets::text_context_menu(ui, &mut character.author_notes, response.id);

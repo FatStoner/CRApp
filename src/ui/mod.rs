@@ -22,6 +22,9 @@ pub mod widgets;
 pub use global_search::{CharacterSearchFieldFilters, LorebookSearchFieldFilters};
 pub use popups::PopupState;
 
+pub mod spell_check;
+pub mod spell_layout;
+
 pub mod parsing;
 
 // Re-export specific items if needed
@@ -188,6 +191,10 @@ pub struct CrapApp {
     pub app_tag_input: String,
     pub ext_tag_input: String,
 
+    // Spell Checker
+    pub spell_checker: Option<std::sync::Arc<spell_check::SpellChecker>>,
+    pub show_spell_check_settings: bool,
+
     // Import Modal State
     pub show_import_modal: bool,
     pub import_text: String,
@@ -250,6 +257,9 @@ impl CrapApp {
             editor_search_query: String::new(),
             app_tag_input: String::new(),
             ext_tag_input: String::new(),
+
+            spell_checker: spell_check::SpellChecker::new().map(std::sync::Arc::new),
+            show_spell_check_settings: false,
 
             show_import_modal: false,
             import_text: String::new(),
