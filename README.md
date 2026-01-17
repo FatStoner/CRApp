@@ -1,6 +1,6 @@
-# C.R.App (Character Repository Application)
+# CRApp (Character Repository Application)
 
-**C.R.App** is a high-performance, local-first Desktop Character Manager built with **Rust**, **SQLite**, and **egui**. designed for power users who need distinct organization and deep integration for their character cards and lorebooks.
+**CRApp** is a high-performance, local-first Desktop Character Manager built with **Rust**, **SQLite**, and **egui**, designed for power users who need distinct organization and deep integration for their character cards and lorebooks.
 
 ![Status](https://img.shields.io/badge/Status-Early_Beta-orange)
 ![License](https://img.shields.io/badge/License-MIT-blue)
@@ -14,8 +14,16 @@ C.R.App leverages the power of a local SQLite database to handle thousands of ch
 -   **🚀 High Performance**: Built in Rust for blazing fast startup and low memory footprint.
 -   **💾 Local-First Database**: All data is stored in a structured local SQLite database.
 -   **🔍 Deep Search**: Search through character names, descriptions, and tags instantly.
+-   **📖 Lorebooks & World Info**: Create and link extensive lorebooks to your characters.
 -   **📂 Nested Collections**: Organize your library with a robust, hierarchical folder system.
--   **🔄 Import/Export**: Supports JSON, text, and native formats. Quick clipboard importing from spicychat.ai profiles.
+-   **🔄 Import/Export**: Full support for TavernAI V2 cards (PNG) and JSON. Quick clipboard importing from spicychat.ai.
+-   **🧹 Auto-Cleanup**: Automatically removes unused images to keep your storage efficient.
+
+## Shortcuts
+
+-   **Ctrl + S**: Save changes.
+-   **Ctrl + F**: Quick search.
+-   **Esc**: Go back / Cancel.
 
 ## Download
 
