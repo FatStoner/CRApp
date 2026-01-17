@@ -209,7 +209,7 @@ pub fn render_browser_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                         app.popup_state = crate::ui::PopupState::ImportDbWarning;
                     }
                     if ui.button("📤 Export DB").clicked() {
-                        app.trigger_db_export();
+                        app.popup_state = crate::ui::PopupState::ExportDbSelection;
                     }
                     ui.add_space(8.0);
                     ui.separator();

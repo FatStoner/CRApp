@@ -912,6 +912,17 @@ impl Database {
         Ok(())
     }
 
+    pub async fn create_checkpoint_and_vacuum(&self, target_path: &str) -> Result<(), sqlx::Error> {
+        // 1. Checkpoint to flush WAL to main DB file (optional but good for minimizing WAL size/issues)
+        self.checkpoint().await?;
+
+        // 2. VACUUM INTO creates a safe snapshot even if connections are open
+        let query = format!("VACUUM INTO '{}'", target_path);
+        sqlx::query(&query).execute(&self.pool).await?;
+
+        Ok(())
+    }
+
     pub async fn close(&self) {
         self.pool.close().await;
     }

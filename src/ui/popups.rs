@@ -41,6 +41,7 @@ pub enum PopupState {
         source_code: String,
         parsed_data: Option<crate::ui::parsing::ParsedLorebookData>,
     },
+    ExportDbSelection,
 }
 
 pub fn render_popups(ctx: &egui::Context, app: &mut CrapApp) {
@@ -588,6 +589,45 @@ pub fn render_popups(ctx: &egui::Context, app: &mut CrapApp) {
                     source_code,
                     parsed_data,
                 };
+            }
+        }
+        PopupState::ExportDbSelection => {
+            let mut close = false;
+            egui::Window::new("Export Database")
+                .collapsible(false)
+                .resizable(false)
+                .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
+                .show(ctx, |ui| {
+                    ui.label("Choose an export method:");
+                    ui.add_space(10.0);
+
+                    if ui
+                        .button("💾 Export Database Only (.db)")
+                        .on_hover_text("Exports just the SQLite database file. Useful for manual backups.")
+                        .clicked()
+                    {
+                        app.trigger_db_export_file_only();
+                        close = true;
+                    }
+
+                    ui.add_space(5.0);
+
+                    if ui
+                        .button("📦 Export Full Backup (.zip)")
+                        .on_hover_text("Exports the database AND all images (avatars, covers, gallery). Recommended for moving to another PC.")
+                        .clicked()
+                    {
+                        app.perform_full_zip_export();
+                        close = true;
+                    }
+
+                    ui.add_space(15.0);
+                    if ui.button("Cancel").clicked() {
+                        close = true;
+                    }
+                });
+            if close {
+                app.popup_state = PopupState::None;
             }
         }
     }
