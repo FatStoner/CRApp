@@ -405,6 +405,7 @@ impl eframe::App for CrapApp {
                                         .map(|t| t.name.clone())
                                         .collect(),
                                     urls: char_obj.urls.clone(),
+                                    avatar_path: char_obj.avatar_path.clone(),
                                 };
 
                                 // Force "New Character" mode
@@ -428,6 +429,28 @@ impl eframe::App for CrapApp {
                             }
                         }
                         Err(e) => self.set_status(format!("Read Error: {}", e), egui::Color32::RED),
+                    }
+                }
+                UiEvent::ImportCharacterData(res) => {
+                    match res {
+                        Ok(parsed) => {
+                            // Force "New Character" mode
+                            self.selected_character = Some(Character::default());
+                            self.mode = AppMode::Characters;
+
+                            self.parsed_data = Some(parsed);
+                            self.show_import_modal = true;
+                            self.import_text.clear();
+
+                            self.set_status_with_duration(
+                                "Character data imported for review.".to_string(),
+                                egui::Color32::GREEN,
+                                Duration::from_secs(10),
+                            );
+                        }
+                        Err(e) => {
+                            self.set_status(format!("Import Error: {}", e), egui::Color32::RED)
+                        }
                     }
                 }
                 UiEvent::DbExportFinished(res) => match res {

@@ -106,6 +106,7 @@ pub enum UiEvent {
     TemplateDeleted(Result<i64, String>),
 
     ImportFileLoaded(Result<String, String>),
+    ImportCharacterData(Result<crate::ui::ParsedCharacterData, String>),
     ThemeLoaded(Result<ThemeMode, String>),
     ScaleLoaded(Result<f32, String>),
     DbExportFinished(Result<String, String>),

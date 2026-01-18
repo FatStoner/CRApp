@@ -199,12 +199,93 @@ pub fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                                 }
                             });
                             ui.menu_button("IMPORT", |ui| {
-                                if ui.button("Load from .crapp file").clicked() {
+                                if ui.button("Import File (JSON, PNG, CRAPP)").clicked() {
                                     let tx_clone = app.tx.clone();
                                     tokio::spawn(async move {
-                                        if let Some(path) = rfd::FileDialog::new().add_filter("Native", &["crapp", "json"]).pick_file() {
-                                            let res = std::fs::read_to_string(path).map_err(|e| e.to_string());
-                                            let _ = tx_clone.send(UiEvent::ImportFileLoaded(res)).await;
+                                        if let Some(path) = rfd::FileDialog::new().add_filter("Supported", &["crapp", "json", "png"]).pick_file() {
+                                            match std::fs::read(&path) {
+                                                Ok(bytes) => {
+                                                    let ext = path.extension().and_then(|s| s.to_str()).unwrap_or("").to_lowercase();
+                                                    
+                                                    let result = if ext == "png" {
+                                                        // 1. Parse Metadata
+                                                        match crate::ui::parsing::parse_png_card(&bytes) {
+                                                            Ok(mut parsed) => {
+                                                                // 2. Save Avatar
+                                                                // We copy the original PNG to avatars folder
+                                                                let dest_dir = std::path::Path::new("data/avatars");
+                                                                let _ = std::fs::create_dir_all(dest_dir);
+                                                                let file_name = format!("imported_{}.png", uuid::Uuid::new_v4());
+                                                                let dest_path = dest_dir.join(&file_name);
+                                                                
+                                                                if let Ok(_) = std::fs::write(&dest_path, &bytes) {
+                                                                    parsed.avatar_path = Some(dest_path.to_string_lossy().to_string());
+                                                                }
+                                                                Ok(parsed)
+                                                            },
+                                                            Err(e) => Err(e),
+                                                        }
+                                                    } else {
+                                                        // Try JSON / Native
+                                                        // For now, treat both as JSON text
+                                                        match String::from_utf8(bytes) {
+                                                            Ok(text) => {
+                                                                if ext == "crapp" {
+                                                                    if let Ok(mut char_obj) = serde_json::from_str::<crate::models::Character>(&text) {
+                                                                         char_obj.id = 0;
+                                                                         let parsed = crate::ui::parsing::ParsedCharacterData {
+                                                                            name: char_obj.name,
+                                                                            title: char_obj.char_title,
+                                                                            personality: char_obj.personality,
+                                                                            scenario: char_obj.scenario,
+                                                                            first_message: char_obj.first_message,
+                                                                            example_dialogue: char_obj.example_dialogue,
+                                                                            external_tags: char_obj.external_tags.into_iter().map(|t| t.name).collect(),
+                                                                            app_tags: char_obj.app_tags.into_iter().map(|t| t.name).collect(),
+                                                                            urls: char_obj.urls,
+                                                                            avatar_path: char_obj.avatar_path,
+                                                                         };
+                                                                         Ok(parsed)
+                                                                    } else {
+                                                                        Err("Failed to parse native .crapp file".to_string())
+                                                                    }
+                                                                } else {
+                                                                    // .json -> Try V2 first
+                                                                    if let Ok(parsed) = crate::ui::parsing::parse_v2_card(&text) {
+                                                                        Ok(parsed)
+                                                                    } else {
+                                                                         // Fallback to native
+                                                                          if let Ok(mut char_obj) = serde_json::from_str::<crate::models::Character>(&text) {
+                                                                             char_obj.id = 0;
+                                                                             let parsed = crate::ui::parsing::ParsedCharacterData {
+                                                                                name: char_obj.name,
+                                                                                title: char_obj.char_title,
+                                                                                personality: char_obj.personality,
+                                                                                scenario: char_obj.scenario,
+                                                                                first_message: char_obj.first_message,
+                                                                                example_dialogue: char_obj.example_dialogue,
+                                                                                external_tags: char_obj.external_tags.into_iter().map(|t| t.name).collect(),
+                                                                                app_tags: char_obj.app_tags.into_iter().map(|t| t.name).collect(),
+                                                                                urls: char_obj.urls,
+                                                                                avatar_path: char_obj.avatar_path,
+                                                                             };
+                                                                             Ok(parsed)
+                                                                        } else {
+                                                                            Err("Failed to parse JSON (Tried V2 and Native)".to_string())
+                                                                        }
+                                                                    }
+                                                                }
+                                                            },
+                                                            Err(e) => Err(format!("Invalid UTF-8: {}", e)),
+                                                        }
+                                                    };
+                                                    
+                                                    let _ = tx_clone.send(UiEvent::ImportCharacterData(result)).await;
+                                                },
+                                                Err(e) => {
+                                                    let _ = tx_clone.send(UiEvent::ImportCharacterData(Err(e.to_string()))).await;
+                                                }
+                                            }
                                         }
                                     });
                                     ui.close_menu();

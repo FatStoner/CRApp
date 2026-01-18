@@ -198,6 +198,10 @@ pub fn render_central_panel(app: &mut CrapApp, ctx: &egui::Context) {
                                         if !d.urls.is_empty() {
                                              c.urls = d.urls.clone();
                                         }
+                                        // Update Avatar
+                                        if let Some(path) = &d.avatar_path {
+                                            c.avatar_path = Some(path.clone());
+                                        }
                                     } else {
                                         // NEW CHARACTER
                                         for tag_name in d.external_tags {
@@ -213,6 +217,10 @@ pub fn render_central_panel(app: &mut CrapApp, ctx: &egui::Context) {
                                                 u.id = 0;
                                                 u.character_id = 0;
                                             }
+                                        }
+                                        // Update Avatar
+                                        if let Some(path) = &d.avatar_path {
+                                            c.avatar_path = Some(path.clone());
                                         }
                                         status_update = Some(("Import applied to New Character (Unsaved).".to_string(), egui::Color32::YELLOW));
                                     }
