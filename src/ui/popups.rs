@@ -499,86 +499,57 @@ pub fn render_popups(ctx: &egui::Context, app: &mut CrapApp) {
                     parsed_data: Some(parsed),
                 };
             } else if do_import {
-                // Perform Import via Async Task
+                // Populate Editor State (Overwrite) instead of saving immediately
                 if let Some(data) = parsed_data {
-                    let tx = app.tx.clone();
-                    let db = app.db.clone();
-
-                    tokio::spawn(async move {
-                        // Map ParsedLorebookData to models::Lorebook
-                        let mut lorebook = crate::models::Lorebook {
-                            title: if data.title.is_empty() {
-                                "Imported Lorebook".to_string()
-                            } else {
-                                data.title
-                            },
-                            description: data.description.clone(),
-                            content: data.description, // Sync desc/content
-                            ..Default::default()
-                        };
-
-                        // Save Lorebook
-                        // We need a proper upsert that returns ID or modify upsert locally to return ID from result.
-                        // But upsert_lorebook in db returns Result<()>.
-                        // Actually, insert usually sets the ID on the passed struct. BUT upsert_lorebook takes &mut Lorebook.
-                        // So we should be good if we call it.
-
-                        // Note: We need to handle tags and entries too.
-
-                        // Step 1: Create Lorebook
-                        if let Ok(_) = db.upsert_lorebook(&mut lorebook).await {
-                            // Step 2: Add Entries
-                            for entry in data.entries {
-                                let mut new_entry = crate::models::LorebookEntry {
-                                    lorebook_id: lorebook.id,
-                                    name: entry.name,
-                                    keywords: entry.keywords.join(", "),
-                                    content: entry.content,
-                                    ..Default::default()
-                                };
-                                if let Ok(eid) = db.add_entry_to_lorebook(&new_entry).await {
-                                    new_entry.id = eid;
-                                    lorebook.entries.push(new_entry);
-                                }
-                            }
-
-                            // Step 3: Add Tags
-                            for tag in data.tags {
-                                let _ = db.add_tag_to_lorebook(lorebook.id, &tag).await;
-                                // We might want to add tags to lorebook object too if we use them immediately
-                                let new_tag = crate::models::Tag { id: 0, name: tag }; // ID is unknown without fetch, maybe acceptable for now
-                                lorebook.tags.push(new_tag);
-                            }
-
-                            // Notify UI
-                            let _ = tx.send(UiEvent::LorebookImported(lorebook)).await;
-
-                            let _ = tx
-                                .send(UiEvent::StatusMessage(
-                                    "Lorebook Imported Successfully".to_string(),
-                                    egui::Color32::GREEN,
-                                ))
-                                .await;
-
-                            // Trigger Reload
-                            // We probably want to select it or just reload the list.
-                            // Sending a generic reload event or just letting user find it.
-                            // There isn't a generic "ReloadLorebooks" event visible here in imports,
-                            // but we can assume main loop refreshes or we can add one.
-                            // For now, StatusMessage is good info.
-                        } else {
-                            let _ = tx
-                                .send(UiEvent::StatusMessage(
-                                    "Failed to Import Lorebook".to_string(),
-                                    egui::Color32::RED,
-                                ))
-                                .await;
+                    // 1. Determine Target (New or Existing)
+                    let mut lorebook = if let Some(current) = &app.selected_lorebook {
+                        current.clone()
+                    } else {
+                        crate::models::Lorebook {
+                             title: if data.title.is_empty() { "Imported Lorebook".to_string() } else { data.title.clone() },
+                             ..Default::default()
                         }
-                    });
-                    // close = true; // This does nothing inside async block and was creating a warning.
-                    // To actually close, we would need to send an event or handle it in the next frame update.
-                    // For now, keeping the popup open allows user to see "Success" message or import another.
-                    // If we want to close, the async task should send a ClosePopup event.
+                    };
+
+                    // 2. Overwrite Fields
+                    if !data.title.is_empty() {
+                         lorebook.title = data.title;
+                    }
+                    lorebook.description = data.description.clone();
+                    lorebook.content = data.description; // Sync desc/content
+
+                    // 3. Entries (Replace All)
+                    // We map them to entries with id: 0 to signify they are new/modified in this context
+                    // If we wanted to be smarter and preserve IDs of matching entries, we could, 
+                    // but "Overwrite" implies full replacement. 
+                    // save_lorebook logic I added will handle diffing/deleting correctly even if we drop IDs here 
+                    // OR save_lorebook assumes IDs are valid. 
+                    // Wait, if I set id=0 here, save_lorebook will see them as NEW and INSERT them.
+                    // It will also see that the OLD entries (which have IDs) are NOT present in this list.
+                    // So it will DELETE the old ones and INSERT these as new.
+                    // This is correct behavior for "Overwrite".
+                    lorebook.entries = data.entries.into_iter().map(|e| {
+                        crate::models::LorebookEntry {
+                            lorebook_id: lorebook.id,
+                            name: e.name,
+                            keywords: e.keywords.join(", "),
+                            content: e.content,
+                            ..Default::default()
+                        }
+                    }).collect();
+
+                    // 4. Tags (Replace All)
+                    lorebook.tags = data.tags.into_iter().map(|t| {
+                        crate::models::Tag { id: 0, name: t }
+                    }).collect();
+
+                    // 5. Update State
+                    app.selected_lorebook = Some(lorebook);
+                    app.mode = crate::ui::AppMode::Lorebooks;
+                    app.central_view = crate::ui::CentralView::Editor;
+                    app.popup_state = PopupState::None;
+                    
+                    app.set_status("Imported data into editor. Click SAVE to persist.".to_string(), egui::Color32::YELLOW);
                 }
             } else if close {
                 app.popup_state = PopupState::None;

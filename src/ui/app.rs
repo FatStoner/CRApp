@@ -530,16 +530,24 @@ impl CrapApp {
                 let _ = tx.send(UiEvent::CharacterSaved(Err(e.to_string()))).await;
                 ctx.request_repaint();
             } else {
-                if is_new {
-                    for tag in &character.external_tags {
-                        let _ = db.add_tag_to_character(character.id, &tag.name, true).await;
-                    }
-                    for tag in &character.app_tags {
-                        let _ = db
-                            .add_tag_to_character(character.id, &tag.name, false)
-                            .await;
-                    }
-                } else {
+                // Sync Tags (For both New and Existing)
+                // We wipe and re-insert to match the editor state exactly (Overwrite behavior)
+                // This handles deletions logic implicitly.
+                let cid = character.id;
+
+                // 1. External Tags
+                let _ = db.remove_all_tags_from_character(cid, true).await;
+                for tag in &character.external_tags {
+                    let _ = db.add_tag_to_character(cid, &tag.name, true).await;
+                }
+
+                // 2. App Tags
+                let _ = db.remove_all_tags_from_character(cid, false).await;
+                for tag in &character.app_tags {
+                    let _ = db.add_tag_to_character(cid, &tag.name, false).await;
+                }
+
+                if !is_new {
                     // Cleanup old avatar if changed
                     if let Some(path) = old_avatar_to_delete {
                         cleanup_avatar(&path);
@@ -634,11 +642,69 @@ impl CrapApp {
         let tx = self.tx.clone();
         let db = self.db.clone();
         let ctx = self.ctx.clone();
+
         tokio::spawn(async move {
             if let Err(e) = db.upsert_lorebook(&mut lorebook).await {
                 let _ = tx.send(UiEvent::LorebookSaved(Err(e.to_string()))).await;
                 ctx.request_repaint();
             } else {
+                let lid = lorebook.id;
+
+                // 1. Sync Tags
+                // Simple wipe and replace strategy for correctness with editor state
+                // This assumes `lorebook.tags` is the source of truth
+                let get_tags_res = db.get_tags_for_lorebook(lid).await;
+                if let Ok(existing_tags) = get_tags_res {
+                    for t in existing_tags {
+                        let _ = db.remove_tag_from_lorebook(lid, t.id).await;
+                    }
+                }
+                for tag in &lorebook.tags {
+                    let _ = db.add_tag_to_lorebook(lid, &tag.name).await;
+                }
+
+                // 2. Sync Entries
+                // We need to handle:
+                // - Updates (existing ID)
+                // - Inserts (ID 0)
+                // - Deletions (ID exists in DB but not in `lorebook.entries`)
+                let get_entries_res = db.get_entries_for_lorebook(lid).await;
+                if let Ok(existing_entries) = get_entries_res {
+                    let current_ids: HashSet<i64> = lorebook
+                        .entries
+                        .iter()
+                        .filter(|e| e.id != 0)
+                        .map(|e| e.id)
+                        .collect();
+
+                    for old_entry in existing_entries {
+                        if !current_ids.contains(&old_entry.id) {
+                            let _ = db.delete_lorebook_entry(old_entry.id).await;
+                        }
+                    }
+                }
+
+                let mut saved_entries = Vec::new();
+                for mut entry in lorebook.entries.clone() {
+                    entry.lorebook_id = lid; // Ensure consistency
+                    entry.updated_at = chrono::Utc::now();
+
+                    if entry.id == 0 {
+                        entry.created_at = chrono::Utc::now(); // Is this correct? models usually handle default, but to be sure
+                        if let Ok(new_id) = db.add_entry_to_lorebook(&entry).await {
+                            entry.id = new_id;
+                            saved_entries.push(entry);
+                        }
+                    } else {
+                        if let Ok(_) = db.update_lorebook_entry(&entry).await {
+                            saved_entries.push(entry);
+                        }
+                    }
+                }
+
+                // Update the object with saved entries (IDs populated)
+                lorebook.entries = saved_entries;
+
                 let _ = tx.send(UiEvent::LorebookSaved(Ok(lorebook))).await;
                 ctx.request_repaint();
 

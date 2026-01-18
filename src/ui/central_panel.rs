@@ -3,7 +3,7 @@ use super::editor::{render_editor_view, render_lorebook_editor};
 use super::parsing::parse_clipboard;
 use crate::models::Tag;
 use crate::ui::options_window::render_options_window;
-use crate::ui::{AppMode, CrapApp, UiEvent};
+use crate::ui::{AppMode, CrapApp};
 use eframe::egui;
 
 // ----------------------------------------------------------------------------
@@ -181,29 +181,18 @@ pub fn render_central_panel(app: &mut CrapApp, ctx: &egui::Context) {
                                     
                                     if c.id != 0 {
                                         // EXISTING CHARACTER
-                                        let tx_clone = app.tx.clone();
-                                        let db_clone = app.db.clone();
-                                        let cid = c.id;
-                                        
-                                        // Tags
-                                        let ext_tags = d.external_tags.clone();
-                                        let app_tags = d.app_tags.clone();
-                                        
-                                        tokio::spawn(async move {
-                                            // Reset tags first
-                                            let _ = db_clone.remove_all_tags_from_character(cid, true).await;
-                                            let _ = db_clone.remove_all_tags_from_character(cid, false).await;
-                                            
-                                            for tag_name in ext_tags {
-                                                let _ = db_clone.add_tag_to_character(cid, &tag_name, true).await;
-                                            }
-                                            for tag_name in app_tags {
-                                                 let _ = db_clone.add_tag_to_character(cid, &tag_name, false).await;
-                                            }
-                                            let _ = tx_clone.send(UiEvent::TagOperationFinished(Ok(()))).await;
-                                        });
+                                        // Update in-memory tags (Overwrite)
+                                        c.external_tags.clear();
+                                        for tag_name in &d.external_tags {
+                                            c.external_tags.push(Tag { id: 0, name: tag_name.clone() });
+                                        }
 
-                                        status_update = Some(("Data updated. Tags being added.".to_string(), egui::Color32::GREEN));
+                                        c.app_tags.clear();
+                                        for tag_name in &d.app_tags {
+                                            c.app_tags.push(Tag { id: 0, name: tag_name.clone() });
+                                        }
+
+                                        status_update = Some(("Data applied. Click SAVE to persist.".to_string(), egui::Color32::GREEN));
                                         
                                         // Update URLs
                                         if !d.urls.is_empty() {
