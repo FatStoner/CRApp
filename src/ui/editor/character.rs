@@ -955,7 +955,7 @@ pub fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
 
                                 egui::ScrollArea::vertical().show(ui, |ui| {
                                     ui.horizontal_wrapped(|ui| {
-                                         for path in files {
+                                         for path in &files {
                                              let path_str = path.to_string_lossy().to_string();
                                              // Use get_image_uri to handle caching and protocol
                                              let uri = crate::ui::get_image_uri(&path_str);
@@ -974,11 +974,17 @@ pub fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
 
                                              if response.clicked() {
                                                  app.fullscreen_image = Some(uri.clone());
+                                                 app.gallery_context = Some(
+                                                     files
+                                                         .iter()
+                                                         .map(|p| crate::ui::get_image_uri(&p.to_string_lossy()))
+                                                         .collect(),
+                                                 );
                                              }
 
                                              response.context_menu(|ui| {
                                                  if ui.button("🗑 Delete").clicked() {
-                                                     let _ = std::fs::remove_file(&path);
+                                                     let _ = std::fs::remove_file(path);
                                                      refresh_gallery = true;
                                                      ui.close_menu();
                                                  }

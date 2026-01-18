@@ -221,6 +221,7 @@ pub struct CrapApp {
 
     // Lightbox
     pub fullscreen_image: Option<String>,
+    pub gallery_context: Option<Vec<String>>,
 }
 
 impl CrapApp {
@@ -292,6 +293,7 @@ impl CrapApp {
             last_scroll_time: Instant::now(),
             focus_search_field: false,
             fullscreen_image: None,
+            gallery_context: None,
         };
 
         // Initial Scale Load
@@ -2244,6 +2246,8 @@ impl eframe::App for CrapApp {
         // LIGHTBOX OVERLAY
         if let Some(uri) = &self.fullscreen_image {
             let mut close = false;
+            let mut next_image = None;
+
             egui::Area::new("lightbox_overlay".into())
                 .order(egui::Order::Foreground)
                 .fixed_pos(egui::pos2(0.0, 0.0))
@@ -2252,7 +2256,6 @@ impl eframe::App for CrapApp {
                     let screen_rect = ctx.screen_rect();
 
                     // 1. Dimmed Background
-                    // We allocate a rect covering the whole screen to catch clicks
                     let (rect, response) =
                         ui.allocate_exact_size(screen_rect.size(), egui::Sense::click());
                     ui.painter()
@@ -2263,42 +2266,9 @@ impl eframe::App for CrapApp {
                     }
 
                     // 2. Centered Image
-                    // Calculate available size (with some padding)
                     let max_size = screen_rect.size() * 0.9;
-
-                    // We render the image centered on top of the background
-                    // We use egui::Image with shrink_to_fit to handle scaling naturally
                     let img = egui::Image::new(uri).shrink_to_fit().max_size(max_size);
 
-                    // Just put it in the center. Area is fixed_pos(0,0), so we can use put/paint_at if we calculate rect, or just a centered layout?
-                    // Centered layout inside the Area is tricky because Area is infinite canvas usually, but we sized it?
-                    // Let's use a sub-ui with centered layout at the screen center.
-
-                    let center_pos = screen_rect.center();
-                    // We need to know image size to center it perfectly? Image widget handles layout.
-                    // A simple way is to use a window-like rect or just ui.put with Align::Center
-
-                    // BUT: we are inside the 'show' of an Area.
-                    // Let's just create a child UI centered.
-
-                    let image_area_rect = egui::Rect::from_center_size(center_pos, max_size);
-
-                    // We can just paint it? But we want interaction (maybe right click to close too?)
-                    // Let's use a Window without frame? No, Area is better for overlay.
-
-                    // We can use `ui.allocate_ui_at_rect` but centering is manual.
-                    // Easier: ui.put() with a centered alignment anchor?
-                    // egui::Area doesn't support layout easily.
-
-                    // Alternative: Use CentralPanel logic? No, overlay.
-
-                    // Let's just use a Window! transparent frame, no title bar, centered.
-                    // But Window captures input differently.
-
-                    // Stick to Area. Manual centering.
-                    // We trust `image.load` to get size for perfect centering?
-                    // Actually, egui::Image logic is robust.
-                    // We can put it in a container that fills screen and centers content.
                     ui.allocate_ui_at_rect(screen_rect, |ui| {
                         ui.centered_and_justified(|ui| {
                             ui.add(img);
@@ -2306,12 +2276,36 @@ impl eframe::App for CrapApp {
                     });
                 });
 
+            // Handle Input
             if ctx.input(|i| i.key_pressed(egui::Key::Escape)) {
                 close = true;
             }
 
+            if ctx.input(|i| i.key_pressed(egui::Key::ArrowRight)) {
+                if let Some(context) = &self.gallery_context {
+                    if let Some(idx) = context.iter().position(|u| u == uri) {
+                        let new_idx = (idx + 1) % context.len();
+                        next_image = Some(context[new_idx].clone());
+                    }
+                }
+            }
+
+            if ctx.input(|i| i.key_pressed(egui::Key::ArrowLeft)) {
+                if let Some(context) = &self.gallery_context {
+                    if let Some(idx) = context.iter().position(|u| u == uri) {
+                        let new_idx = if idx == 0 { context.len() - 1 } else { idx - 1 };
+                        next_image = Some(context[new_idx].clone());
+                    }
+                }
+            }
+
             if close {
                 self.fullscreen_image = None;
+                self.gallery_context = None;
+            }
+
+            if let Some(next) = next_image {
+                self.fullscreen_image = Some(next);
             }
         }
 
