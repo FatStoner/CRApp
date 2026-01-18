@@ -222,6 +222,26 @@ pub fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                             });
                             
                             ui.add_space(10.0);
+                            if ui.button("APPLY TEMPLATE").clicked() {
+                                // Since we are in the editor with a taken character, the popup will need to know target char id.
+                                // But TemplateSelector doesn't need it yet?
+                                // Actually, my implementation of TemplateSelector in popups.rs checks app.selected_character to create the preview.
+                                // BUT, app.selected_character is NONE here because we took it!
+                                // We need to handle this.
+                                // We can't put it back yet.
+                                // Strategy: Use a workaround.
+                                // OR, we can change TemplateSelector to NOT rely on app.selected_character IMMEDIATELY, 
+                                // or we can pass the ID to TemplateSelector?
+                                // Let's check my popups.rs implementation...
+                                // It creates TemplatePreview { target_char_id: char.id } inside the update loop which happens mostly in render_popups where app.selected_character IS valid (hopefully).
+                                // WAIT. render_popups is called at the end of the frame usually?
+                                // In `render_central_panel`, `selected_character` is taken.
+                                // `render_popups` is called in `update`...
+                                // Let's check where `render_popups` is called.
+                                app.popup_state = crate::ui::PopupState::TemplateSelector;
+                            }
+
+                            ui.add_space(10.0);
                             if app.is_saving {
                                 ui.spinner();
                                 ui.label("Saving...");

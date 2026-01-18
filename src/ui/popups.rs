@@ -46,6 +46,11 @@ pub enum PopupState {
         parsed_data: Option<crate::ui::parsing::ParsedLorebookData>,
     },
     ExportDbSelection,
+    TemplateSelector,
+    TemplatePreview {
+        template_data: crate::models::Template,
+        target_char_id: i64,
+    },
 }
 
 pub fn render_popups(ctx: &egui::Context, app: &mut CrapApp) {
@@ -657,6 +662,121 @@ pub fn render_popups(ctx: &egui::Context, app: &mut CrapApp) {
                 });
             if close {
                 app.popup_state = PopupState::None;
+            }
+        }
+        PopupState::TemplateSelector => {
+            let mut close = false;
+            let mut selected_template = None;
+            egui::Window::new("Select Template")
+                .collapsible(false)
+                .resizable(true)
+                .min_width(300.0)
+                .default_height(400.0)
+                .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
+                .show(ctx, |ui| {
+                     ui.label("Choose a template to apply:");
+                     ui.add_space(5.0);
+                     
+                     egui::ScrollArea::vertical().show(ui, |ui| {
+                         for template in &app.templates {
+                            if ui.button(&template.name).clicked() {
+                                selected_template = Some(template.clone());
+                            }
+                         }
+                     });
+
+                    ui.add_space(10.0);
+                    if ui.button("Cancel").clicked() {
+                        close = true;
+                    }
+                });
+            
+            if let Some(template) = selected_template {
+                 if let Some(char) = &app.selected_character {
+                     app.popup_state = PopupState::TemplatePreview {
+                         template_data: template,
+                         target_char_id: char.id
+                     };
+                 } else {
+                     // Should not happen if button is only in editor
+                     close = true;
+                 }
+            } else if close {
+                app.popup_state = PopupState::None;
+            }
+        }
+        PopupState::TemplatePreview { mut template_data, target_char_id } => {
+            let mut close = false;
+            let mut apply = false;
+            
+            egui::Window::new("Preview & Edit Template")
+                .collapsible(false)
+                .resizable(true)
+                .min_width(500.0)
+                .default_height(600.0)
+                .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
+                .show(ctx, |ui| {
+                    ui.label(egui::RichText::new("Review the template data before applying.").strong());
+                    ui.label("You can edit these fields here. They will overwrite the current character's data.");
+                    ui.separator();
+                    
+                    egui::ScrollArea::vertical().show(ui, |ui| {
+                        ui.label("Title:");
+                        ui.text_edit_singleline(&mut template_data.title);
+                        ui.add_space(5.0);
+                        
+                        ui.label("First Message:");
+                        ui.add(egui::TextEdit::multiline(&mut template_data.first_message).desired_rows(3));
+                        ui.add_space(5.0);
+                        
+                        ui.label("Personality:");
+                        ui.add(egui::TextEdit::multiline(&mut template_data.personality).desired_rows(3));
+                        ui.add_space(5.0);
+                        
+                        ui.label("Scenario:");
+                        ui.add(egui::TextEdit::multiline(&mut template_data.scenario).desired_rows(3));
+                        ui.add_space(5.0);
+                        
+                        ui.label("Example Dialogue:");
+                        ui.add(egui::TextEdit::multiline(&mut template_data.example_dialogue).desired_rows(3));
+                    });
+                    
+                    ui.separator();
+                    ui.horizontal(|ui| {
+                        if ui.button("Apply Template").clicked() {
+                            apply = true;
+                        }
+                        if ui.button("Cancel").clicked() {
+                            close = true;
+                        }
+                    });
+                });
+            
+            if apply {
+                 if let Some(char) = &mut app.selected_character {
+                     if char.id == target_char_id {
+                         char.char_title = template_data.title;
+                         char.first_message = template_data.first_message;
+                         char.personality = template_data.personality;
+                         char.scenario = template_data.scenario;
+                         char.example_dialogue = template_data.example_dialogue;
+                         // Mark as modified if we tracked that, but UI handles dirty checks by diffing with DB
+                     }
+                 }
+                app.popup_state = PopupState::None;
+            } else if close {
+                app.popup_state = PopupState::None;
+            } else {
+                // Determine if we need to update state because of edits
+                 // We need to persist edits to the popup state
+                 // Since we destructured `template_data` mutably from a clone of the state (at start of fn),
+                 // we must write it back.
+                 // HOWEVER, `app.popup_state` is already borrowing `app`? No, we cloned state at start.
+                 // So we can write to app.popup_state.
+                 app.popup_state = PopupState::TemplatePreview {
+                     template_data,
+                     target_char_id
+                 };
             }
         }
     }
