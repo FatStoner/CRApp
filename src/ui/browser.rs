@@ -409,12 +409,39 @@ pub fn render_browser_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                         for char in &chars {
                             ui.add_space(8.0);
 
+                            // List Item Hover Interaction
+                            let id = ui.make_persistent_id(format!("char_list_{}", char.id));
+                            let prev_rect = ui
+                                .data(|d| d.get_temp::<egui::Rect>(id))
+                                .unwrap_or(egui::Rect::ZERO);
+
+                            let interact_response = if prev_rect.width() > 0.0 {
+                                ui.interact(prev_rect, id, egui::Sense::click())
+                            } else {
+                                // Dummy response for first frame
+                                ui.allocate_response(egui::Vec2::ZERO, egui::Sense::hover())
+                            };
+
+                            if interact_response.clicked() {
+                                actions.push(BrowserAction::OpenCharacter(char.id));
+                            }
+
+                            // Determine colors
+                            let bg_color = if interact_response.hovered() {
+                                ui.visuals().widgets.hovered.bg_fill
+                            } else {
+                                ui.visuals().widgets.noninteractive.bg_fill
+                            };
+                            let stroke = if interact_response.hovered() {
+                                ui.visuals().widgets.hovered.bg_stroke
+                            } else {
+                                ui.visuals().widgets.noninteractive.bg_stroke
+                            };
+
                             // Main card container
-                            let bg_color = ui.visuals().widgets.noninteractive.bg_fill;
-                            // We want a card look for List/URL views now
-                            egui::Frame::group(ui.style())
+                            let frame_response = egui::Frame::group(ui.style())
                                 .fill(bg_color)
-                                .stroke(ui.visuals().widgets.noninteractive.bg_stroke)
+                                .stroke(stroke)
                                 .rounding(4.0)
                                 .inner_margin(8.0)
                                 .show(ui, |ui| {
@@ -551,7 +578,14 @@ pub fn render_browser_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                                             }
                                         });
                                     });
-                                });
+                                })
+                                .response;
+
+                            // We need to account for the potential space added before the frame
+                            // The rect we want is the frame's rect, which includes the inner margin and content.
+                            // However, we want the hover area to include the outer margin if possible, or at least be stable.
+                            // frame_response.rect is good.
+                            ui.data_mut(|d| d.insert_temp(id, frame_response.rect));
                         }
                     });
                 }
@@ -966,10 +1000,39 @@ pub fn render_subfolder_list_item(
     actions: &mut Vec<BrowserAction>,
 ) {
     ui.add_space(8.0);
-    let bg_color = ui.visuals().widgets.noninteractive.bg_fill;
-    egui::Frame::group(ui.style())
+
+    // List Item Hover Interaction
+    let id = ui.make_persistent_id(format!("folder_list_{}", folder.id));
+    let prev_rect = ui
+        .data(|d| d.get_temp::<egui::Rect>(id))
+        .unwrap_or(egui::Rect::ZERO);
+
+    let interact_response = if prev_rect.width() > 0.0 {
+        ui.interact(prev_rect, id, egui::Sense::click())
+    } else {
+        // Dummy response for first frame
+        ui.allocate_response(egui::Vec2::ZERO, egui::Sense::hover())
+    };
+
+    if interact_response.clicked() {
+        actions.push(BrowserAction::OpenCollection(folder.id));
+    }
+
+    // Determine colors
+    let bg_color = if interact_response.hovered() {
+        ui.visuals().widgets.hovered.bg_fill
+    } else {
+        ui.visuals().widgets.noninteractive.bg_fill
+    };
+    let stroke = if interact_response.hovered() {
+        ui.visuals().widgets.hovered.bg_stroke
+    } else {
+        ui.visuals().widgets.noninteractive.bg_stroke
+    };
+
+    let frame_response = egui::Frame::group(ui.style())
         .fill(bg_color)
-        .stroke(ui.visuals().widgets.noninteractive.bg_stroke)
+        .stroke(stroke)
         .rounding(4.0)
         .inner_margin(8.0)
         .show(ui, |ui| {
@@ -1043,5 +1106,8 @@ pub fn render_subfolder_list_item(
                     );
                 });
             });
-        });
+        })
+        .response;
+
+    ui.data_mut(|d| d.insert_temp(id, frame_response.rect));
 }
