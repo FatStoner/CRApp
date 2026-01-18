@@ -1,8 +1,8 @@
 use super::browser::render_browser_view;
 use super::editor::{render_editor_view, render_lorebook_editor};
 use super::parsing::parse_clipboard;
-use crate::ui::options_window::render_options_window;
 use crate::models::Tag;
+use crate::ui::options_window::render_options_window;
 use crate::ui::{AppMode, CrapApp, UiEvent};
 use eframe::egui;
 

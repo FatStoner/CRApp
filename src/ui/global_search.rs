@@ -106,197 +106,204 @@ pub fn render_deep_search(app: &mut CrapApp, ui: &mut egui::Ui) {
         }
     });
 
-    // Folder filter
-    ui.horizontal(|ui| {
-        ui.label("Folder:");
+    // Advanced Options Collapsible
+    ui.collapsing("Advanced options", |ui| {
+        // Folder filter
+        ui.horizontal(|ui| {
+            ui.label("Folder:");
 
-        egui::ComboBox::from_id_salt("deep_search_folder_filter")
-            .selected_text(if let Some(coll_id) = app.deep_search_filter_collection {
-                app.collections
-                    .iter()
-                    .find(|c| c.id == coll_id)
-                    .map(|c| c.name.as_str())
-                    .unwrap_or("Unknown")
-            } else {
-                "All Folders"
-            })
-            .show_ui(ui, |ui| {
-                // "All Folders" option
-                if ui
-                    .selectable_value(&mut app.deep_search_filter_collection, None, "All Folders")
-                    .clicked()
-                {
-                    // Trigger re-search if query exists
-                    if !app.deep_search_query.trim().is_empty() {
-                        app.perform_deep_search();
+            egui::ComboBox::from_id_salt("deep_search_folder_filter")
+                .selected_text(if let Some(coll_id) = app.deep_search_filter_collection {
+                    app.collections
+                        .iter()
+                        .find(|c| c.id == coll_id)
+                        .map(|c| c.name.as_str())
+                        .unwrap_or("Unknown")
+                } else {
+                    "All Folders"
+                })
+                .show_ui(ui, |ui| {
+                    // "All Folders" option
+                    if ui
+                        .selectable_value(
+                            &mut app.deep_search_filter_collection,
+                            None,
+                            "All Folders",
+                        )
+                        .clicked()
+                    {
+                        // Trigger re-search if query exists
+                        if !app.deep_search_query.trim().is_empty() {
+                            app.perform_deep_search();
+                        }
                     }
+
+                    ui.separator();
+
+                    // List all root collections and their children
+                    let root_collections: Vec<_> = app
+                        .collections
+                        .iter()
+                        .filter(|c| c.parent_id.is_none())
+                        .cloned()
+                        .collect();
+
+                    for collection in root_collections {
+                        render_collection_option(app, ui, &collection, 0);
+                    }
+                });
+        });
+
+        // Field filters
+        ui.separator();
+        ui.horizontal(|ui| {
+            ui.label("Search in:");
+
+            if ui.button("All").clicked() {
+                app.deep_search_char_field_filters =
+                    crate::ui::CharacterSearchFieldFilters::all_enabled();
+                app.deep_search_lore_field_filters =
+                    crate::ui::LorebookSearchFieldFilters::all_enabled();
+                if !app.deep_search_query.trim().is_empty() {
+                    app.perform_deep_search();
                 }
+            }
 
-                ui.separator();
-
-                // List all root collections and their children
-                let root_collections: Vec<_> = app
-                    .collections
-                    .iter()
-                    .filter(|c| c.parent_id.is_none())
-                    .cloned()
-                    .collect();
-
-                for collection in root_collections {
-                    render_collection_option(app, ui, &collection, 0);
+            if ui.button("None").clicked() {
+                app.deep_search_char_field_filters =
+                    crate::ui::CharacterSearchFieldFilters::all_disabled();
+                app.deep_search_lore_field_filters =
+                    crate::ui::LorebookSearchFieldFilters::all_disabled();
+                if !app.deep_search_query.trim().is_empty() {
+                    app.perform_deep_search();
                 }
-            });
-    });
+            }
+        });
 
-    // Field filters
-    ui.separator();
-    ui.horizontal(|ui| {
-        ui.label("Search in:");
+        ui.add_space(4.0);
+        ui.horizontal(|ui| {
+            ui.label(egui::RichText::new("Character Fields:").strong());
+            ui.add_space(8.0);
+            if ui.button("All").clicked() {
+                app.deep_search_char_field_filters =
+                    crate::ui::CharacterSearchFieldFilters::all_enabled();
+                if !app.deep_search_query.trim().is_empty() {
+                    app.perform_deep_search();
+                }
+            }
+            if ui.button("None").clicked() {
+                app.deep_search_char_field_filters =
+                    crate::ui::CharacterSearchFieldFilters::all_disabled();
+                if !app.deep_search_query.trim().is_empty() {
+                    app.perform_deep_search();
+                }
+            }
+        });
+        ui.horizontal_wrapped(|ui| {
+            let mut changed = false;
 
-        if ui.button("All").clicked() {
-            app.deep_search_char_field_filters =
-                crate::ui::CharacterSearchFieldFilters::all_enabled();
-            app.deep_search_lore_field_filters =
-                crate::ui::LorebookSearchFieldFilters::all_enabled();
-            if !app.deep_search_query.trim().is_empty() {
+            changed |= ui
+                .checkbox(&mut app.deep_search_char_field_filters.name, "Name")
+                .changed();
+            changed |= ui
+                .checkbox(&mut app.deep_search_char_field_filters.char_title, "Title")
+                .changed();
+            changed |= ui
+                .checkbox(
+                    &mut app.deep_search_char_field_filters.personality,
+                    "Personality",
+                )
+                .changed();
+            changed |= ui
+                .checkbox(&mut app.deep_search_char_field_filters.scenario, "Scenario")
+                .changed();
+            changed |= ui
+                .checkbox(
+                    &mut app.deep_search_char_field_filters.first_message,
+                    "First Message",
+                )
+                .changed();
+            changed |= ui
+                .checkbox(
+                    &mut app.deep_search_char_field_filters.example_dialogue,
+                    "Example Dialogue",
+                )
+                .changed();
+            changed |= ui
+                .checkbox(
+                    &mut app.deep_search_char_field_filters.author_notes,
+                    "Notes",
+                )
+                .changed();
+            changed |= ui
+                .checkbox(&mut app.deep_search_char_field_filters.urls, "URLs")
+                .changed();
+            changed |= ui
+                .checkbox(&mut app.deep_search_char_field_filters.tags, "Tags")
+                .changed();
+
+            if changed && !app.deep_search_query.trim().is_empty() {
                 app.perform_deep_search();
             }
-        }
+        });
 
-        if ui.button("None").clicked() {
-            app.deep_search_char_field_filters =
-                crate::ui::CharacterSearchFieldFilters::all_disabled();
-            app.deep_search_lore_field_filters =
-                crate::ui::LorebookSearchFieldFilters::all_disabled();
-            if !app.deep_search_query.trim().is_empty() {
+        ui.add_space(4.0);
+        ui.horizontal(|ui| {
+            ui.label(egui::RichText::new("Lorebook Fields:").strong());
+            ui.add_space(8.0);
+            if ui.button("All").clicked() {
+                app.deep_search_lore_field_filters =
+                    crate::ui::LorebookSearchFieldFilters::all_enabled();
+                if !app.deep_search_query.trim().is_empty() {
+                    app.perform_deep_search();
+                }
+            }
+            if ui.button("None").clicked() {
+                app.deep_search_lore_field_filters =
+                    crate::ui::LorebookSearchFieldFilters::all_disabled();
+                if !app.deep_search_query.trim().is_empty() {
+                    app.perform_deep_search();
+                }
+            }
+        });
+        ui.horizontal_wrapped(|ui| {
+            let mut changed = false;
+
+            changed |= ui
+                .checkbox(&mut app.deep_search_lore_field_filters.title, "Title")
+                .changed();
+            changed |= ui
+                .checkbox(
+                    &mut app.deep_search_lore_field_filters.description,
+                    "Description",
+                )
+                .changed();
+            changed |= ui
+                .checkbox(&mut app.deep_search_lore_field_filters.tags, "Tags")
+                .changed();
+            changed |= ui
+                .checkbox(
+                    &mut app.deep_search_lore_field_filters.entry_name,
+                    "Entry Name",
+                )
+                .changed();
+            changed |= ui
+                .checkbox(
+                    &mut app.deep_search_lore_field_filters.entry_keywords,
+                    "Entry Keywords",
+                )
+                .changed();
+            changed |= ui
+                .checkbox(
+                    &mut app.deep_search_lore_field_filters.entry_content,
+                    "Entry Content",
+                )
+                .changed();
+
+            if changed && !app.deep_search_query.trim().is_empty() {
                 app.perform_deep_search();
             }
-        }
-    });
-
-    ui.add_space(4.0);
-    ui.horizontal(|ui| {
-        ui.label(egui::RichText::new("Character Fields:").strong());
-        ui.add_space(8.0);
-        if ui.button("All").clicked() {
-            app.deep_search_char_field_filters =
-                crate::ui::CharacterSearchFieldFilters::all_enabled();
-            if !app.deep_search_query.trim().is_empty() {
-                app.perform_deep_search();
-            }
-        }
-        if ui.button("None").clicked() {
-            app.deep_search_char_field_filters =
-                crate::ui::CharacterSearchFieldFilters::all_disabled();
-            if !app.deep_search_query.trim().is_empty() {
-                app.perform_deep_search();
-            }
-        }
-    });
-    ui.horizontal_wrapped(|ui| {
-        let mut changed = false;
-
-        changed |= ui
-            .checkbox(&mut app.deep_search_char_field_filters.name, "Name")
-            .changed();
-        changed |= ui
-            .checkbox(&mut app.deep_search_char_field_filters.char_title, "Title")
-            .changed();
-        changed |= ui
-            .checkbox(
-                &mut app.deep_search_char_field_filters.personality,
-                "Personality",
-            )
-            .changed();
-        changed |= ui
-            .checkbox(&mut app.deep_search_char_field_filters.scenario, "Scenario")
-            .changed();
-        changed |= ui
-            .checkbox(
-                &mut app.deep_search_char_field_filters.first_message,
-                "First Message",
-            )
-            .changed();
-        changed |= ui
-            .checkbox(
-                &mut app.deep_search_char_field_filters.example_dialogue,
-                "Example Dialogue",
-            )
-            .changed();
-        changed |= ui
-            .checkbox(
-                &mut app.deep_search_char_field_filters.author_notes,
-                "Notes",
-            )
-            .changed();
-        changed |= ui
-            .checkbox(&mut app.deep_search_char_field_filters.urls, "URLs")
-            .changed();
-        changed |= ui
-            .checkbox(&mut app.deep_search_char_field_filters.tags, "Tags")
-            .changed();
-
-        if changed && !app.deep_search_query.trim().is_empty() {
-            app.perform_deep_search();
-        }
-    });
-
-    ui.add_space(4.0);
-    ui.horizontal(|ui| {
-        ui.label(egui::RichText::new("Lorebook Fields:").strong());
-        ui.add_space(8.0);
-        if ui.button("All").clicked() {
-            app.deep_search_lore_field_filters =
-                crate::ui::LorebookSearchFieldFilters::all_enabled();
-            if !app.deep_search_query.trim().is_empty() {
-                app.perform_deep_search();
-            }
-        }
-        if ui.button("None").clicked() {
-            app.deep_search_lore_field_filters =
-                crate::ui::LorebookSearchFieldFilters::all_disabled();
-            if !app.deep_search_query.trim().is_empty() {
-                app.perform_deep_search();
-            }
-        }
-    });
-    ui.horizontal_wrapped(|ui| {
-        let mut changed = false;
-
-        changed |= ui
-            .checkbox(&mut app.deep_search_lore_field_filters.title, "Title")
-            .changed();
-        changed |= ui
-            .checkbox(
-                &mut app.deep_search_lore_field_filters.description,
-                "Description",
-            )
-            .changed();
-        changed |= ui
-            .checkbox(&mut app.deep_search_lore_field_filters.tags, "Tags")
-            .changed();
-        changed |= ui
-            .checkbox(
-                &mut app.deep_search_lore_field_filters.entry_name,
-                "Entry Name",
-            )
-            .changed();
-        changed |= ui
-            .checkbox(
-                &mut app.deep_search_lore_field_filters.entry_keywords,
-                "Entry Keywords",
-            )
-            .changed();
-        changed |= ui
-            .checkbox(
-                &mut app.deep_search_lore_field_filters.entry_content,
-                "Entry Content",
-            )
-            .changed();
-
-        if changed && !app.deep_search_query.trim().is_empty() {
-            app.perform_deep_search();
-        }
+        });
     });
     ui.separator();
 
