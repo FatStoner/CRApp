@@ -54,12 +54,6 @@ pub struct Tag {
     pub name: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct TagPair {
-    pub tag: Tag,
-    pub is_external: bool,
-}
-
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, FromRow)]
 pub struct CharacterUrl {
     pub id: i64,

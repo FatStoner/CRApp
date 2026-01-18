@@ -578,7 +578,7 @@ pub fn render_lorebook_editor(app: &mut CrapApp, ui: &mut egui::Ui) {
                             app.popup_state = crate::ui::PopupState::CollectionIconConfirmation {
                                 id,
                                 path: String::new(),
-                                preview_texture: None,
+                                _preview_texture: None,
                             };
                         }
                         crate::ui::browser::BrowserAction::OpenCharacter(id) => {

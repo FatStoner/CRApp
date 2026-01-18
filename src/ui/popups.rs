@@ -8,11 +8,9 @@ pub enum PopupState {
         id: i64,
         name: String,
     },
-    DeleteConfirmation {
-        id: i64,
-    },
+
     DeleteWarning {
-        id: i64,
+        _id: i64,
         count: usize,
     },
     DeleteCharacterConfirmation {
@@ -39,7 +37,7 @@ pub enum PopupState {
     CollectionIconConfirmation {
         id: i64,
         path: String,
-        preview_texture: Option<egui::TextureHandle>,
+        _preview_texture: Option<egui::TextureHandle>,
     },
     LorebookImport {
         source_code: String,
@@ -95,32 +93,8 @@ pub fn render_popups(ctx: &egui::Context, app: &mut CrapApp) {
                 app.popup_state = PopupState::None;
             }
         }
-        PopupState::DeleteConfirmation { id } => {
-            // Note: This seems legacy/unused based on warnings, but keeping for now as it's in the enum
-            let mut close = false;
-            egui::Window::new("Delete Collection?")
-                .collapsible(false)
-                .resizable(false)
-                .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
-                .show(ctx, |ui| {
-                    ui.label("Are you sure you want to delete this collection?");
-                    ui.colored_label(egui::Color32::RED, "This action cannot be undone.");
-                    ui.add_space(10.0);
-                    ui.horizontal(|ui| {
-                        if ui.button("Yes, Delete").clicked() {
-                            app.delete_collection(id);
-                            close = true;
-                        }
-                        if ui.button("Cancel").clicked() {
-                            close = true;
-                        }
-                    });
-                });
-            if close {
-                app.popup_state = PopupState::None;
-            }
-        }
-        PopupState::DeleteWarning { id: _, count } => {
+
+        PopupState::DeleteWarning { _id: _, count } => {
             let mut close = false;
             egui::Window::new("Cannot Delete Folder")
                 .collapsible(false)
@@ -387,7 +361,7 @@ pub fn render_popups(ctx: &egui::Context, app: &mut CrapApp) {
                         app.popup_state = PopupState::CollectionIconConfirmation {
                             id,
                             path: path.clone(),
-                            preview_texture: None,
+                            _preview_texture: None,
                         };
                     }
 
@@ -436,7 +410,7 @@ pub fn render_popups(ctx: &egui::Context, app: &mut CrapApp) {
                     ui.label("Paste the page source code below:");
 
                     egui::ScrollArea::vertical()
-                        .id_source("import_source_scroll")
+                        .id_salt("import_source_scroll")
                         .max_height(200.0)
                         .show(ui, |ui| {
                             ui.add(
@@ -458,7 +432,7 @@ pub fn render_popups(ctx: &egui::Context, app: &mut CrapApp) {
                     if let Some(data) = &parsed_data {
                         ui.heading("Preview");
                         egui::ScrollArea::vertical()
-                            .id_source("import_preview_scroll")
+                            .id_salt("import_preview_scroll")
                             .max_height(150.0)
                             .show(ui, |ui| {
                                 egui::Grid::new("import_preview_grid").num_columns(2).show(
@@ -698,8 +672,7 @@ pub fn render_popups(ctx: &egui::Context, app: &mut CrapApp) {
                          target_char_id: char.id
                      };
                  } else {
-                     // Should not happen if button is only in editor
-                     close = true;
+                     app.popup_state = PopupState::None;
                  }
             } else if close {
                 app.popup_state = PopupState::None;

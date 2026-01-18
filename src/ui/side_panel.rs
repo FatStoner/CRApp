@@ -1,4 +1,4 @@
-use crate::models::{Character, Collection, Lorebook, ThemeMode};
+use crate::models::{Character, Collection, Lorebook};
 use crate::ui::{AppMode, CrapApp, SortDirection, SortMode};
 use eframe::egui;
 
@@ -441,7 +441,7 @@ pub fn render_side_panel(app: &mut CrapApp, ctx: &egui::Context) {
                                 .count();
                             if child_colls + child_chars > 0 {
                                 app.popup_state = crate::ui::PopupState::DeleteWarning {
-                                    id,
+                                    _id: id,
                                     count: child_colls + child_chars,
                                 };
                             } else {

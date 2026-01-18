@@ -1,4 +1,4 @@
-use crate::ui::{CrapApp, UiEvent};
+use crate::ui::CrapApp;
 use eframe::egui;
 
 pub fn render_template_editor(app: &mut CrapApp, ui: &mut egui::Ui) {

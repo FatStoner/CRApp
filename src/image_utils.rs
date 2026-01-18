@@ -1,6 +1,7 @@
 use image::GenericImageView;
 use std::path::Path;
 
+#[allow(dead_code)]
 pub fn process_collection_image(path: &str) -> Option<String> {
     let img = image::open(path).ok()?;
     let (w, h) = img.dimensions();
@@ -27,6 +28,7 @@ pub fn process_collection_image(path: &str) -> Option<String> {
     Some(save_path)
 }
 
+#[allow(dead_code)]
 pub fn process_clipboard_image() -> Option<String> {
     let mut clipboard = arboard::Clipboard::new().ok()?;
     let image_data = clipboard.get_image().ok()?;

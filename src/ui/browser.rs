@@ -192,7 +192,7 @@ pub fn render_browser_view(app: &mut CrapApp, ui: &mut egui::Ui) {
             ui.add_space(8.0);
             ui.add_space(8.0);
 
-            egui::ComboBox::from_id_source("view_mode_selector")
+            egui::ComboBox::from_id_salt("view_mode_selector")
                 .selected_text(match app.browser_view_mode {
                     BrowserViewMode::Grid => "View: Grid",
                     BrowserViewMode::List => "View: List",
@@ -611,7 +611,7 @@ pub fn render_browser_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                         .count();
 
                 if count > 0 {
-                    app.popup_state = crate::ui::PopupState::DeleteWarning { id, count };
+                    app.popup_state = crate::ui::PopupState::DeleteWarning { _id: id, count };
                 } else {
                     app.delete_collection(id);
                 }
@@ -626,7 +626,7 @@ pub fn render_browser_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                 app.popup_state = crate::ui::PopupState::CollectionIconConfirmation {
                     id,
                     path: String::new(),
-                    preview_texture: None,
+                    _preview_texture: None,
                 };
             }
             BrowserAction::OpenCharacter(id) => {
@@ -653,7 +653,7 @@ pub fn render_browser_view(app: &mut CrapApp, ui: &mut egui::Ui) {
 
 pub fn render_character_card(
     ui: &mut egui::Ui,
-    app: &mut CrapApp,
+    _app: &mut CrapApp,
     char: &crate::models::Character,
     all_collections: &Vec<crate::models::Collection>,
     actions: &mut Vec<BrowserAction>,
@@ -853,7 +853,7 @@ pub fn render_character_card(
 
 pub fn render_subfolder_card(
     ui: &mut egui::Ui,
-    app: &mut CrapApp,
+    _app: &mut CrapApp,
     folder: &crate::models::Collection,
     actions: &mut Vec<BrowserAction>,
 ) {

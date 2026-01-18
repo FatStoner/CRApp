@@ -142,7 +142,7 @@ pub enum UiEvent {
     DbReloaded(Result<Database, String>),
 
     LoreLinksBulkLoaded(HashMap<i64, Vec<i64>>),
-    CollectionIconUpdated(Result<i64, String>),
+
     TokenCountCalculated(i64, usize, usize), // (CharId, Tokens, Chars)
     LorebookImported(Lorebook),
     StatusMessage(String, egui::Color32),
@@ -205,7 +205,6 @@ pub struct CrapApp {
 
     // Spell Checker
     pub spell_checker: Option<std::sync::Arc<spell_check::SpellChecker>>,
-    pub show_spell_check_settings: bool,
 
     // Import Modal State
     pub show_import_modal: bool,
@@ -284,7 +283,6 @@ impl CrapApp {
             ext_tag_input: String::new(),
 
             spell_checker: spell_check::SpellChecker::new().map(std::sync::Arc::new),
-            show_spell_check_settings: false,
 
             show_import_modal: false,
             show_options_window: false,
@@ -980,29 +978,6 @@ impl CrapApp {
         path.join(" / ")
     }
 
-    pub fn get_descendant_collections(&self, parent_id: Option<i64>) -> Vec<i64> {
-        let mut result = Vec::new();
-
-        if let Some(pid) = parent_id {
-            result.push(pid);
-
-            // Find all direct children
-            let children: Vec<i64> = self
-                .collections
-                .iter()
-                .filter(|c| c.parent_id == Some(pid))
-                .map(|c| c.id)
-                .collect();
-
-            // Recursively get descendants
-            for child_id in children {
-                result.extend(self.get_descendant_collections(Some(child_id)));
-            }
-        }
-
-        result
-    }
-
     pub fn toggle_lore_link(&mut self, char_id: i64, lore_id: i64, link: bool) {
         if char_id == 0 {
             return;
@@ -1123,7 +1098,7 @@ impl CrapApp {
         if let Some(c) = self.characters.iter_mut().find(|c| c.id == char_id) {
             c.is_favorite = !c.is_favorite;
             // Persist
-            let mut char_clone = c.clone();
+            let char_clone = c.clone();
             // We use save_character which handles upsert.
             // But save_character might be too heavy if it reloads everything?
             // Actually it spawns a task and eventually reloads chars.
@@ -1631,7 +1606,7 @@ impl CrapApp {
             }
 
             // 5.5 Aggregate Matches
-            for (_, mut lb) in lorebook_map {
+            for (_, lb) in lorebook_map {
                 let mut matches = Vec::new();
 
                 // 5.5.1 Lorebook Text Matches
@@ -2271,18 +2246,7 @@ impl eframe::App for CrapApp {
                         );
                     }
                 },
-                UiEvent::CollectionIconUpdated(res) => match res {
-                    Ok(_) => {
-                        self.set_status(
-                            "Collection Icon Updated".to_string(),
-                            egui::Color32::GREEN,
-                        );
-                        self.reload_collections();
-                    }
-                    Err(e) => {
-                        self.set_status(format!("Icon Update Error: {}", e), egui::Color32::RED)
-                    }
-                },
+
                 UiEvent::TokenCountCalculated(id, tokens, chars) => {
                     self.token_cache.insert(id, (tokens, chars));
                     self.token_calc_in_progress.remove(&id);
@@ -2364,7 +2328,7 @@ impl eframe::App for CrapApp {
                     let max_size = screen_rect.size() * 0.9;
                     let img = egui::Image::new(uri).shrink_to_fit().max_size(max_size);
 
-                    ui.allocate_ui_at_rect(screen_rect, |ui| {
+                    ui.allocate_new_ui(egui::UiBuilder::new().max_rect(screen_rect), |ui| {
                         ui.centered_and_justified(|ui| {
                             ui.add(img);
                         });
@@ -2723,7 +2687,7 @@ impl CrapApp {
                 ctx.request_repaint();
                 // Reload
                 match db.get_all_templates().await {
-                    Ok(mut templates) => {
+                    Ok(templates) => {
                         let _ = tx.send(UiEvent::TemplatesLoaded(Ok(templates))).await;
                     }
                     Err(e) => {

@@ -31,7 +31,7 @@ enum ImportFormat {
     Profile,
     Edit,
     CraveEdit,
-    LorebookHtml,
+
     Unknown,
 }
 
@@ -582,7 +582,7 @@ fn parse_profile_view(lines: &[&str]) -> ParsedCharacterData {
                     // Check for Lorebook pattern:
                     // If we have at least 2 candidates, checks the distance between 0 and 1.
                     // If distance is 2 (1 empty line gap), assume 0 is Lorebook and 1 is Title.
-                    let (first_idx, first_val) = candidates_with_indices[0];
+                    let (first_idx, _first_val) = candidates_with_indices[0];
                     let start_index = if candidates_with_indices.len() >= 2 {
                         let (second_idx, _) = candidates_with_indices[1];
                         if second_idx - first_idx == 2 {

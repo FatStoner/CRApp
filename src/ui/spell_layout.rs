@@ -89,8 +89,7 @@ pub fn create_spell_check_layouter(
             }
 
             // Check Spell error
-            let is_spell_error = spell_errors.iter().any(|r| r.0 <= start && r.1 >= end); // Range is fully within error? No, points split error.
-                                                                                          // Check if THIS block is part of an error.
+
             if spell_errors.iter().any(|r| start >= r.0 && end <= r.1) {
                 format.underline = egui::Stroke::new(1.0, egui::Color32::RED);
             }

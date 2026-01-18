@@ -176,7 +176,7 @@ pub fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                                                                 // Add tEXt chunk
                                                                 // TavernAI spec requires tEXt chunk with keyword "chara" and value as base64 encoded JSON
                                                                 // add_text_chunk adds a tEXt chunk.
-                                                                encoder.add_text_chunk("chara".to_string(), b64.to_string());
+                                                                    let _ = encoder.add_text_chunk("chara".to_string(), b64.to_string());
                                                                                             
                                                                 let mut writer = encoder.write_header().expect("Failed to write PNG header");
                                                                 let _ = writer.write_image_data(&pixels);

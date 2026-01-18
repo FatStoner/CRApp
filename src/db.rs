@@ -299,7 +299,7 @@ impl Database {
         let sort = if move_up { "DESC" } else { "ASC" };
 
         // Handle parent_id null checks
-        let query = if let Some(pid) = current.parent_id {
+        let query = if let Some(_pid) = current.parent_id {
             format!("SELECT * FROM collections WHERE parent_id = ? AND display_order {} ? ORDER BY display_order {} LIMIT 1", op, sort)
         } else {
             format!("SELECT * FROM collections WHERE parent_id IS NULL AND display_order {} ? ORDER BY display_order {} LIMIT 1", op, sort)
@@ -947,41 +947,6 @@ impl Database {
         self.pool.close().await;
     }
 
-    pub async fn validate_candidate(path: &std::path::Path) -> Result<(), String> {
-        if !path.exists() {
-            return Err("File does not exist".to_string());
-        }
-
-        let db_url = format!("sqlite://{}", path.to_string_lossy());
-
-        // Open separate pool
-        let pool = SqlitePoolOptions::new()
-            .max_connections(1)
-            .connect(&db_url)
-            .await
-            .map_err(|e| e.to_string())?;
-
-        // Basic Check: Does 'characters' table exist?
-        let row: Option<(i64,)> = sqlx::query_as(
-            "SELECT count(*) FROM sqlite_master WHERE type='table' AND name='characters'",
-        )
-        .fetch_optional(&pool)
-        .await
-        .map_err(|e| e.to_string())?;
-
-        let valid = match row {
-            Some((count,)) => count > 0,
-            None => false,
-        };
-
-        pool.close().await;
-
-        if valid {
-            Ok(())
-        } else {
-            Err("Invalid database schema: 'characters' table missing.".to_string())
-        }
-    }
     // --- Templates ---
     pub async fn get_all_templates(&self) -> Result<Vec<crate::models::Template>, sqlx::Error> {
         sqlx::query_as::<_, crate::models::Template>("SELECT * FROM templates ORDER BY name ASC")

@@ -127,7 +127,7 @@ pub fn text_context_menu(ui: &mut egui::Ui, text: &mut String, id: egui::Id) {
         if let Some(cb) = &mut clipboard {
             if let Ok(content) = cb.get_text() {
                 let content_len_chars = content.chars().count();
-                let mut insert_index = 0;
+                let insert_index;
 
                 // For paste, we prefer the "current" cursor if it exists, even if it's just a point.
                 // But if we have a stored SELECTION, we should probably overwrite it?
