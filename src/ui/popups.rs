@@ -399,6 +399,7 @@ pub fn render_popups(ctx: &egui::Context, app: &mut CrapApp) {
             let mut close = false;
             let mut do_parse = false;
             let mut do_import = false;
+            let mut loaded_file_data = None;
 
             egui::Window::new("Import Lorebook from SpicyChat")
                 .collapsible(false)
@@ -407,7 +408,22 @@ pub fn render_popups(ctx: &egui::Context, app: &mut CrapApp) {
                 .default_height(500.0)
                 .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
                 .show(ctx, |ui| {
-                    ui.label("Paste the page source code below:");
+                     ui.horizontal(|ui| {
+                        if ui.button("📂 Load .crappbook / JSON").clicked() {
+                             if let Some(path) = rfd::FileDialog::new()
+                                .add_filter("Lorebook", &["crappbook", "json"])
+                                .pick_file() 
+                            {
+                                if let Ok(content) = std::fs::read_to_string(&path) {
+                                    if let Ok(data) = crate::ui::parsing::parse_crappbook_json(&content) {
+                                        loaded_file_data = Some(data);
+                                    }
+                                }
+                            }
+                        }
+                    });
+                    ui.separator();
+                    ui.label("Or paste SpicyChat source code below:");
 
                     egui::ScrollArea::vertical()
                         .id_salt("import_source_scroll")
@@ -492,7 +508,12 @@ pub fn render_popups(ctx: &egui::Context, app: &mut CrapApp) {
                 });
 
             // Handle State Updates outside the closure
-            if do_parse {
+            if let Some(data) = loaded_file_data {
+                 app.popup_state = PopupState::LorebookImport {
+                    source_code: String::new(),
+                    parsed_data: Some(data),
+                };
+            } else if do_parse {
                 let parsed = crate::ui::parsing::parse_spicychat_lorebook(&source_code);
                 app.popup_state = PopupState::LorebookImport {
                     source_code, // Keep source code

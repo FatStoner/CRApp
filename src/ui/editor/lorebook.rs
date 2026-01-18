@@ -45,8 +45,38 @@ pub fn render_lorebook_editor(app: &mut CrapApp, ui: &mut egui::Ui) {
             ui.heading("Edit Lorebook");
 
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                // EXPORT (Placeholder)
-                ui.add_enabled(false, egui::Button::new("EXPORT"));
+                // EXPORT
+                if ui.button("EXPORT").clicked() {
+                    let export_data = crate::ui::parsing::ParsedLorebookData {
+                        title: book.title.clone(),
+                        description: book.description.clone(),
+                        tags: book.tags.iter().map(|t| t.name.clone()).collect(),
+                        entries: book.entries.iter().map(|e| crate::ui::parsing::ParsedLorebookEntry {
+                            name: e.name.clone(),
+                            keywords: e.keywords.split(',').map(|k| k.trim().to_string()).filter(|k| !k.is_empty()).collect(),
+                            content: e.content.clone(),
+                        }).collect(),
+                    };
+
+                    if let Ok(json) = serde_json::to_string_pretty(&export_data) {
+                        let safe_title: String = book.title.chars().filter(|c| c.is_alphanumeric() || *c == ' ' || *c == '-' || *c == '_').collect();
+                        let filename = format!("{}.crappbook", safe_title.replace(" ", "_"));
+                        
+                         if let Some(path) = rfd::FileDialog::new()
+                            .set_file_name(&filename)
+                            .add_filter("Crappbook", &["crappbook", "json"])
+                            .save_file()
+                        {
+                            if let Err(e) = std::fs::write(&path, json) {
+                                status_update = Some((format!("Export failed: {}", e), egui::Color32::RED));
+                            } else {
+                                status_update = Some(("Export successful!".to_string(), egui::Color32::GREEN));
+                            }
+                        }
+                    } else {
+                         status_update = Some(("Serialization failed!".to_string(), egui::Color32::RED));
+                    }
+                }
 
                 // IMPORT
                 if ui.button("IMPORT").clicked() {

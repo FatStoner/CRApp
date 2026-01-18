@@ -16,19 +16,23 @@ pub struct ParsedCharacterData {
     pub avatar_path: Option<String>,
 }
 
-#[derive(Default, Clone, Debug)]
+#[derive(Default, Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct ParsedLorebookEntry {
     pub name: String,
     pub keywords: Vec<String>,
     pub content: String,
 }
 
-#[derive(Default, Clone, Debug)]
+#[derive(Default, Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct ParsedLorebookData {
     pub title: String,
     pub description: String,
     pub tags: Vec<String>,
     pub entries: Vec<ParsedLorebookEntry>,
+}
+
+pub fn parse_crappbook_json(json: &str) -> Result<ParsedLorebookData, serde_json::Error> {
+    serde_json::from_str(json)
 }
 
 enum ImportFormat {
