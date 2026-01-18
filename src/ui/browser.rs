@@ -867,20 +867,19 @@ pub fn render_subfolder_card(
     // 2. Visuals (Hover effect)
     let is_hovered = response.hovered();
     let bg_color = if is_hovered {
-        egui::Color32::from_gray(45)
+        ui.visuals().widgets.hovered.bg_fill
     } else {
-        egui::Color32::from_gray(32)
+        ui.visuals().widgets.noninteractive.bg_fill
     };
     let stroke_color = if is_hovered {
-        egui::Color32::from_gray(100)
+        ui.visuals().widgets.hovered.bg_stroke
     } else {
-        egui::Color32::from_gray(60)
+        ui.visuals().widgets.noninteractive.bg_stroke
     };
 
     // 3. Paint Background
     ui.painter().rect_filled(rect, 8.0, bg_color);
-    ui.painter()
-        .rect_stroke(rect, 8.0, egui::Stroke::new(1.0, stroke_color));
+    ui.painter().rect_stroke(rect, 8.0, stroke_color);
 
     // 4. Render Content (Manual Painting)
     let center_x = rect.center().x;
@@ -905,14 +904,20 @@ pub fn render_subfolder_card(
         };
         crate::ui::widgets::paint_avatar_crop(ui, icon_rect, &uri, 8.0);
     } else {
-        ui.painter()
-            .rect_filled(icon_rect, 8.0, egui::Color32::from_rgb(45, 45, 60));
+        let icon_bg = ui
+            .visuals()
+            .widgets
+            .noninteractive
+            .bg_stroke
+            .color
+            .linear_multiply(0.5);
+        ui.painter().rect_filled(icon_rect, 8.0, icon_bg);
         ui.painter().text(
             icon_rect.center(),
             egui::Align2::CENTER_CENTER,
             "📁",
             egui::FontId::proportional(64.0),
-            egui::Color32::from_rgb(200, 200, 200),
+            ui.visuals().text_color(),
         );
     }
 
@@ -920,14 +925,13 @@ pub fn render_subfolder_card(
     let text_top = icon_rect.max.y + 16.0;
     let text_pos = egui::pos2(center_x, text_top);
 
-    // Manual layout for centered text (wrapping if overly long?)
-    // For now simple single line or limited wrap centered
+    // Manual layout for centered text
     ui.painter().text(
         text_pos,
         egui::Align2::CENTER_TOP,
         &folder.name,
         egui::FontId::proportional(16.0),
-        egui::Color32::from_gray(220),
+        ui.visuals().text_color(),
     );
 
     // 5. Interaction Logic
@@ -1010,14 +1014,20 @@ pub fn render_subfolder_list_item(
                     };
                     crate::ui::widgets::paint_avatar_crop(ui, rect, &uri, 4.0);
                 } else {
-                    ui.painter()
-                        .rect_filled(rect, 4.0, egui::Color32::from_gray(60));
+                    let icon_bg = ui
+                        .visuals()
+                        .widgets
+                        .noninteractive
+                        .bg_stroke
+                        .color
+                        .linear_multiply(0.5);
+                    ui.painter().rect_filled(rect, 4.0, icon_bg);
                     ui.painter().text(
                         rect.center(),
                         egui::Align2::CENTER_CENTER,
                         "📁",
                         egui::FontId::proportional(40.0),
-                        egui::Color32::from_rgb(200, 200, 200),
+                        ui.visuals().text_color(),
                     );
                 }
 
