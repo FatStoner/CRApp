@@ -38,6 +38,23 @@ pub fn render_collection_move_menu(
     }
 }
 
+fn count_recursive(
+    collection_id: Option<i64>,
+    collections: &[crate::models::Collection],
+    characters: &[crate::models::Character],
+) -> usize {
+    let direct = characters
+        .iter()
+        .filter(|c| c.collection_id == collection_id)
+        .count();
+    let sub_folders = collections.iter().filter(|c| c.parent_id == collection_id);
+    let mut total = direct;
+    for sub in sub_folders {
+        total += count_recursive(Some(sub.id), collections, characters);
+    }
+    total
+}
+
 pub fn render_browser_view(app: &mut CrapApp, ui: &mut egui::Ui) {
     let viewing_all = app.viewing_all_characters;
     let collection_id = app.selected_collection_id;
@@ -274,23 +291,6 @@ pub fn render_browser_view(app: &mut CrapApp, ui: &mut egui::Ui) {
     // --- Character Counter Calculations ---
     let direct_count = chars.len();
 
-    fn count_recursive(
-        collection_id: Option<i64>,
-        collections: &[crate::models::Collection],
-        characters: &[crate::models::Character],
-    ) -> usize {
-        let direct = characters
-            .iter()
-            .filter(|c| c.collection_id == collection_id)
-            .count();
-        let sub_folders = collections.iter().filter(|c| c.parent_id == collection_id);
-        let mut total = direct;
-        for sub in sub_folders {
-            total += count_recursive(Some(sub.id), collections, characters);
-        }
-        total
-    }
-
     let total_count = if viewing_all {
         app.characters.len()
     } else {
@@ -400,14 +400,12 @@ pub fn render_browser_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                     });
                 } else {
                     // LIST or URL VIEW
-                    // Keep folders separate at the top (horizontal wrapped for folders)
-                    ui.horizontal_wrapped(|ui| {
-                        for folder in &subfolders {
-                            render_subfolder_card(ui, app, folder, &mut actions);
-                        }
-                    });
-
                     ui.vertical(|ui| {
+                        for folder in &subfolders {
+                            let count =
+                                count_recursive(Some(folder.id), &app.collections, &app.characters);
+                            render_subfolder_list_item(ui, app, folder, count, &mut actions);
+                        }
                         for char in &chars {
                             ui.add_space(8.0);
 
@@ -954,4 +952,86 @@ pub fn render_subfolder_card(
             ui.close_menu();
         }
     });
+}
+
+pub fn render_subfolder_list_item(
+    ui: &mut egui::Ui,
+    _app: &mut CrapApp,
+    folder: &crate::models::Collection,
+    count: usize,
+    actions: &mut Vec<BrowserAction>,
+) {
+    ui.add_space(8.0);
+    let bg_color = ui.visuals().widgets.noninteractive.bg_fill;
+    egui::Frame::group(ui.style())
+        .fill(bg_color)
+        .stroke(ui.visuals().widgets.noninteractive.bg_stroke)
+        .rounding(4.0)
+        .inner_margin(8.0)
+        .show(ui, |ui| {
+            ui.set_min_width(ui.available_width());
+            ui.horizontal(|ui| {
+                // Folder Icon
+                let size = 80.0;
+                let (rect, response) =
+                    ui.allocate_exact_size(egui::vec2(size, size), egui::Sense::click());
+
+                if response.clicked() {
+                    actions.push(BrowserAction::OpenCollection(folder.id));
+                }
+
+                response.context_menu(|ui| {
+                    if ui.button("Rename Folder").clicked() {
+                        actions.push(BrowserAction::RenameCollection(
+                            folder.id,
+                            folder.name.clone(),
+                        ));
+                        ui.close_menu();
+                    }
+                    if ui.button("Change Icon").clicked() {
+                        actions.push(BrowserAction::UpdateCollectionIcon(folder.id));
+                        ui.close_menu();
+                    }
+                    if ui.button("Delete Folder").clicked() {
+                        actions.push(BrowserAction::DeleteCollection(folder.id));
+                        ui.close_menu();
+                    }
+                });
+
+                if let Some(path) = &folder.image_path {
+                    let uri = if path.contains("://") {
+                        path.clone()
+                    } else {
+                        if let Ok(abs) = std::fs::canonicalize(path) {
+                            format!("file://{}", abs.to_string_lossy())
+                        } else {
+                            path.clone()
+                        }
+                    };
+                    crate::ui::widgets::paint_avatar_crop(ui, rect, &uri, 4.0);
+                } else {
+                    ui.painter()
+                        .rect_filled(rect, 4.0, egui::Color32::from_gray(60));
+                    ui.painter().text(
+                        rect.center(),
+                        egui::Align2::CENTER_CENTER,
+                        "📁",
+                        egui::FontId::proportional(40.0),
+                        egui::Color32::from_rgb(200, 200, 200),
+                    );
+                }
+
+                ui.add_space(10.0);
+
+                // Info
+                ui.vertical(|ui| {
+                    ui.heading(&folder.name);
+                    ui.add_space(4.0);
+                    ui.label(
+                        egui::RichText::new(format!("Contains {} characters", count))
+                            .color(egui::Color32::GRAY),
+                    );
+                });
+            });
+        });
 }
