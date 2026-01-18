@@ -41,6 +41,7 @@ impl Database {
 
         // 2. Run Migrations
         // This will create tables if they don't exist, using the idempotent SQL files.
+        println!("Checking for migrations (templates support)...");
         println!("Applying migrations...");
         if let Err(e) = MIGRATOR.run(&pool).await {
             let err_msg = e.to_string();
@@ -57,7 +58,26 @@ impl Database {
         // 1. Ensure 'content' in 'lorebooks' exists (covered by sqlx usually, but good to be sure if we silenced error)
         // (Skipping for now as app works, focusing on the new issue)
 
-        // 2. Ensure 'image_path' in 'collections'
+        // 2. Ensure 'templates' table exists (Migration fallback)
+        println!("Verifying schema for 'templates'...");
+        let _ = sqlx::query(
+            "CREATE TABLE IF NOT EXISTS templates (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                title TEXT NOT NULL,
+                first_message TEXT NOT NULL DEFAULT '',
+                personality TEXT NOT NULL DEFAULT '',
+                scenario TEXT NOT NULL DEFAULT '',
+                example_dialogue TEXT NOT NULL DEFAULT '',
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );",
+        )
+        .execute(&pool)
+        .await
+        .map_err(|e| eprintln!("Warning: Failed to ensure templates table exists: {}", e));
+
+        // 3. Ensure 'image_path' in 'collections'
         // We try to add it. If it exists, it errors, and we ignore that error.
         println!("Verifying schema for 'collections'...");
         let _ = sqlx::query("ALTER TABLE collections ADD COLUMN image_path TEXT")
@@ -961,5 +981,63 @@ impl Database {
         } else {
             Err("Invalid database schema: 'characters' table missing.".to_string())
         }
+    }
+    // --- Templates ---
+    pub async fn get_all_templates(&self) -> Result<Vec<crate::models::Template>, sqlx::Error> {
+        sqlx::query_as::<_, crate::models::Template>("SELECT * FROM templates ORDER BY name ASC")
+            .fetch_all(&self.pool)
+            .await
+    }
+
+    pub async fn upsert_template(
+        &self,
+        template: &mut crate::models::Template,
+    ) -> Result<(), sqlx::Error> {
+        template.updated_at = chrono::Utc::now();
+        if template.id == 0 {
+            // INSERT
+            let id = sqlx::query(
+                "INSERT INTO templates (name, title, first_message, personality, scenario, example_dialogue, created_at, updated_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+            )
+            .bind(&template.name)
+            .bind(&template.title)
+            .bind(&template.first_message)
+            .bind(&template.personality)
+            .bind(&template.scenario)
+            .bind(&template.example_dialogue)
+            .bind(template.created_at)
+            .bind(template.updated_at)
+            .execute(&self.pool)
+            .await?
+            .last_insert_rowid();
+
+            template.id = id;
+        } else {
+            // UPDATE
+            sqlx::query(
+                "UPDATE templates SET name=?, title=?, first_message=?, personality=?, scenario=?, example_dialogue=?, updated_at=? WHERE id=?"
+            )
+            .bind(&template.name)
+            .bind(&template.title)
+            .bind(&template.first_message)
+            .bind(&template.personality)
+            .bind(&template.scenario)
+            .bind(&template.example_dialogue)
+            .bind(template.updated_at)
+            .bind(template.id)
+            .execute(&self.pool)
+            .await?;
+        }
+
+        Ok(())
+    }
+
+    pub async fn delete_template(&self, id: i64) -> Result<(), sqlx::Error> {
+        sqlx::query("DELETE FROM templates WHERE id = ?")
+            .bind(id)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
     }
 }

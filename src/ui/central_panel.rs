@@ -274,6 +274,9 @@ pub fn render_central_panel(app: &mut CrapApp, ctx: &egui::Context) {
             AppMode::Lorebooks => {
                 render_lorebook_editor(app, ui);
             },
+            AppMode::Templates => {
+                crate::ui::editor::render_template_editor(app, ui);
+            },
             _ => {
                 ui.label("Unknown mode");
             }

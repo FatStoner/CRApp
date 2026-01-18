@@ -2,7 +2,7 @@ use crate::db::Database;
 use eframe::egui;
 
 use crate::models::{
-    Character, Collection, DeepSearchResult, Lorebook, SearchResultKind, Tag, ThemeMode,
+    Character, Collection, DeepSearchResult, Lorebook, SearchResultKind, Tag, Template, ThemeMode,
 };
 
 use tokio::sync::mpsc;
@@ -35,6 +35,7 @@ pub use parsing::ParsedCharacterData;
 pub enum AppMode {
     Characters,
     Lorebooks,
+    Templates,
     DeepSearch,
 }
 
@@ -87,6 +88,9 @@ pub enum AppAction {
     GoBack,
     CreateNewCharacter(Option<i64>),
     CreateNewLorebook,
+    CreateNewTemplate,
+    SwitchTemplate(i64),
+    SwitchToTemplates,
 }
 
 // PopupState moved to popups.rs
@@ -127,6 +131,9 @@ pub enum UiEvent {
     LorebookEntryDeleted(Result<i64, String>),
     LorebookEntryAdded(Result<i64, String>), // Returns new ID
     LorebookDeleted(Result<i64, String>),
+    TemplatesLoaded(Result<Vec<Template>, String>),
+    TemplateSaved(Result<Template, String>),
+    TemplateDeleted(Result<i64, String>),
 
     ImportFileLoaded(Result<String, String>),
     ThemeLoaded(Result<ThemeMode, String>),
@@ -150,6 +157,7 @@ pub struct CrapApp {
     // Data (Cached)
     pub characters: Vec<Character>,
     pub lorebooks: Vec<Lorebook>,
+    pub templates: Vec<Template>,
     pub collections: Vec<Collection>,
     pub lore_links: HashSet<i64>,
     pub char_lore_map: HashMap<i64, Vec<i64>>,
@@ -160,6 +168,7 @@ pub struct CrapApp {
     pub mode: AppMode,
     pub selected_character: Option<Character>,
     pub selected_lorebook: Option<Lorebook>,
+    pub selected_template: Option<Template>,
     pub selected_entry: Option<crate::models::LorebookEntry>,
     pub active_char_tab: CharacterTab,
     pub active_lorebook_tab: LorebookTab,
@@ -236,6 +245,7 @@ impl CrapApp {
             ctx: cc.egui_ctx.clone(),
             characters: Vec::new(),
             lorebooks: Vec::new(),
+            templates: Vec::new(),
             collections: Vec::new(),
             lore_links: HashSet::new(),
             char_lore_map: HashMap::new(),
@@ -244,6 +254,7 @@ impl CrapApp {
             mode: AppMode::Characters,
             selected_character: None,
             selected_lorebook: None,
+            selected_template: None,
             selected_entry: None,
 
             active_char_tab: CharacterTab::MainData,
@@ -427,6 +438,18 @@ impl CrapApp {
                 }
                 Err(e) => {
                     let _ = tx.send(UiEvent::LorebooksLoaded(Err(e.to_string()))).await;
+                    ctx.request_repaint();
+                }
+            }
+
+            // Load Templates
+            match db.get_all_templates().await {
+                Ok(templates) => {
+                    let _ = tx.send(UiEvent::TemplatesLoaded(Ok(templates))).await;
+                    ctx.request_repaint();
+                }
+                Err(e) => {
+                    let _ = tx.send(UiEvent::TemplatesLoaded(Err(e.to_string()))).await;
                     ctx.request_repaint();
                 }
             }
@@ -1035,6 +1058,17 @@ impl CrapApp {
                     false
                 }
             }
+        } else if let Some(selected_template) = &self.selected_template {
+            if selected_template.id == 0 {
+                !selected_template.content_eq(&Template::default())
+            } else {
+                if let Some(original) = self.templates.iter().find(|t| t.id == selected_template.id)
+                {
+                    !selected_template.content_eq(original)
+                } else {
+                    false
+                }
+            }
         } else {
             false
         }
@@ -1141,6 +1175,18 @@ impl CrapApp {
         }
     }
 
+    pub fn request_switch_to_templates(&mut self) {
+        if self.has_unsaved_changes() {
+            self.popup_state = PopupState::UnsavedChanges {
+                target: AppAction::SwitchToTemplates,
+            };
+        } else {
+            self.mode = AppMode::Templates;
+            self.selected_character = None;
+            self.selected_lorebook = None;
+        }
+    }
+
     pub fn perform_action(&mut self, action: AppAction, ctx: &egui::Context) {
         match action {
             AppAction::SwitchCharacter(id) => self.load_character(id),
@@ -1172,6 +1218,17 @@ impl CrapApp {
             }
             AppAction::CreateNewLorebook => {
                 self.perform_create_new_lorebook();
+            }
+            AppAction::CreateNewTemplate => {
+                self.perform_create_new_template();
+            }
+            AppAction::SwitchTemplate(id) => {
+                self.perform_template_switch(id);
+            }
+            AppAction::SwitchToTemplates => {
+                self.mode = AppMode::Templates;
+                self.selected_character = None;
+                self.selected_lorebook = None;
             }
         }
     }
@@ -2048,6 +2105,44 @@ impl eframe::App for CrapApp {
                     }
                     Err(e) => self.set_status(format!("Delete Error: {}", e), egui::Color32::RED),
                 },
+                UiEvent::TemplatesLoaded(res) => match res {
+                    Ok(list) => {
+                        self.templates = list;
+                    }
+                    Err(e) => {
+                        eprintln!("Load error: {}", e);
+                        self.loading_error = Some(e);
+                    }
+                },
+                UiEvent::TemplateSaved(res) => {
+                    self.is_saving = false;
+                    match res {
+                        Ok(t) => {
+                            self.selected_template = Some(t);
+                            self.set_status("Template Saved!".to_string(), egui::Color32::GREEN);
+                        }
+                        Err(e) => {
+                            self.set_status(format!("Save Error: {}", e), egui::Color32::RED);
+                        }
+                    }
+                }
+                UiEvent::TemplateDeleted(res) => {
+                    self.is_saving = false;
+                    match res {
+                        Ok(id) => {
+                            self.set_status("Template Deleted".to_string(), egui::Color32::GREEN);
+                            self.templates.retain(|t| t.id != id);
+                            if let Some(selected) = &self.selected_template {
+                                if selected.id == id {
+                                    self.selected_template = None;
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            self.set_status(format!("Delete Error: {}", e), egui::Color32::RED);
+                        }
+                    }
+                }
                 UiEvent::DeepSearchCompleted(res) => {
                     self.is_deep_searching = false;
                     match res {
@@ -2592,6 +2687,87 @@ impl CrapApp {
                 }
             }
         });
+    }
+    pub fn create_new_template(&mut self) {
+        if self.has_unsaved_changes() {
+            self.popup_state = PopupState::UnsavedChanges {
+                target: AppAction::CreateNewTemplate,
+            };
+        } else {
+            self.perform_create_new_template();
+        }
+    }
+
+    pub fn perform_create_new_template(&mut self) {
+        self.push_history();
+        let new_template = Template::default();
+        self.selected_template = Some(new_template.clone());
+        self.save_template(new_template);
+        self.mode = AppMode::Templates;
+        self.selected_character = None;
+        self.selected_lorebook = None;
+    }
+
+    pub fn save_template(&mut self, mut template: Template) {
+        self.is_saving = true;
+        self.status_message = None;
+        let tx = self.tx.clone();
+        let db = self.db.clone();
+        let ctx = self.ctx.clone();
+        tokio::spawn(async move {
+            if let Err(e) = db.upsert_template(&mut template).await {
+                let _ = tx.send(UiEvent::TemplateSaved(Err(e.to_string()))).await;
+                ctx.request_repaint();
+            } else {
+                let _ = tx.send(UiEvent::TemplateSaved(Ok(template))).await;
+                ctx.request_repaint();
+                // Reload
+                match db.get_all_templates().await {
+                    Ok(mut templates) => {
+                        let _ = tx.send(UiEvent::TemplatesLoaded(Ok(templates))).await;
+                    }
+                    Err(e) => {
+                        let _ = tx.send(UiEvent::TemplatesLoaded(Err(e.to_string()))).await;
+                    }
+                }
+                ctx.request_repaint();
+            }
+        });
+    }
+
+    pub fn delete_template(&self, id: i64) {
+        let tx = self.tx.clone();
+        let db = self.db.clone();
+        let ctx = self.ctx.clone();
+        tokio::spawn(async move {
+            let res = db.delete_template(id).await;
+            let _ = tx
+                .send(UiEvent::TemplateDeleted(
+                    res.map(|_| id).map_err(|e| e.to_string()),
+                ))
+                .await;
+            ctx.request_repaint();
+        });
+    }
+
+    pub fn request_template_switch(&mut self, id: i64) {
+        if self.has_unsaved_changes() {
+            self.popup_state = PopupState::UnsavedChanges {
+                target: AppAction::SwitchTemplate(id),
+            };
+        } else {
+            self.perform_template_switch(id);
+        }
+    }
+
+    pub fn perform_template_switch(&mut self, id: i64) {
+        self.push_history();
+        if let Some(t) = self.templates.iter().find(|t| t.id == id).cloned() {
+            self.selected_template = Some(t);
+            self.mode = AppMode::Templates;
+            self.selected_character = None;
+            self.selected_lorebook = None;
+        }
     }
 }
 

@@ -19,6 +19,13 @@ pub fn render_side_panel(app: &mut CrapApp, ctx: &egui::Context) {
                 }
             });
             ui.separator();
+            if app.mode == AppMode::Characters || app.mode == AppMode::Templates {
+                let is_active = app.mode == AppMode::Templates;
+                if ui.selectable_label(is_active, "Templates").clicked() {
+                    app.request_switch_to_templates();
+                }
+                ui.separator();
+            }
             ui.separator();
 
             if let Some(err) = &app.loading_error {
@@ -301,6 +308,92 @@ pub fn render_side_panel(app: &mut CrapApp, ctx: &egui::Context) {
                                     crate::ui::PopupState::DeleteLorebookConfirmation { id, title };
                             }
                         }
+                        AppMode::Templates => {
+                            let mut template_to_select = None;
+                            let mut delete_req = None;
+
+                            for template in &app.templates {
+                                let is_selected = app.selected_template.as_ref().map(|t| t.id)
+                                    == Some(template.id);
+                                let (rect, response) = ui.allocate_exact_size(
+                                    egui::vec2(ui.available_width(), 48.0),
+                                    egui::Sense::click(),
+                                );
+
+                                if ui.is_rect_visible(rect) {
+                                    let bg_color = if is_selected {
+                                        ui.visuals().widgets.active.bg_fill
+                                    } else if response.hovered() {
+                                        ui.visuals().widgets.hovered.bg_fill
+                                    } else {
+                                        egui::Color32::TRANSPARENT
+                                    };
+
+                                    if bg_color != egui::Color32::TRANSPARENT {
+                                        let highlight_rect = rect.shrink2(egui::vec2(0.0, 2.0));
+                                        ui.painter().rect_filled(highlight_rect, 4.0, bg_color);
+                                    }
+
+                                    ui.allocate_new_ui(
+                                        egui::UiBuilder::new().max_rect(rect).layout(
+                                            egui::Layout::left_to_right(egui::Align::Center),
+                                        ),
+                                        |ui| {
+                                            ui.add_space(6.0);
+                                            // Icon
+                                            let thumb_size = 40.0;
+                                            let (thumb_rect, _) = ui.allocate_exact_size(
+                                                egui::vec2(thumb_size, thumb_size),
+                                                egui::Sense::hover(),
+                                            );
+
+                                            ui.painter().rect_filled(
+                                                thumb_rect,
+                                                2.0,
+                                                egui::Color32::from_gray(60),
+                                            );
+                                            ui.painter().text(
+                                                thumb_rect.center(),
+                                                egui::Align2::CENTER_CENTER,
+                                                "T",
+                                                egui::FontId::proportional(20.0),
+                                                egui::Color32::WHITE,
+                                            );
+
+                                            ui.add_space(8.0);
+                                            let mut label_text =
+                                                egui::RichText::new(&template.name);
+                                            if is_selected {
+                                                label_text = label_text
+                                                    .strong()
+                                                    .color(egui::Color32::LIGHT_BLUE);
+                                            }
+                                            ui.add(egui::Label::new(label_text).selectable(false));
+                                        },
+                                    );
+
+                                    response.context_menu(|ui| {
+                                        if ui.button("Delete").clicked() {
+                                            delete_req = Some((template.id, template.name.clone()));
+                                            ui.close_menu();
+                                        }
+                                    });
+
+                                    if response.clicked() {
+                                        template_to_select = Some(template.id);
+                                    }
+                                }
+                            }
+
+                            if let Some(tid) = template_to_select {
+                                app.request_template_switch(tid);
+                            }
+
+                            if let Some((id, name)) = delete_req {
+                                app.popup_state =
+                                    crate::ui::PopupState::DeleteTemplateConfirmation { id, name };
+                            }
+                        }
                         _ => {}
                     }
                 });
@@ -421,6 +514,12 @@ pub fn render_side_panel(app: &mut CrapApp, ctx: &egui::Context) {
                             app.create_new_lorebook();
                         }
                     });
+
+                    if app.mode == AppMode::Templates {
+                        if ui.button("➕ New Template").clicked() {
+                            app.create_new_template();
+                        }
+                    }
                     if app.mode == AppMode::Characters {
                         if ui.button("📁 New Folder").clicked() {
                             app.save_collection(0, "New Folder".to_string(), None);

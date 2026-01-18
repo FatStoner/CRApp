@@ -222,3 +222,45 @@ impl Lorebook {
             && self.entries == other.entries
     }
 }
+
+#[derive(Debug, Clone, FromRow, PartialEq, Serialize, Deserialize)]
+pub struct Template {
+    pub id: i64,
+    pub name: String,
+    pub title: String,
+    pub first_message: String,
+    pub personality: String,
+    pub scenario: String,
+    pub example_dialogue: String,
+    #[sqlx(default)]
+    pub created_at: DateTime<Utc>,
+    #[sqlx(default)]
+    pub updated_at: DateTime<Utc>,
+}
+
+impl Default for Template {
+    fn default() -> Self {
+        Self {
+            id: 0,
+            name: "New Template".to_string(),
+            title: "".to_string(),
+            first_message: "".to_string(),
+            personality: "".to_string(),
+            scenario: "".to_string(),
+            example_dialogue: "".to_string(),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        }
+    }
+}
+
+impl Template {
+    pub fn content_eq(&self, other: &Template) -> bool {
+        self.name == other.name
+            && self.title == other.title
+            && self.first_message == other.first_message
+            && self.personality == other.personality
+            && self.scenario == other.scenario
+            && self.example_dialogue == other.example_dialogue
+    }
+}

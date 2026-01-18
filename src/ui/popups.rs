@@ -28,6 +28,10 @@ pub enum PopupState {
         id: i64,
         title: String,
     },
+    DeleteTemplateConfirmation {
+        id: i64,
+        name: String,
+    },
     UnsavedChanges {
         target: AppAction,
     },
@@ -228,6 +232,31 @@ pub fn render_popups(ctx: &egui::Context, app: &mut CrapApp) {
                                         .await;
                                 }
                             });
+                            close = true;
+                        }
+                        if ui.button("Cancel").clicked() {
+                            close = true;
+                        }
+                    });
+                });
+            if close {
+                app.popup_state = PopupState::None;
+            }
+        }
+        PopupState::DeleteTemplateConfirmation { id, name } => {
+            let mut close = false;
+            egui::Window::new("Delete Template?")
+                .collapsible(false)
+                .resizable(false)
+                .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
+                .show(ctx, |ui| {
+                    ui.label(format!("Are you sure you want to delete '{}'?", name));
+                    ui.colored_label(egui::Color32::RED, "This action cannot be undone.");
+                    ui.add_space(10.0);
+
+                    ui.horizontal(|ui| {
+                        if ui.button("Yes, Delete").clicked() {
+                            app.delete_template(id);
                             close = true;
                         }
                         if ui.button("Cancel").clicked() {
