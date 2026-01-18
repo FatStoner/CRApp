@@ -507,7 +507,19 @@ pub fn render_browser_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                                                                 ))
                                                                 .strong(),
                                                             );
-                                                            ui.hyperlink(&url.url);
+                                                            let resp = ui.hyperlink(&url.url);
+                                                            resp.context_menu(|ui| {
+                                                                if ui
+                                                                    .button("📋 Copy URL")
+                                                                    .clicked()
+                                                                {
+                                                                    ui.output_mut(|o| {
+                                                                        o.copied_text =
+                                                                            url.url.clone()
+                                                                    });
+                                                                    ui.close_menu();
+                                                                }
+                                                            });
                                                         });
                                                     }
 
