@@ -106,7 +106,7 @@ pub fn render_browser_view(app: &mut CrapApp, ui: &mut egui::Ui) {
             .map(|c| c.name.clone())
             .unwrap_or("Unknown".to_string())
     } else {
-        "Uncategorized (Root)".to_string()
+        "Uncategorized".to_string()
     };
 
     let parent_id = if let Some(id) = collection_id {

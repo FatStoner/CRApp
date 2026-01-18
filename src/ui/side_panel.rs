@@ -129,6 +129,13 @@ pub fn render_side_panel(app: &mut CrapApp, ctx: &egui::Context) {
                                 actions.push(TreeAction::DeselectCollection);
                             }
 
+                            response.context_menu(|ui| {
+                                if ui.button("Fold all").clicked() {
+                                    actions.push(TreeAction::FoldAllFolders);
+                                    ui.close_menu();
+                                }
+                            });
+
                             if let Some(_) = response.dnd_hover_payload::<i64>() {
                                 ui.painter().rect_stroke(
                                     response.rect,
@@ -386,6 +393,20 @@ pub fn render_side_panel(app: &mut CrapApp, ctx: &egui::Context) {
                         TreeAction::ToggleFavorite(id) => {
                             app.toggle_favorite(id);
                         }
+                        TreeAction::FoldAllFolders => {
+                            // Deselect any collection so that ancestor logic doesn't force folders back open
+                            app.request_collection_switch(None);
+
+                            for col in &app.collections {
+                                let id = egui::Id::new(("folder", col.id));
+                                if let Some(mut state) =
+                                    egui::collapsing_header::CollapsingState::load(ctx, id)
+                                {
+                                    state.set_open(false);
+                                    state.store(ctx);
+                                }
+                            }
+                        }
                     }
                 }
 
@@ -425,6 +446,7 @@ pub enum TreeAction {
     CreateNewCharacter(Option<i64>),
     MoveCollection(i64, bool), // id, move_up
     ToggleFavorite(i64),
+    FoldAllFolders,
 }
 
 // Move render_tree here
@@ -483,7 +505,7 @@ pub fn render_tree(
             }
         }
 
-        let id_str = ui.make_persistent_id(col.id);
+        let id_str = egui::Id::new(("folder", col.id));
         let mut state = egui::collapsing_header::CollapsingState::load_with_default_open(
             ui.ctx(),
             id_str,
