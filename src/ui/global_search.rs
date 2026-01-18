@@ -305,7 +305,28 @@ pub fn render_deep_search(app: &mut CrapApp, ui: &mut egui::Ui) {
         ui.label("Searching database...");
     } else {
         ui.separator();
-        ui.label(format!("Found {} results", app.deep_search_results.len()));
+        ui.horizontal(|ui| {
+            ui.label(format!("Found {} results", app.deep_search_results.len()));
+
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                let sort_label = match app.deep_search_sort {
+                    None => "Sort: Default",
+                    Some(crate::ui::SortDirection::Ascending) => "Sort: A-Z",
+                    Some(crate::ui::SortDirection::Descending) => "Sort: Z-A",
+                };
+
+                if ui.button(sort_label).clicked() {
+                    app.deep_search_sort = match app.deep_search_sort {
+                        None => Some(crate::ui::SortDirection::Ascending),
+                        Some(crate::ui::SortDirection::Ascending) => {
+                            Some(crate::ui::SortDirection::Descending)
+                        }
+                        Some(crate::ui::SortDirection::Descending) => None,
+                    };
+                    app.sort_deep_search_results();
+                }
+            });
+        });
 
         let mut nav_action: Option<(SearchResultKind, i64)> = None;
 

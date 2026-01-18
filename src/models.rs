@@ -16,6 +16,7 @@ pub struct DeepSearchResult {
     pub display_name: String,
     pub collection_id: Option<i64>,     // For filtering by folder
     pub matches: Vec<(String, String)>, // (Field Name, Snippet)
+    pub index: usize,                   // For restoring original order
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

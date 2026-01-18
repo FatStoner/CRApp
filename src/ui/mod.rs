@@ -186,6 +186,7 @@ pub struct CrapApp {
     pub deep_search_char_field_filters: CharacterSearchFieldFilters, // Character field selection
     pub deep_search_lore_field_filters: LorebookSearchFieldFilters, // Lorebook field selection
     pub deep_search_results: Vec<DeepSearchResult>,
+    pub deep_search_sort: Option<SortDirection>,
     pub is_deep_searching: bool,
     pub editor_search_query: String, // In-editor search
 
@@ -264,6 +265,7 @@ impl CrapApp {
             deep_search_char_field_filters: CharacterSearchFieldFilters::default(),
             deep_search_lore_field_filters: LorebookSearchFieldFilters::default(),
             deep_search_results: Vec::new(),
+            deep_search_sort: None,
             is_deep_searching: false,
             editor_search_query: String::new(),
             app_tag_input: String::new(),
@@ -1385,6 +1387,7 @@ impl CrapApp {
         self.is_deep_searching = true;
         self.mode = AppMode::DeepSearch;
         self.deep_search_results.clear();
+        self.deep_search_sort = None; // Reset sort on new search
 
         let query = self.deep_search_query.clone();
         let filter_collection = self.deep_search_filter_collection;
@@ -1516,6 +1519,7 @@ impl CrapApp {
                         display_name: c.name,
                         collection_id: c.collection_id,
                         matches,
+                        index: 0, // Will be set after collection to ensure global order
                     });
                 }
             }
@@ -1623,6 +1627,7 @@ impl CrapApp {
                         display_name: lb.title,
                         collection_id: None,
                         matches,
+                        index: 0, // Will be set later
                     });
                 }
             }
@@ -1663,9 +1668,42 @@ impl CrapApp {
                 });
             }
 
+            // 6. Sort and Finalize
+            // We want stable initial order, so we assign index here based on push order
+            for (i, res) in results.iter_mut().enumerate() {
+                res.index = i;
+            }
+
             let _ = tx.send(UiEvent::DeepSearchCompleted(Ok(results))).await;
             ctx.request_repaint();
         });
+    }
+
+    pub fn sort_deep_search_results(&mut self) {
+        if self.deep_search_results.is_empty() {
+            return;
+        }
+
+        match self.deep_search_sort {
+            Some(SortDirection::Ascending) => {
+                self.deep_search_results.sort_by(|a, b| {
+                    a.display_name
+                        .to_lowercase()
+                        .cmp(&b.display_name.to_lowercase())
+                });
+            }
+            Some(SortDirection::Descending) => {
+                self.deep_search_results.sort_by(|a, b| {
+                    b.display_name
+                        .to_lowercase()
+                        .cmp(&a.display_name.to_lowercase())
+                });
+            }
+            None => {
+                // Restore original order
+                self.deep_search_results.sort_by_key(|r| r.index);
+            }
+        }
     }
 
     pub fn set_theme(&mut self, theme: ThemeMode) {
