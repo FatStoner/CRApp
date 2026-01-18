@@ -12,46 +12,14 @@ pub fn render_side_panel(app: &mut CrapApp, ctx: &egui::Context) {
             ui.horizontal(|ui| {
                 ui.selectable_value(&mut app.mode, AppMode::Characters, "Characters");
                 ui.selectable_value(&mut app.mode, AppMode::Lorebooks, "Lorebooks");
-            });
-            ui.separator();
-            ui.separator();
 
-            // Theme Toggle
-            ui.horizontal(|ui| {
-                ui.label("Theme:");
-                let theme_txt = match app.theme {
-                    ThemeMode::System => "🌗 Auto",
-                    ThemeMode::Light => "☀️ Light",
-                    ThemeMode::Dark => "🌙 Dark",
-                };
-                if ui.button(theme_txt).clicked() {
-                    let new_theme = match app.theme {
-                        ThemeMode::System => ThemeMode::Light,
-                        ThemeMode::Light => ThemeMode::Dark,
-                        ThemeMode::Dark => ThemeMode::System,
-                    };
-                    app.set_theme(new_theme);
+                ui.add_space(8.0);
+                if ui.button("Options").clicked() {
+                    app.show_options_window = true;
                 }
-
-                ui.separator();
-
-                ui.label("Scale:");
-                let current_scale = (app.ui_scale * 100.0).round() as i32;
-                let mut selected = current_scale;
-
-                egui::ComboBox::from_id_salt("scale_combo")
-                    .selected_text(format!("{}%", current_scale))
-                    .show_ui(ui, |ui| {
-                        for p in (80..=150).step_by(10) {
-                            if ui
-                                .selectable_value(&mut selected, p, format!("{}%", p))
-                                .clicked()
-                            {
-                                app.set_scale(selected as f32 / 100.0);
-                            }
-                        }
-                    });
             });
+            ui.separator();
+            ui.separator();
 
             if let Some(err) = &app.loading_error {
                 ui.colored_label(egui::Color32::RED, format!("Error: {}", err));

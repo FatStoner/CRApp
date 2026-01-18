@@ -22,6 +22,7 @@ pub mod widgets;
 pub use global_search::{CharacterSearchFieldFilters, LorebookSearchFieldFilters};
 pub use popups::PopupState;
 
+pub mod options_window;
 pub mod spell_check;
 pub mod spell_layout;
 
@@ -198,6 +199,7 @@ pub struct CrapApp {
 
     // Import Modal State
     pub show_import_modal: bool,
+    pub show_options_window: bool,
     pub import_text: String,
     pub parsed_data: Option<ParsedCharacterData>,
 
@@ -271,6 +273,7 @@ impl CrapApp {
             show_spell_check_settings: false,
 
             show_import_modal: false,
+            show_options_window: false,
             import_text: String::new(),
             parsed_data: None,
 

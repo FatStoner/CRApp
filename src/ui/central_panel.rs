@@ -1,6 +1,7 @@
 use super::browser::render_browser_view;
 use super::editor::{render_editor_view, render_lorebook_editor};
 use super::parsing::parse_clipboard;
+use crate::ui::options_window::render_options_window;
 use crate::models::Tag;
 use crate::ui::{AppMode, CrapApp, UiEvent};
 use eframe::egui;
@@ -246,6 +247,10 @@ pub fn render_central_panel(app: &mut CrapApp, ctx: &egui::Context) {
                     }
                 });
             return; // Modal blocking
+        }
+
+        if app.show_options_window {
+            render_options_window(app, ctx);
         }
 
         // Global Search View
