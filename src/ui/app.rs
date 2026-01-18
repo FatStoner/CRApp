@@ -99,6 +99,7 @@ pub struct CrapApp {
     // Lightbox
     pub fullscreen_image: Option<String>,
     pub gallery_context: Option<Vec<String>>,
+    pub use_custom_background: bool,
 }
 
 impl CrapApp {
@@ -172,6 +173,7 @@ impl CrapApp {
             focus_search_field: false,
             fullscreen_image: None,
             gallery_context: None,
+            use_custom_background: false,
         };
 
         // Initial Scale Load
@@ -205,6 +207,22 @@ impl CrapApp {
                 }
                 Ok(None) => {}
                 Err(e) => eprintln!("Failed to load theme: {}", e),
+            }
+        });
+
+        // Initial Background Setting Load
+        let tx = app.tx.clone();
+        let db = app.db.clone();
+        let ctx = app.ctx.clone();
+        tokio::spawn(async move {
+            match db.get_setting("use_custom_background").await {
+                Ok(Some(val)) => {
+                    let enabled = val == "true";
+                    let _ = tx.send(UiEvent::CustomBackgroundLoaded(enabled)).await;
+                    ctx.request_repaint();
+                }
+                Ok(None) => {}
+                Err(e) => eprintln!("Failed to load background setting: {}", e),
             }
         });
 
@@ -1710,6 +1728,16 @@ impl CrapApp {
             let _ = db.set_setting("ui_scale", &val).await;
         });
     }
+
+    pub fn set_custom_background_mode(&mut self, enabled: bool) {
+        self.use_custom_background = enabled;
+        let db = self.db.clone();
+        let val = if enabled { "true" } else { "false" };
+        tokio::spawn(async move {
+            let _ = db.set_setting("use_custom_background", val).await;
+        });
+    }
+
     pub fn ensure_token_count(&mut self, character: &Character) {
         if self.token_cache.contains_key(&character.id) {
             return;

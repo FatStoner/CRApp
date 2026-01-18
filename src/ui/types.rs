@@ -117,4 +117,5 @@ pub enum UiEvent {
     TokenCountCalculated(i64, usize, usize), // (CharId, Tokens, Chars)
     LorebookImported(Lorebook),
     StatusMessage(String, egui::Color32),
+    CustomBackgroundLoaded(bool),
 }

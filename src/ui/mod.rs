@@ -115,6 +115,9 @@ impl eframe::App for CrapApp {
                         self.apply_theme();
                     }
                 }
+                UiEvent::CustomBackgroundLoaded(enabled) => {
+                    self.use_custom_background = enabled;
+                }
                 UiEvent::ScaleLoaded(res) => {
                     if let Ok(scale) = res {
                         self.ui_scale = scale;

@@ -62,7 +62,11 @@ pub fn render_browser_view(app: &mut CrapApp, ui: &mut egui::Ui) {
 
     // Background Image
     // Background Image
-    let bg_path = "data/background/default.png";
+    let bg_path = if app.use_custom_background {
+        "data/background/custom.png"
+    } else {
+        "data/background/default.png"
+    };
     let bg_uri = crate::ui::get_image_uri(bg_path);
 
     // Async load check

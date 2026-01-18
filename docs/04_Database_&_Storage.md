@@ -108,6 +108,7 @@ Non-text data is stored on the local filesystem, with paths stored in the databa
 -   **Collection Images**: Stored in `data/collection_images/`.
 -   **Lorebook Covers**: Stored in `data/covers/`.
 -   **Gallery**: Stored in `data/gallery/` (Reserved for character galleries, managed separately).
+-   **Background**: Stored in `data/background/` (`default.png` and `custom.png`).
 -   **Exports**: Saved to `exports/` (default dialog path).
 
 ## Automated Media Cleanup

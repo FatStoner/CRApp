@@ -55,6 +55,46 @@ pub fn render_options_window(app: &mut CrapApp, ctx: &egui::Context) {
 
             ui.add_space(20.0);
             ui.separator();
+
+            ui.heading("Background");
+            ui.add_space(8.0);
+
+            ui.horizontal(|ui| {
+                let mut use_custom = app.use_custom_background;
+                if ui
+                    .checkbox(&mut use_custom, "Use Custom Background")
+                    .changed()
+                {
+                    app.set_custom_background_mode(use_custom);
+                }
+            });
+
+            ui.add_space(5.0);
+            if ui.button("Select Custom Image...").clicked() {
+                let ctx = ctx.clone();
+                std::thread::spawn(move || {
+                    if let Some(path) = rfd::FileDialog::new()
+                        .add_filter("Images", &["png", "jpg", "jpeg", "webp"])
+                        .pick_file()
+                    {
+                        let target_dir = std::path::Path::new("data/background");
+                        if !target_dir.exists() {
+                            let _ = std::fs::create_dir_all(target_dir);
+                        }
+                        let target = target_dir.join("custom.png");
+
+                        if std::fs::copy(path, &target).is_ok() {
+                            // Invalidate cache
+                            let uri = crate::ui::get_image_uri("data/background/custom.png");
+                            ctx.forget_image(&uri);
+                            ctx.request_repaint();
+                        }
+                    }
+                });
+            }
+
+            ui.add_space(20.0);
+            ui.separator();
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
                 if ui.button("Close").clicked() {
                     close = true;

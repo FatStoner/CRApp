@@ -11,6 +11,13 @@ The `central_panel.rs` module acts as the orchestrator for the main content area
     -   Hosting the "Import from Clipboard" modal.
     -   Delegating rendering to sub-modules.
 
+### 1b. Options Window (`ui/options_window.rs`)
+A dedicated modal window for application-wide settings.
+-   **Features**:
+    -   **Theme**: Toggle Light/Dark/System theme.
+    -   **UI Scale**: Adjust global UI scaling.
+    -   **Background**: Toggle custom background image and file picker integration.
+
 ### 2. Browser View (`ui/browser.rs`)
 Handles the "Gallery" or "Browser" view where characters are listed.
 -   **Features**:
@@ -24,6 +31,7 @@ Handles the "Gallery" or "Browser" view where characters are listed.
         -   Red heart (\u2764) watermark on favorite character cards.
         -   Custom 1:1 cropped images for folder icons.
     -   **Context Menu**: Right-click actions (Move, Delete, Edit, Toggle Favorite, **Change Icon**).
+27:     -   **Background**: Supports a custom background image (configured in Options).
 
 ### 3. Editor View (`ui/editor.rs`)
 Handles the detailed editing interfaces.
