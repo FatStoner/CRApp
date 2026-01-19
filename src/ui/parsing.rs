@@ -39,6 +39,7 @@ enum ImportFormat {
     Profile,
     Edit,
     CraveEdit,
+    GirlfriendGpt,
 
     Unknown,
 }
@@ -57,6 +58,7 @@ pub fn parse_clipboard(text: &str) -> ParsedCharacterData {
     match detect_format(&lines) {
         ImportFormat::Edit => parse_edit_view(&lines),
         ImportFormat::CraveEdit => parse_crave_edit_view(&lines),
+        ImportFormat::GirlfriendGpt => parse_ggpt_view(&lines),
         ImportFormat::Profile => parse_profile_view(&lines),
         // For LorebookHtml, we need a separate entry point or return type.
         // Since parse_clipboard returns ParsedCharacterData, we might need a separate function for Lorebooks.
@@ -260,6 +262,10 @@ fn detect_format(lines: &[&str]) -> ImportFormat {
     // Crave specific check
     if lines.iter().any(|l| l.contains("CraveU AI")) {
         return ImportFormat::CraveEdit;
+    }
+
+    if lines.iter().any(|l| l.contains("GirlfriendGPT")) {
+        return ImportFormat::GirlfriendGpt;
     }
 
     // Edit view specific characteristic
@@ -504,6 +510,117 @@ fn parse_crave_edit_view(lines: &[&str]) -> ParsedCharacterData {
                     } else {
                         data.external_tags.push(line.to_string());
                     }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    data.cleanup();
+    data
+}
+
+fn parse_ggpt_view(lines: &[&str]) -> ParsedCharacterData {
+    let mut data = ParsedCharacterData::default();
+    let mut current_section = "";
+
+    for (i, &line) in lines.iter().enumerate() {
+        let lower = line.to_lowercase();
+        let trimmed = line.trim();
+
+        // One-line fields
+        if lower == "character name" {
+            if let Some(val_idx) = find_next_value_index(lines, i) {
+                data.name = lines[val_idx].to_string();
+            }
+            continue;
+        }
+
+        if lower == "character age" {
+            // Not currently stored in ParsedCharacterData, skipping
+            continue;
+        }
+
+        if lower.starts_with("description") && lower.contains("tokens") {
+            // Mapping Description -> Title as requested
+            current_section = "title";
+            continue;
+        }
+
+        if lower.starts_with("personality") && lower.contains("tokens") {
+            current_section = "personality";
+            continue;
+        }
+
+        if lower.starts_with("scenario") && lower.contains("tokens") {
+            current_section = "scenario";
+            continue;
+        }
+
+        if lower.starts_with("first message") && lower.contains("tokens") {
+            current_section = "first_message";
+            continue;
+        }
+
+        if lower.starts_with("example conversation") {
+            current_section = "example_dialogue";
+            continue;
+        }
+
+        if lower == "character tags" {
+            current_section = "tags";
+            continue;
+        }
+
+        // Stop conditions
+        if lower == "write a brief overview of your character."
+            || lower == "describe your character's traits, behavior, and demeanor."
+            || lower == "legacy"
+            || lower.contains("visibility")
+        {
+            current_section = "";
+            continue;
+        }
+
+        match current_section {
+            "title" => {
+                if !trimmed.is_empty() {
+                    data.title.push_str(line);
+                    data.title.push('\n');
+                }
+            }
+            "personality" => {
+                data.personality.push_str(line);
+                data.personality.push('\n');
+            }
+            "scenario" => {
+                data.scenario.push_str(line);
+                data.scenario.push('\n');
+            }
+            "first_message" => {
+                data.first_message.push_str(line);
+                data.first_message.push('\n');
+            }
+            "example_dialogue" => {
+                // The example sometimes has a warning "⚠️ Can cause unpredictable behavior..."
+                if !line.contains("⚠️") {
+                    data.example_dialogue.push_str(line);
+                    data.example_dialogue.push('\n');
+                }
+            }
+            "tags" => {
+                if lower == "add tag" || lower.is_empty() {
+                    continue;
+                }
+                // Stop if we hit descriptions beneath tags
+                if lower.starts_with("assign tags that describes") {
+                    current_section = "";
+                    continue;
+                }
+
+                // Tags seem to be on their own lines
+                if !trimmed.is_empty() {
+                    data.external_tags.push(trimmed.to_string());
                 }
             }
             _ => {}
@@ -800,6 +917,57 @@ mod tests {
         ";
         let data = parse_clipboard(raw_text);
         assert_eq!(data.name, "MyName");
+    }
+
+    #[test]
+    fn test_parse_ggpt_view() {
+        let raw_text = r#"GirlfriendGPT
+Edit Character
+Character Name
+Kaida
+
+Description (272 tokens)
+Sunlight filters through the curtains.
+Write a brief overview of your character.
+
+Personality (938 tokens)
+Kaida Akiko
+Age: 22
+Describe your character's traits, behavior, and demeanor.
+
+Scenario (674 tokens)
+RULES: always use DESCRIPTIONS
+Legacy
+
+First Message (475 tokens)
+Warm sunlight filtered through.
+Legacy
+
+Example Conversation(2 tokens)
+.
+⚠️ Can cause unpredictable behavior, use with care.
+
+Character Tags
+Add tag
+Female
+Original Character (OC)
+Assign tags that describes your character.
+"#;
+        let data = parse_clipboard(raw_text);
+        assert_eq!(data.name, "Kaida");
+        assert!(data.title.contains("Sunlight filters through"));
+        assert!(!data.title.contains("Write a brief overview")); // Should stop
+        assert!(data.personality.contains("Kaida Akiko"));
+        assert!(data.scenario.contains("RULES: always use DESCRIPTIONS"));
+        assert!(data
+            .first_message
+            .contains("Warm sunlight filtered through."));
+        assert!(data.example_dialogue.contains("."));
+        assert!(!data.example_dialogue.contains("⚠️"));
+        assert!(data.external_tags.contains(&"Female".to_string()));
+        assert!(data
+            .external_tags
+            .contains(&"Original Character (OC)".to_string()));
     }
 
     #[test]
