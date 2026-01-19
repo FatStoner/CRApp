@@ -16,7 +16,7 @@ C.R.App leverages the power of a local SQLite database to handle thousands of ch
 -   **🔍 Deep Search**: Search through character names, descriptions, and tags instantly.
 -   **📖 Lorebooks & World Info**: Create and link extensive lorebooks to your characters.
 -   **📂 Nested Collections**: Organize your library with a robust, hierarchical folder system.
--   **🔄 Import/Export**: Full support for TavernAI V2 cards (PNG) and JSON. Quick clipboard importing from spicychat.ai.
+-   **🔄 Import/Export**: Full support for TavernAI V2 cards (PNG) and JSON. Quick clipboard importing from **SpicyChat**, **JanitorAI**, **GirlfriendGPT**, and **CraveU**.
 -   **🧹 Auto-Cleanup**: Automatically removes unused images to keep your storage efficient.
 
 ## Shortcuts
@@ -31,9 +31,11 @@ The latest version for Windows is available on the [Releases Page](https://githu
 
 1.  Go to the **Releases** page.
 2.  Expand the **Assets** section of the latest release.
-3.  Download `crap.exe`.
-4.  **Create a new folder** (e.g., `C.R.App`) and move `crap.exe` into it.
-5.  Run it!
+3.  Download `crap_vX.X.X.zip` (latest version).
+4.  **Extract the contents** to a folder (e.g., `C.R.App`).
+    -   *New Installation*: Extract to a new empty folder.
+    -   *Update*: Extract to your existing folder and **overwrite** the files.
+5.  Run `crap.exe`!
 
 > [!TIP]
 > **Why a separate folder?**
