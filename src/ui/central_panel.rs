@@ -25,7 +25,7 @@ pub fn render_central_panel(app: &mut CrapApp, ctx: &egui::Context) {
                 .show(ctx, |ui| {
                     if app.parsed_data.is_none() {
                         // Phase 1: Input
-                        ui.label("Import from spicychat.ai, craveu.ai, or girlfriendgpt.online:");
+                        ui.label("Import from spicychat.ai, janitorai.com, craveu.ai, or girlfriendgpt.online:");
                         ui.label(egui::RichText::new("1. Go to the character profile OR edit page on the service\n2. Select All (Ctrl+A)\n3. Copy (Ctrl+C)\n4. Paste here (Ctrl+V)").size(11.0).color(egui::Color32::GRAY));
                         ui.add_space(4.0);
                         
@@ -60,36 +60,49 @@ pub fn render_central_panel(app: &mut CrapApp, ctx: &egui::Context) {
                         ui.heading("Review Parsed Data");
                         ui.separator();
                         
-                        let data = app.parsed_data.as_mut().unwrap();
-                        
-                        egui::ScrollArea::vertical().show(ui, |ui| {
-                            egui::Grid::new("review_grid").striped(true).num_columns(2).show(ui, |ui| {
-                                ui.label("Name:");
-                                ui.text_edit_singleline(&mut data.name);
-                                ui.end_row();
-                                
-                                ui.label("Title:");
-                                ui.text_edit_singleline(&mut data.title);
-                                ui.end_row();
-                                
-                                ui.label("Personality:");
-                                ui.add(egui::TextEdit::multiline(&mut data.personality).desired_rows(10).desired_width(f32::INFINITY));
-                                ui.end_row();
-                                
-                                ui.label("Scenario:");
-                                ui.add(egui::TextEdit::multiline(&mut data.scenario).desired_rows(8).desired_width(f32::INFINITY));
-                                ui.end_row();
-                                
-                                ui.label("First Message:");
-                                ui.add(egui::TextEdit::multiline(&mut data.first_message).desired_rows(6).desired_width(f32::INFINITY));
-                                ui.end_row();
+                        egui::ScrollArea::vertical()
+                            .id_source("review_parsed_data_scroll") // unique id
+                            .auto_shrink([false, false]) // Don't shrink to content, fill window
+                            .show(ui, |ui| {
+                                let data = app.parsed_data.as_mut().unwrap(); // FIX: Define data inside the closure!
 
-                                ui.label("Example Dialogue:");
-                                ui.add(egui::TextEdit::multiline(&mut data.example_dialogue).desired_rows(6).desired_width(f32::INFINITY));
-                                ui.end_row();
+                                let avail_width = ui.available_width();
+                                // We are in a grid with 2 columns.
+                                // We need to estimate input width.
+                                // If we don't know exact label width, we can use a reasonable default or layout differently.
+                                // Actually, let's just use single column for small screens or keep grid but use relative sizing?
+                                // If we use desired_width(input_width), we need to make sure grid respects it.
+                                // Let's try to just subtract a fixed amount for label.
+                                let input_width = (avail_width - 150.0).max(200.0);
+
+                                egui::Grid::new("review_grid").striped(true).num_columns(2).min_col_width(100.0).show(ui, |ui| {
+                                    ui.label("Name:");
+                                    ui.add(egui::TextEdit::singleline(&mut data.name).desired_width(input_width));
+                                    ui.end_row();
+                                    
+                                    ui.label("Title (Bio):");
+                                    ui.add(egui::TextEdit::multiline(&mut data.title).desired_rows(3).desired_width(input_width));
+                                    ui.end_row();
+                                    
+                                    ui.label("Personality:");
+                                    ui.add(egui::TextEdit::multiline(&mut data.personality).desired_rows(10).desired_width(input_width));
+                                    ui.end_row();
+                                    
+                                    ui.label("Scenario:");
+                                    ui.add(egui::TextEdit::multiline(&mut data.scenario).desired_rows(8).desired_width(input_width));
+                                    ui.end_row();
+                                    
+                                    ui.label("First Message:");
+                                    ui.add(egui::TextEdit::multiline(&mut data.first_message).desired_rows(6).desired_width(input_width));
+                                    ui.end_row();
+
+                                    ui.label("Example Dialogue:");
+                                    ui.add(egui::TextEdit::multiline(&mut data.example_dialogue).desired_rows(6).desired_width(input_width));
+                                    ui.end_row();
                                 
                                 ui.label("External Tags:");
                                 ui.vertical(|ui| {
+                                    ui.set_max_width(input_width); // FIX: Constrain width for wrapping
                                     ui.horizontal_wrapped(|ui| {
                                         let mut tags_to_remove = Vec::new();
                                         for (i, tag) in data.external_tags.iter().enumerate() {
@@ -119,6 +132,7 @@ pub fn render_central_panel(app: &mut CrapApp, ctx: &egui::Context) {
 
                                 ui.label("App Tags:");
                                 ui.vertical(|ui| {
+                                    ui.set_max_width(input_width); // FIX: Constrain width for wrapping
                                     ui.horizontal_wrapped(|ui| {
                                         let mut tags_to_remove = Vec::new();
                                         for (i, tag) in data.app_tags.iter().enumerate() {

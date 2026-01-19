@@ -305,6 +305,11 @@ pub fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                                     trigger_import = true;
                                     ui.close_menu();
                                 }
+
+                                if ui.button("Paste from JanitorAI (Edit/Profile)").clicked() {
+                                    trigger_import = true;
+                                    ui.close_menu();
+                                }
                             });
                             
                             ui.add_space(10.0);
