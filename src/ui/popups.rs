@@ -424,6 +424,8 @@ pub fn render_popups(ctx: &egui::Context, app: &mut CrapApp) {
                     });
                     ui.separator();
                     ui.label("Or paste SpicyChat source code below:");
+                    ui.add_space(4.0);
+                    ui.label(egui::RichText::new("To import: Go to lorebook page, right click empty space -> Inspect Element.\nFind the first <html ...> line, right click -> Copy -> Copy outerHTML.").size(11.0).color(egui::Color32::GRAY));
 
                     egui::ScrollArea::vertical()
                         .id_salt("import_source_scroll")
