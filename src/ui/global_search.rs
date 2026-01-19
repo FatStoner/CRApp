@@ -1,4 +1,5 @@
-use crate::ui::{AppMode, CrapApp, SearchResultKind};
+use crate::models::SearchResultKind;
+use crate::ui::{AppMode, CrapApp};
 use eframe::egui;
 
 #[derive(Clone, Debug, PartialEq)]

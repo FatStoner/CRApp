@@ -62,55 +62,58 @@ pub fn render_browser_view(app: &mut CrapApp, ui: &mut egui::Ui) {
 
     // Background Image
     // Background Image
-    let bg_path = if app.use_custom_background {
-        "data/background/custom.png"
-    } else {
-        "data/background/default.png"
-    };
-    let bg_uri = crate::ui::get_image_uri(bg_path);
+    if app.show_background {
+        let bg_path = if app.use_custom_background {
+            "data/background/custom.png"
+        } else {
+            "data/background/default.png"
+        };
+        let bg_uri = crate::ui::get_image_uri(bg_path);
 
-    // Async load check
-    match ui
-        .ctx()
-        .try_load_image(bg_uri.as_str().into(), Default::default())
-    {
-        Ok(egui::load::ImagePoll::Ready { image }) => {
-            let (img_w, img_h) = (image.size[0] as f32, image.size[1] as f32);
-            if img_w > 0.0 && img_h > 0.0 {
-                let rect = ui.available_rect_before_wrap();
-                let avail_w = rect.width();
-                let avail_h = rect.height();
+        // Async load check
+        match ui
+            .ctx()
+            .try_load_image(bg_uri.as_str().into(), Default::default())
+        {
+            Ok(egui::load::ImagePoll::Ready { image }) => {
+                let (img_w, img_h) = (image.size[0] as f32, image.size[1] as f32);
+                if img_w > 0.0 && img_h > 0.0 {
+                    let rect = ui.available_rect_before_wrap();
+                    let avail_w = rect.width();
+                    let avail_h = rect.height();
 
-                let img_aspect = img_w / img_h;
-                let avail_aspect = avail_w / avail_h;
+                    let img_aspect = img_w / img_h;
+                    let avail_aspect = avail_w / avail_h;
 
-                // We want to CONTAIN the image (fit inside), so we take the smaller scale
-                // But then we also want it 10% smaller than that, so 0.9 scale.
-                let scale_factor = if avail_aspect > img_aspect {
-                    // Available is wider than image, so height is the limiting factor
-                    avail_h / img_h
-                } else {
-                    // Available is taller than image, so width is the limiting factor
-                    avail_w / img_w
-                };
+                    // We want to CONTAIN the image (fit inside), so we take the smaller scale
+                    // But then we also want it 10% smaller than that, so 0.9 scale.
+                    let scale_factor = if avail_aspect > img_aspect {
+                        // Available is wider than image, so height is the limiting factor
+                        avail_h / img_h
+                    } else {
+                        // Available is taller than image, so width is the limiting factor
+                        avail_w / img_w
+                    };
 
-                let final_scale = scale_factor * 0.9;
+                    let final_scale = scale_factor * 0.9;
 
-                let final_w = img_w * final_scale;
-                let final_h = img_h * final_scale;
+                    let final_w = img_w * final_scale;
+                    let final_h = img_h * final_scale;
 
-                let center = rect.center();
-                let final_rect = egui::Rect::from_center_size(center, egui::vec2(final_w, final_h));
+                    let center = rect.center();
+                    let final_rect =
+                        egui::Rect::from_center_size(center, egui::vec2(final_w, final_h));
 
-                egui::Image::new(bg_uri)
-                    .tint(egui::Color32::WHITE.gamma_multiply(0.5))
-                    .paint_at(ui, final_rect);
+                    egui::Image::new(bg_uri)
+                        .tint(egui::Color32::WHITE.gamma_multiply(0.5))
+                        .paint_at(ui, final_rect);
+                }
             }
+            Ok(egui::load::ImagePoll::Pending { .. }) => {
+                // Just wait, egui will repaint when loaded
+            }
+            _ => {}
         }
-        Ok(egui::load::ImagePoll::Pending { .. }) => {
-            // Just wait, egui will repaint when loaded
-        }
-        _ => {}
     }
 
     // Clone collections for context menu usage

@@ -60,6 +60,24 @@ pub fn render_options_window(app: &mut CrapApp, ctx: &egui::Context) {
             ui.add_space(8.0);
 
             ui.horizontal(|ui| {
+                let mut show_bg = app.show_background;
+                if ui.checkbox(&mut show_bg, "Show Background").changed() {
+                    app.set_background_visibility(show_bg);
+                }
+            });
+
+            ui.add_space(8.0);
+
+            ui.horizontal(|ui| {
+                let mut show_watermark = app.show_watermark;
+                if ui.checkbox(&mut show_watermark, "Show Watermark").changed() {
+                    app.set_watermark_visibility(show_watermark);
+                }
+            });
+
+            ui.add_space(8.0);
+
+            ui.horizontal(|ui| {
                 let mut use_custom = app.use_custom_background;
                 if ui
                     .checkbox(&mut use_custom, "Use Custom Background")
@@ -92,6 +110,20 @@ pub fn render_options_window(app: &mut CrapApp, ctx: &egui::Context) {
                     }
                 });
             }
+
+            ui.add_space(20.0);
+            ui.separator();
+
+            ui.heading("About");
+            ui.add_space(4.0);
+            ui.vertical_centered(|ui| {
+                ui.label(egui::RichText::new("Created by JustJam").strong());
+                ui.label(
+                    egui::RichText::new("Special thanks to The Library of Snailexandra")
+                        .size(11.0)
+                        .italics(),
+                );
+            });
 
             ui.add_space(20.0);
             ui.separator();

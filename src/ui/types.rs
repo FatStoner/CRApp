@@ -26,6 +26,11 @@ pub enum LorebookTab {
 }
 
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
+pub enum TemplateTab {
+    Details,
+}
+
+#[derive(PartialEq, Eq, Clone, Copy, Debug)]
 pub enum CentralView {
     Editor,
     Browser,
@@ -118,4 +123,6 @@ pub enum UiEvent {
     LorebookImported(Lorebook),
     StatusMessage(String, egui::Color32),
     CustomBackgroundLoaded(bool),
+    WatermarkLoaded(bool),
+    BackgroundLoaded(bool),
 }
