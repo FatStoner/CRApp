@@ -24,7 +24,7 @@ Houses shared logic unrelated to direct rendering.
 The `central_panel.rs` module acts as the orchestrator for the main content area.
 -   **Responsibilities**:
     -   Determining which view to render based on `AppMode` and `CentralView` state.
-    -   Hosting the "Import from Clipboard" modal.
+    -   Hosting the consolidated "Import from Clipboard" modal with clear platform support.
     -   Delegating rendering to sub-modules.
 
 ### 1b. Options Window (`ui/options_window.rs`)
@@ -73,17 +73,19 @@ Handles the detailed editing interfaces.
     -   **Safety**: Delete confirmation for lore entries.
     -   **Quick Search**: In-editor search bar that highlights matches and automatically jumps to matching entries.
 
-### 4. Parsing (`ui/parsing.rs`)
+### 4. Parsing (`ui/parsing/`)
 Dedicated logic for parsing character data from external text sources (clipboard).
+-   **Structure**: Split into format-specific modules (`janitor.rs`, `spicychat.rs`, `crave.rs`, etc.) for maintainability.
+-   **Entry Point**: `ui/parsing/mod.rs` handles format detection and dispatches to the correct parser.
 -   **Function**: `parse_clipboard(text: &str) -> ParsedCharacterData`.
 -   **Function**: `parse_spicychat_lorebook(html: &str) -> ParsedLorebookData`.
 -   **Logic**:
     -   **Character**: Heuristic parsing of unstructured text to extract Name, Persona, Scenario, etc.
         -   **Supported Sources**:
-            -   **SpicyChat.ai**: Edit & Profile Views (HTML/Text).
-            -   **CraveU.ai**: Edit Page (Text).
-            -   **GirlfriendGPT**: Edit Page (Text).
             -   **JanitorAI**: Edit & Profile Pages (Text).
+            -   **CraveU.ai**: Edit Page (Text).
+            -   **GirlfriendGPT**: View Page (Text).
+            -   **SpicyChat.ai**: Chatbots (Text) & Lorebooks (HTML/Text).
     -   **Lorebook**: Dual-mode HTML parsing (Edit View vs Profile View) with intelligent dispatching to handle source site structure variations.
 
 ### 5. Side Panel (`ui/side_panel.rs`)

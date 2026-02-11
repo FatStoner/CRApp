@@ -325,22 +325,7 @@ pub fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                                     ui.close_menu();
                                 }
                                 
-                                if ui.button("Paste from SpicyChat Clipboard").clicked() {
-                                    trigger_import = true;
-                                    ui.close_menu();
-                                }
-
-                                if ui.button("Paste from Crave AI Clipboard").clicked() {
-                                    trigger_import = true;
-                                    ui.close_menu();
-                                }
-
-                                if ui.button("Paste from GirlfriendGPT Clipboard").clicked() {
-                                    trigger_import = true;
-                                    ui.close_menu();
-                                }
-
-                                if ui.button("Paste from JanitorAI (Edit/Profile)").clicked() {
+                                if ui.button("Import from Clipboard").clicked() {
                                     trigger_import = true;
                                     ui.close_menu();
                                 }

@@ -15,7 +15,7 @@ The application is structured into four main layers:
     -   **Navigation**: `side_panel.rs`.
     -   **Overlays**: `lightbox.rs` (Image viewer).
     -   **Utilities**: `utils.rs` (Shared logic).
-    -   **Parsing**: `parsing.rs` handles imports.
+    -   **Parsing**: `parsing/` module handles format-specific logic.
 4.  **Data Layer (`db.rs`, `models.rs`)**:
     -   **Models**: Rust structs representing entities (Character, Lorebook, Tag).
     -   **Database**: Async SQLite operations via `sqlx`.
@@ -49,7 +49,9 @@ src/
     ├── side_panel.rs     # Left navigation bar (with culling)
     ├── browser.rs        # Character Grid/List view (with culling)
     ├── editor/           # Sub-modules for editors (Character, Lorebook)
-    ├── parsing.rs        # Text and HTML parsing logic
+    ├── parsing/    # Modular text and HTML parsing logic
+    │   ├── mod.rs  # Entry point and format detection
+    │   └── ...     # Format-specific modules (janitor, spicychat, etc.)
     ├── global_search.rs  # Global Deep Search
     ├── popups.rs         # Unified modal handling
     ├── text_highlight.rs # Search highlight logic
