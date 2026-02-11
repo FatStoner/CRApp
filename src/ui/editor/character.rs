@@ -231,7 +231,11 @@ pub fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                             ui.menu_button("IMPORT", |ui| {
                                 if ui.button("Import File (JSON, PNG, CRAPP)").clicked() {
                                     let tx_clone = app.tx.clone();
+                                    // Capture target_id to move into the async block
+                                    let target_id_clone = if character.id != 0 { Some(character.id as u64) } else { None };
+                                    
                                     tokio::spawn(async move {
+                                        let target_id = target_id_clone; // Move it here
                                         if let Some(path) = rfd::FileDialog::new().add_filter("Supported", &["crapp", "json", "png"]).pick_file() {
                                             match std::fs::read(&path) {
                                                 Ok(bytes) => {
@@ -310,10 +314,10 @@ pub fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                                                         }
                                                     };
                                                     
-                                                    let _ = tx_clone.send(UiEvent::ImportCharacterData(result)).await;
+                                                    let _ = tx_clone.send(UiEvent::ImportCharacterData(result, target_id)).await;
                                                 },
                                                 Err(e) => {
-                                                    let _ = tx_clone.send(UiEvent::ImportCharacterData(Err(e.to_string()))).await;
+                                                    let _ = tx_clone.send(UiEvent::ImportCharacterData(Err(e.to_string()), target_id)).await;
                                                 }
                                             }
                                         }

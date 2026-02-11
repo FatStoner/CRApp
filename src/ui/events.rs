@@ -333,12 +333,21 @@ pub fn handle_ui_events(app: &mut CrapApp, ctx: &egui::Context) {
                     Err(e) => app.set_status(format!("Move Error: {}", e), egui::Color32::RED),
                 }
             }
-            UiEvent::ImportFileLoaded(res) => {
+            UiEvent::ImportFileLoaded(res, target_id) => {
                 match res {
                     Ok(json_content) => {
                         if let Ok(mut char_obj) = serde_json::from_str::<Character>(&json_content) {
-                            // Clean ID for new import
-                            char_obj.id = 0;
+                            // Clean ID for new import only if we are not updating
+                            if target_id.is_none() {
+                                char_obj.id = 0;
+                            } else {
+                                // If updating, we keep the ID of the target, NOT the file content
+                                // Actually, let's logic this out:
+                                // If target_id is Some(id), we want to merge/overwrite THAT character.
+                                // The file content might have ID=123, but we might be pasting into ID=456.
+                                // We should probably ignore the file's ID if target_id is set.
+                                char_obj.id = target_id.unwrap() as i64;
+                            }
 
                             // Map to ParsedCharacterData for review
                             let parsed = ParsedCharacterData {
@@ -362,8 +371,19 @@ pub fn handle_ui_events(app: &mut CrapApp, ctx: &egui::Context) {
                                 avatar_path: char_obj.avatar_path.clone(),
                             };
 
-                            // Force "New Character" mode
-                            app.selected_character = Some(Character::default());
+                            if let Some(tid) = target_id {
+                                if let Some(existing) =
+                                    app.characters.iter().find(|c| c.id == tid as i64)
+                                {
+                                    app.selected_character = Some(existing.clone());
+                                } else {
+                                    app.selected_character = Some(Character::default());
+                                }
+                            } else {
+                                // Force "New Character" mode
+                                app.selected_character = Some(Character::default());
+                            }
+
                             app.mode = AppMode::Characters;
 
                             app.parsed_data = Some(parsed);
@@ -385,11 +405,23 @@ pub fn handle_ui_events(app: &mut CrapApp, ctx: &egui::Context) {
                     Err(e) => app.set_status(format!("Read Error: {}", e), egui::Color32::RED),
                 }
             }
-            UiEvent::ImportCharacterData(res) => {
+            UiEvent::ImportCharacterData(res, target_id) => {
                 match res {
                     Ok(parsed) => {
-                        // Force "New Character" mode
-                        app.selected_character = Some(Character::default());
+                        if let Some(tid) = target_id {
+                            if let Some(existing) =
+                                app.characters.iter().find(|c| c.id == tid as i64)
+                            {
+                                app.selected_character = Some(existing.clone());
+                            } else {
+                                // Fallback if ID not found
+                                app.selected_character = Some(Character::default());
+                            }
+                        } else {
+                            // Force "New Character" mode
+                            app.selected_character = Some(Character::default());
+                        }
+
                         app.mode = AppMode::Characters;
 
                         app.parsed_data = Some(parsed);
