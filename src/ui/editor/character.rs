@@ -515,6 +515,14 @@ pub fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                                                       if ui.toggle_value(&mut app.count_title_in_total, "count in total").changed() {
                                                           app.token_cache.clear();
                                                       }
+                                                      let mut ignore = character.spell_check_overrides.contains("title");
+                                                      if ui.checkbox(&mut ignore, "Ignore Spell Check").changed() {
+                                                          if ignore {
+                                                              character.spell_check_overrides.insert("title".to_string());
+                                                          } else {
+                                                              character.spell_check_overrides.remove("title");
+                                                          }
+                                                      }
                                                       ui.label(egui::RichText::new(format!("Tokens: {} | Chars: {}", count_tokens(&character.char_title), character.char_title.chars().count())).size(12.0).color(egui::Color32::GRAY));
                                                   });
                                               })
@@ -525,7 +533,9 @@ pub fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                                                      .desired_width(f32::INFINITY)
                                                      .desired_rows(1);
                                                   {
-                                                      let mut layouter = crate::ui::spell_layout::create_spell_check_layouter(app.spell_checker.clone(), app.editor_search_query.clone());
+                                                      let mut layouter = crate::ui::spell_layout::create_spell_check_layouter(
+                                                          if app.enable_spell_check && !character.spell_check_overrides.contains("title") { app.spell_checker.clone() } else { None },
+                                                          app.editor_search_query.clone());
                                                       let response = ui.add(title_edit.layouter(&mut *layouter));
                                                       crate::ui::widgets::track_text_selection(ui, &response);
                                                       response.context_menu(|ui| {
@@ -543,6 +553,14 @@ pub fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                                              .show_header(ui, |ui| {
                                                  ui.label("First Message");
                                                  ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                                     let mut ignore = character.spell_check_overrides.contains("first_message");
+                                                     if ui.checkbox(&mut ignore, "Ignore Spell Check").changed() {
+                                                         if ignore {
+                                                             character.spell_check_overrides.insert("first_message".to_string());
+                                                         } else {
+                                                             character.spell_check_overrides.remove("first_message");
+                                                         }
+                                                     }
                                                      if ui.small_button("Copy").clicked() {
                                                          ui.output_mut(|o| o.copied_text = character.first_message.clone());
                                                          status_update = Some(("Copied First Message to clipboard".to_string(), egui::Color32::GREEN));
@@ -553,7 +571,9 @@ pub fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                                              .body(|ui| {
                                                  let text_edit = egui::TextEdit::multiline(&mut character.first_message).desired_width(f32::INFINITY);
                                                   {
-                                                      let mut layouter = crate::ui::spell_layout::create_spell_check_layouter(app.spell_checker.clone(), app.editor_search_query.clone());
+                                                      let mut layouter = crate::ui::spell_layout::create_spell_check_layouter(
+                                                          if app.enable_spell_check && !character.spell_check_overrides.contains("first_message") { app.spell_checker.clone() } else { None },
+                                                          app.editor_search_query.clone());
                                                       let response = ui.add(text_edit.layouter(&mut *layouter));
                                                       crate::ui::widgets::track_text_selection(ui, &response);
                                                       response.context_menu(|ui| {
@@ -569,6 +589,14 @@ pub fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                                              .show_header(ui, |ui| {
                                                  ui.label("Personality");
                                                  ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                                     let mut ignore = character.spell_check_overrides.contains("personality");
+                                                     if ui.checkbox(&mut ignore, "Ignore Spell Check").changed() {
+                                                         if ignore {
+                                                             character.spell_check_overrides.insert("personality".to_string());
+                                                         } else {
+                                                             character.spell_check_overrides.remove("personality");
+                                                         }
+                                                     }
                                                      if ui.small_button("Copy").clicked() {
                                                          ui.output_mut(|o| o.copied_text = character.personality.clone());
                                                          status_update = Some(("Copied Personality to clipboard".to_string(), egui::Color32::GREEN));
@@ -579,7 +607,9 @@ pub fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                                              .body(|ui| {
                                                  let text_edit = egui::TextEdit::multiline(&mut character.personality).desired_width(f32::INFINITY);
                                                   {
-                                                      let mut layouter = crate::ui::spell_layout::create_spell_check_layouter(app.spell_checker.clone(), app.editor_search_query.clone());
+                                                      let mut layouter = crate::ui::spell_layout::create_spell_check_layouter(
+                                                          if app.enable_spell_check && !character.spell_check_overrides.contains("personality") { app.spell_checker.clone() } else { None },
+                                                          app.editor_search_query.clone());
                                                       let response = ui.add(text_edit.layouter(&mut *layouter));
                                                       crate::ui::widgets::track_text_selection(ui, &response);
                                                       response.context_menu(|ui| {
@@ -594,6 +624,14 @@ pub fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                                              .show_header(ui, |ui| {
                                                  ui.label("Scenario");
                                                  ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                                     let mut ignore = character.spell_check_overrides.contains("scenario");
+                                                     if ui.checkbox(&mut ignore, "Ignore Spell Check").changed() {
+                                                         if ignore {
+                                                             character.spell_check_overrides.insert("scenario".to_string());
+                                                         } else {
+                                                             character.spell_check_overrides.remove("scenario");
+                                                         }
+                                                     }
                                                      if ui.small_button("Copy").clicked() {
                                                          ui.output_mut(|o| o.copied_text = character.scenario.clone());
                                                          status_update = Some(("Copied Scenario to clipboard".to_string(), egui::Color32::GREEN));
@@ -604,7 +642,9 @@ pub fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                                              .body(|ui| {
                                                  let text_edit = egui::TextEdit::multiline(&mut character.scenario).desired_width(f32::INFINITY);
                                                   {
-                                                      let mut layouter = crate::ui::spell_layout::create_spell_check_layouter(app.spell_checker.clone(), app.editor_search_query.clone());
+                                                      let mut layouter = crate::ui::spell_layout::create_spell_check_layouter(
+                                                          if app.enable_spell_check && !character.spell_check_overrides.contains("scenario") { app.spell_checker.clone() } else { None },
+                                                          app.editor_search_query.clone());
                                                       let response = ui.add(text_edit.layouter(&mut *layouter));
                                                       crate::ui::widgets::track_text_selection(ui, &response);
                                                       response.context_menu(|ui| {
@@ -619,6 +659,14 @@ pub fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                                              .show_header(ui, |ui| {
                                                  ui.label("Example Dialogue");
                                                  ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                                     let mut ignore = character.spell_check_overrides.contains("example");
+                                                     if ui.checkbox(&mut ignore, "Ignore Spell Check").changed() {
+                                                         if ignore {
+                                                             character.spell_check_overrides.insert("example".to_string());
+                                                         } else {
+                                                             character.spell_check_overrides.remove("example");
+                                                         }
+                                                     }
                                                      if ui.small_button("Copy").clicked() {
                                                          ui.output_mut(|o| o.copied_text = character.example_dialogue.clone());
                                                          status_update = Some(("Copied Example Dialogue to clipboard".to_string(), egui::Color32::GREEN));
@@ -629,7 +677,9 @@ pub fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                                              .body(|ui| {
                                                  let text_edit = egui::TextEdit::multiline(&mut character.example_dialogue).desired_width(f32::INFINITY);
                                                   {
-                                                      let mut layouter = crate::ui::spell_layout::create_spell_check_layouter(app.spell_checker.clone(), app.editor_search_query.clone());
+                                                      let mut layouter = crate::ui::spell_layout::create_spell_check_layouter(
+                                                          if app.enable_spell_check && !character.spell_check_overrides.contains("example") { app.spell_checker.clone() } else { None },
+                                                          app.editor_search_query.clone());
                                                       let response = ui.add(text_edit.layouter(&mut *layouter));
                                                       crate::ui::widgets::track_text_selection(ui, &response);
                                                       response.context_menu(|ui| {
@@ -900,7 +950,9 @@ pub fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                                  let width = ui.ctx().screen_rect().width() * 2.0 / 3.0;
                                  let text_edit = egui::TextEdit::multiline(&mut character.author_notes).desired_width(width);
                                   {
-                                      let mut layouter = crate::ui::spell_layout::create_spell_check_layouter(app.spell_checker.clone(), app.editor_search_query.clone());
+                                      let mut layouter = crate::ui::spell_layout::create_spell_check_layouter(
+                                          if app.enable_spell_check && !character.spell_check_overrides.contains("notes") { app.spell_checker.clone() } else { None },
+                                          app.editor_search_query.clone());
                                       let response = ui.add(text_edit.layouter(&mut *layouter));
                                       crate::ui::widgets::track_text_selection(ui, &response);
                                       response.context_menu(|ui| {

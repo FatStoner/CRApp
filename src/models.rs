@@ -79,6 +79,9 @@ pub struct Character {
     pub collection_id: Option<i64>,
     #[sqlx(default)]
     pub is_favorite: bool,
+    pub spell_check_overrides_json: Option<String>,
+    #[sqlx(skip)]
+    pub spell_check_overrides: std::collections::HashSet<String>,
     #[sqlx(skip)]
     pub app_tags: Vec<Tag>,
     #[sqlx(skip)]
@@ -104,6 +107,8 @@ impl Default for Character {
             updated_at: Utc::now(),
             collection_id: None,
             is_favorite: false,
+            spell_check_overrides_json: None,
+            spell_check_overrides: std::collections::HashSet::new(),
             app_tags: Vec::new(),
             external_tags: Vec::new(),
             urls: Vec::new(),
@@ -124,11 +129,20 @@ impl Character {
             && self.avatar_path == other.avatar_path
             && self.collection_id == other.collection_id
             && self.is_favorite == other.is_favorite
+            && self.spell_check_overrides == other.spell_check_overrides
             && self
                 .urls
                 .iter()
                 .filter(|u| !u.url.trim().is_empty())
                 .eq(other.urls.iter().filter(|u| !u.url.trim().is_empty()))
+    }
+
+    pub fn post_load(&mut self) {
+        if let Some(json) = &self.spell_check_overrides_json {
+            if let Ok(set) = serde_json::from_str(json) {
+                self.spell_check_overrides = set;
+            }
+        }
     }
 }
 

@@ -21,6 +21,7 @@ Represents an AI character definition.
     -   `app_tags`: `Vec<Tag>` (Internal organization tags).
     -   `external_tags`: `Vec<Tag>` (Tags imported from source, e.g., spicychat).
     -   `urls`: `Vec<CharacterUrl>` (Source URLs for the character).
+    -   `spell_check_overrides`: `HashSet<String>` (Names of fields that should ignore spell check).
 
 ### CharacterUrl
 Represents a source link for a character.

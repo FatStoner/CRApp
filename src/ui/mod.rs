@@ -145,6 +145,9 @@ impl eframe::App for CrapApp {
                 UiEvent::BackgroundLoaded(show) => {
                     self.show_background = show;
                 }
+                UiEvent::SpellCheckSettingLoaded(enabled) => {
+                    self.enable_spell_check = enabled;
+                }
                 UiEvent::LoreLinksBulkLoaded(map) => {
                     self.char_lore_map = map;
                 }

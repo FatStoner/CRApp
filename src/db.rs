@@ -89,13 +89,30 @@ impl Database {
                 }
             });
 
+        // 4. Ensure 'spell_check_overrides_json' in 'characters'
+        let _ = sqlx::query("ALTER TABLE characters ADD COLUMN spell_check_overrides_json TEXT")
+            .execute(&pool)
+            .await
+            .map_err(|e| {
+                if !e.to_string().contains("duplicate column name") {
+                    eprintln!(
+                        "Warning: Failed to add spell_check_overrides_json column: {}",
+                        e
+                    );
+                }
+            });
+
         Ok(Database { pool })
     }
 
     pub async fn get_all_characters(&self) -> Result<Vec<crate::models::Character>, sqlx::Error> {
-        sqlx::query_as::<_, crate::models::Character>("SELECT * FROM characters")
+        let mut list = sqlx::query_as::<_, crate::models::Character>("SELECT * FROM characters")
             .fetch_all(&self.pool)
-            .await
+            .await?;
+        for c in &mut list {
+            c.post_load();
+        }
+        Ok(list)
     }
 
     pub async fn upsert_character(
@@ -103,12 +120,17 @@ impl Database {
         character: &mut crate::models::Character,
     ) -> Result<(), sqlx::Error> {
         character.updated_at = chrono::Utc::now();
+        character.spell_check_overrides_json = if character.spell_check_overrides.is_empty() {
+            None
+        } else {
+            serde_json::to_string(&character.spell_check_overrides).ok()
+        };
 
         if character.id == 0 {
             // INSERT
             let id = sqlx::query(
-                "INSERT INTO characters (name, char_name, char_title, personality, scenario, example_dialogue, first_message, author_notes, avatar_path, created_at, updated_at, collection_id, is_favorite)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+                "INSERT INTO characters (name, char_name, char_title, personality, scenario, example_dialogue, first_message, author_notes, avatar_path, created_at, updated_at, collection_id, is_favorite, spell_check_overrides_json)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
             )
             .bind(&character.name)
             .bind(&character.char_name)
@@ -123,6 +145,7 @@ impl Database {
             .bind(character.updated_at)
             .bind(character.collection_id)
             .bind(character.is_favorite)
+            .bind(&character.spell_check_overrides_json)
             .execute(&self.pool)
             .await?
             .last_insert_rowid();
@@ -131,7 +154,7 @@ impl Database {
         } else {
             // UPDATE
             sqlx::query(
-                "UPDATE characters SET name=?, char_name=?, char_title=?, personality=?, scenario=?, example_dialogue=?, first_message=?, author_notes=?, avatar_path=?, updated_at=?, collection_id=?, is_favorite=? WHERE id=?"
+                "UPDATE characters SET name=?, char_name=?, char_title=?, personality=?, scenario=?, example_dialogue=?, first_message=?, author_notes=?, avatar_path=?, updated_at=?, collection_id=?, is_favorite=?, spell_check_overrides_json=? WHERE id=?"
             )
             .bind(&character.name)
             .bind(&character.char_name)
@@ -145,6 +168,7 @@ impl Database {
             .bind(character.updated_at)
             .bind(character.collection_id)
             .bind(character.is_favorite)
+            .bind(&character.spell_check_overrides_json)
             .bind(character.id)
             .execute(&self.pool)
             .await?;
@@ -572,13 +596,14 @@ impl Database {
     ) -> Result<Vec<crate::models::Character>, sqlx::Error> {
         let pattern = format!("%{}%", query);
         // We search in all text fields
-        sqlx::query_as::<_, crate::models::Character>(
+        let mut list = sqlx::query_as::<_, crate::models::Character>(
             "SELECT DISTINCT c.* FROM characters c
              LEFT JOIN character_urls u ON c.id = u.character_id
              WHERE 
              c.name LIKE ? OR 
              c.personality LIKE ? OR 
              c.scenario LIKE ? OR 
+             c.char_title LIKE ? OR 
              c.example_dialogue LIKE ? OR 
              c.first_message LIKE ? OR 
              c.author_notes LIKE ? OR
@@ -593,8 +618,13 @@ impl Database {
         .bind(&pattern)
         .bind(&pattern)
         .bind(&pattern)
+        .bind(&pattern)
         .fetch_all(&self.pool)
-        .await
+        .await?;
+        for c in &mut list {
+            c.post_load();
+        }
+        Ok(list)
     }
 
     pub async fn search_tags_matching(
@@ -647,7 +677,11 @@ impl Database {
             q = q.bind(id);
         }
 
-        q.fetch_all(&self.pool).await
+        let mut list = q.fetch_all(&self.pool).await?;
+        for c in &mut list {
+            c.post_load();
+        }
+        Ok(list)
     }
 
     pub async fn search_lorebooks_text(

@@ -33,6 +33,15 @@ pub fn render_options_window(app: &mut CrapApp, ctx: &egui::Context) {
 
             ui.add_space(8.0);
 
+            ui.horizontal(|ui| {
+                let mut enabled = app.enable_spell_check;
+                if ui.checkbox(&mut enabled, "Enable Spell Check").changed() {
+                    app.set_spell_check(enabled);
+                }
+            });
+
+            ui.add_space(8.0);
+
             // Scale
             ui.horizontal(|ui| {
                 ui.label("Scale:");

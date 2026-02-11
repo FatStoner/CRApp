@@ -103,6 +103,7 @@ pub struct CrapApp {
     pub use_custom_background: bool,
     pub show_watermark: bool,
     pub show_background: bool,
+    pub enable_spell_check: bool,
 }
 
 impl CrapApp {
@@ -180,6 +181,7 @@ impl CrapApp {
             use_custom_background: false,
             show_watermark: true,
             show_background: true,
+            enable_spell_check: true,
         };
 
         // Initial Scale Load
@@ -265,6 +267,24 @@ impl CrapApp {
                     let _ = tx.send(UiEvent::BackgroundLoaded(true)).await;
                 }
                 Err(e) => eprintln!("Failed to load background visibility setting: {}", e),
+            }
+        });
+
+        // Initial Spell Check Load
+        let tx = app.tx.clone();
+        let db = app.db.clone();
+        let ctx = app.ctx.clone();
+        tokio::spawn(async move {
+            match db.get_setting("enable_spell_check").await {
+                Ok(Some(val)) => {
+                    let enabled = val != "false";
+                    let _ = tx.send(UiEvent::SpellCheckSettingLoaded(enabled)).await;
+                    ctx.request_repaint();
+                }
+                Ok(None) => {
+                    let _ = tx.send(UiEvent::SpellCheckSettingLoaded(true)).await;
+                }
+                Err(e) => eprintln!("Failed to load spell check setting: {}", e),
             }
         });
 
@@ -1809,6 +1829,15 @@ impl CrapApp {
         let val = visible.to_string();
         tokio::spawn(async move {
             let _ = db.set_setting("show_background", &val).await;
+        });
+    }
+
+    pub fn set_spell_check(&mut self, enabled: bool) {
+        self.enable_spell_check = enabled;
+        let db = self.db.clone();
+        let val = enabled.to_string();
+        tokio::spawn(async move {
+            let _ = db.set_setting("enable_spell_check", &val).await;
         });
     }
 
