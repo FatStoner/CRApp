@@ -410,8 +410,9 @@ pub fn render_popups(ctx: &egui::Context, app: &mut CrapApp) {
                 .show(ctx, |ui| {
                      ui.horizontal(|ui| {
                         if ui.button("📂 Load .crappbook / JSON").clicked() {
-                             if let Some(path) = rfd::FileDialog::new()
-                                .add_filter("Lorebook", &["crappbook", "json"])
+                            if let Some(path) = rfd::FileDialog::new()
+                                .add_filter("Lorebook Files", &["crappbook", "json"])
+                                .add_filter("All Files", &["*"])
                                 .pick_file() 
                             {
                                 if let Ok(content) = std::fs::read_to_string(&path) {

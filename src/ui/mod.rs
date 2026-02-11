@@ -97,7 +97,19 @@ impl eframe::App for CrapApp {
                     }
                 },
                 UiEvent::LorebooksLoaded(res) => match res {
-                    Ok(books) => self.lorebooks = books,
+                    Ok(mut books) => {
+                        // Preserve entries from existing cache to prevent "dirty" state due to shallow reload
+                        for new_book in &mut books {
+                            if let Some(existing) =
+                                self.lorebooks.iter().find(|b| b.id == new_book.id)
+                            {
+                                if !existing.entries.is_empty() {
+                                    new_book.entries = existing.entries.clone();
+                                }
+                            }
+                        }
+                        self.lorebooks = books;
+                    }
                     Err(e) => {
                         self.loading_error = Some(e);
                     }
@@ -162,6 +174,14 @@ impl eframe::App for CrapApp {
                     self.is_saving = false;
                     match res {
                         Ok(l) => {
+                            // UPDATE CACHE (Critical for dirty check)
+                            if let Some(existing) = self.lorebooks.iter_mut().find(|b| b.id == l.id)
+                            {
+                                *existing = l.clone();
+                            } else {
+                                self.lorebooks.push(l.clone());
+                            }
+
                             self.selected_lorebook = Some(l);
                             self.set_status("Lorebook Saved!".to_string(), egui::Color32::GREEN);
 

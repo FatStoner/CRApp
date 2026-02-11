@@ -765,6 +765,11 @@ impl CrapApp {
                 // Update the object with saved entries (IDs populated)
                 lorebook.entries = saved_entries;
 
+                // Reload tags to ensure we have correct database IDs (otherwise dirty check fails)
+                if let Ok(saved_tags) = db.get_tags_for_lorebook(lid).await {
+                    lorebook.tags = saved_tags;
+                }
+
                 let _ = tx.send(UiEvent::LorebookSaved(Ok(lorebook))).await;
                 ctx.request_repaint();
 

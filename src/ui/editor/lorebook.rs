@@ -3,6 +3,28 @@ use eframe::egui;
 
 pub fn render_lorebook_editor(app: &mut CrapApp, ui: &mut egui::Ui) {
     if let Some(mut book) = app.selected_lorebook.take() {
+        // --- SYNC START: Sync selected_entry back to book for accurate dirty check ---
+        if let Some(selected) = &app.selected_entry {
+             if let Some(existing) = book.entries.iter_mut().find(|e| e.id == selected.id) {
+                 *existing = selected.clone();
+             } else if selected.id == 0 {
+                 // It's a new entry that hasn't been saved to DB yet, but is in our temporary book list?
+                 // If ID is 0, we might have multiple new entries. 
+                 // Best effort: find by reference or assume single new entry being edited?
+                 // Actually, list logic usually appends. 
+                 // Let's rely on ID match for existing, and for new ones... 
+                 // If we are editing a new entry, it must be in the list?
+                 // If app.selected_entry is a COPY, we must find the original in `book.entries`.
+                 // If it's 0, we can't easily find it unless we use index or pointer equality (not possible with clone).
+                 // STRATEGY: When creating a new entry, give it a temp ID or handle 0 carefully.
+                 // For now, let's assume if we are editing an entry with ID 0, it might be the last one added? 
+                 // OR, we just don't sync back ID 0 entries correctly yet?
+                 // Wait, `add_entry_to_lorebook` DB call returns an ID. So entries usually have IDs.
+                 // Only truly ephemeral entries have ID 0.
+             }
+        }
+        // --- SYNC END ---
+
         let mut save_lore_req = None;
         let mut tag_add_request = None;
         let mut tag_remove_request = None;
@@ -15,7 +37,7 @@ pub fn render_lorebook_editor(app: &mut CrapApp, ui: &mut egui::Ui) {
 
         // Check Dirty State
         let is_dirty = if book.id == 0 {
-            !book.content_eq(&crate::models::Lorebook::default())
+            true // Always dirty if new
         } else {
             if let Some(original) = app.lorebooks.iter().find(|b| b.id == book.id) {
                 !book.content_eq(original)
@@ -26,6 +48,12 @@ pub fn render_lorebook_editor(app: &mut CrapApp, ui: &mut egui::Ui) {
 
         // Check for Ctrl+S (Global scope for editor)
         if ui.input_mut(|i| i.consume_key(egui::Modifiers::CTRL, egui::Key::S)) {
+            // Sync before save!
+            if let Some(selected) = &app.selected_entry {
+                 if let Some(existing) = book.entries.iter_mut().find(|e| e.id == selected.id) {
+                     *existing = selected.clone();
+                 }
+            }
             save_lore_req = Some(book.clone());
         }
 
@@ -96,6 +124,12 @@ pub fn render_lorebook_editor(app: &mut CrapApp, ui: &mut egui::Ui) {
                     .add(egui::Button::new(egui::RichText::new("SAVE").strong()).fill(save_color))
                     .clicked()
                 {
+                    // Sync before save!
+                    if let Some(selected) = &app.selected_entry {
+                         if let Some(existing) = book.entries.iter_mut().find(|e| e.id == selected.id) {
+                             *existing = selected.clone();
+                         }
+                    }
                     save_lore_req = Some(book.clone());
                 }
 
@@ -158,14 +192,28 @@ pub fn render_lorebook_editor(app: &mut CrapApp, ui: &mut egui::Ui) {
 
                 if !current_match {
                     // 3. Find first matching entry
-                    if let Some(matching_entry) = book.entries.iter().find(|e| {
+                    let matching_entry_idx = book.entries.iter().position(|e| {
                         e.name.to_lowercase().contains(&query_lower)
                             || e.keywords.to_lowercase().contains(&query_lower)
                             || e.content.to_lowercase().contains(&query_lower)
-                    }) {
-                        app.selected_entry = Some(matching_entry.clone());
-                        // Switch to Entries tab if not already there
-                        app.active_lorebook_tab = crate::ui::LorebookTab::Entries;
+                    });
+
+                    if let Some(idx) = matching_entry_idx {
+                        // SYNC BEFORE AUTO-SWITCH
+                        if let Some(current) = &app.selected_entry {
+                            if let Some(existing) = book.entries.iter_mut().find(|e| e.id == current.id) {
+                                *existing = current.clone();
+                            }
+                        }
+                        
+                        // We need to re-access the entry after potential mutable borrow above
+                        // But since we have the index, we can just grab it.
+                        // Wait, did `test` borrow `book.entries`? No, it returned an index.
+                        if let Some(entry) = book.entries.get(idx) {
+                             app.selected_entry = Some(entry.clone());
+                             // Switch to Entries tab if not already there
+                             app.active_lorebook_tab = crate::ui::LorebookTab::Entries;
+                        }
                     }
                 }
             }
@@ -493,6 +541,7 @@ pub fn render_lorebook_editor(app: &mut CrapApp, ui: &mut egui::Ui) {
                                          ui.separator();
                                          egui::ScrollArea::vertical().id_salt("entries_list_scroll").show(ui, |ui| {
                                              ui.set_width(ui.available_width());
+                                              let mut switch_to_entry = None;
                                               for entry in &book.entries {
                                                   let selected = app.selected_entry.as_ref().map(|e| e.id) == Some(entry.id);
                                                   
@@ -521,9 +570,19 @@ pub fn render_lorebook_editor(app: &mut CrapApp, ui: &mut egui::Ui) {
                                                       };
 
                                                       if ui.selectable_label(selected, label_text).clicked() {
-                                                          app.selected_entry = Some(entry.clone());
+                                                          switch_to_entry = Some(entry.clone());
                                                       }
                                                   });
+                                              }
+
+                                              if let Some(new_entry) = switch_to_entry {
+                                                  // SYNC BEFORE SWITCH
+                                                  if let Some(current) = &app.selected_entry {
+                                                      if let Some(existing) = book.entries.iter_mut().find(|e| e.id == current.id) {
+                                                          *existing = current.clone();
+                                                      }
+                                                  }
+                                                  app.selected_entry = Some(new_entry);
                                               }
                                          });
                                      });
@@ -645,6 +704,12 @@ pub fn render_lorebook_editor(app: &mut CrapApp, ui: &mut egui::Ui) {
         }
 
         // Restore ownership
+        // SYNC FINAL
+        if let Some(current) = &app.selected_entry {
+            if let Some(existing) = book.entries.iter_mut().find(|e| e.id == current.id) {
+                *existing = current.clone();
+            }
+        }
         app.selected_lorebook = Some(book);
 
         if back_history_req {
