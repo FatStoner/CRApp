@@ -27,11 +27,9 @@ Handles the "Gallery" or "Browser" view where characters are listed.
     -   **Sorting**: Alphabetical, Date, etc. (Ascending/Descending).
     -   **Navigation**: Folder traversal for collections.
     -   **Favorites View**: Dedicated filtered view for favorite characters.
-    -   **Visual Indicators**:
-        -   Red heart (\u2764) watermark on favorite character cards.
-        -   Custom 1:1 cropped images for folder icons.
     -   **Context Menu**: Right-click actions (Move, Delete, Edit, Toggle Favorite, **Change Icon**).
-27:     -   **Background**: Supports a custom background image (configured in Options).
+    -   **Clipboard Support**: Large "Paste from Clipboard" button supporting local files, web links, and raw image data (Windows/Linux compatible).
+    -   **Background**: Supports a custom background image (configured in Options).
 
 ### 3. Editor View (`ui/editor.rs`)
 Handles the detailed editing interfaces.
@@ -133,4 +131,10 @@ Renders and processes only the items currently visible in the viewport.
 -   **Browser Grid**: Skips processing and rendering for cards outside the scroll area.
 -   **Browser List**: Skips expensive avatar painting for non-visible rows.
 
-This prevents the application from issuing thousands of image load requests simultaneously when opening large folders, eliminating UI freezes.
+### 3. Lightbox (Fullscreen Gallery Viewer)
+-   **Dynamic Interaction Zones**:
+    -   **Background**: The viewer intelligently calculates the image's centered position. Clicking any "empty" space (the dimmed background) immediately closes the viewer.
+    -   **Navigation**: High-priority left/right zones (15% screen width) allow cycling through the gallery context.
+    -   **Image Protection**: The image itself consumes click events, preventing accidental closure when interacting with the main view.
+-   **Implementation**: Utilizes `egui::Image::load_for_size` to ensure accurate rect-to-screen mapping, avoiding common immediate-mode UI "dead zones" or "interaction bleed".
+

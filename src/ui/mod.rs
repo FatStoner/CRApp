@@ -584,26 +584,105 @@ impl eframe::App for CrapApp {
                 .interactable(true)
                 .show(ctx, |ui| {
                     let screen_rect = ctx.screen_rect();
+                    let sw = screen_rect.width();
+                    let sh = screen_rect.height();
 
-                    // 1. Dimmed Background
-                    let (rect, response) =
-                        ui.allocate_exact_size(screen_rect.size(), egui::Sense::click());
-                    ui.painter()
-                        .rect_filled(rect, 0.0, egui::Color32::from_black_alpha(200));
+                    // === PAINT ONLY (no interaction) ===
 
-                    if response.clicked() {
+                    // 1. Paint dimmed background
+                    ui.painter().rect_filled(
+                        screen_rect,
+                        0.0,
+                        egui::Color32::from_black_alpha(200),
+                    );
+
+                    // 1b. Background Interaction (Lowest Priority)
+                    let bg_response = ui.allocate_rect(screen_rect, egui::Sense::click());
+                    if bg_response.clicked() {
                         close = true;
                     }
 
-                    // 2. Centered Image
+                    // 2. Image Handling
                     let max_size = screen_rect.size() * 0.9;
-                    let img = egui::Image::new(uri).shrink_to_fit().max_size(max_size);
+                    let img = egui::Image::new(uri)
+                        .shrink_to_fit()
+                        .max_size(max_size)
+                        .sense(egui::Sense::click());
 
-                    ui.allocate_new_ui(egui::UiBuilder::new().max_rect(screen_rect), |ui| {
-                        ui.centered_and_justified(|ui| {
-                            ui.add(img);
-                        });
-                    });
+                    // Attempt to load image to get dimensions
+
+                    match img.load_for_size(ui.ctx(), max_size) {
+                        Ok(egui::load::TexturePoll::Ready { texture, .. }) => {
+                            let img_size = texture.size;
+                            // Scale down if larger than max_size while maintaining aspect ratio
+                            let width_ratio = max_size.x / img_size.x;
+                            let height_ratio = max_size.y / img_size.y;
+                            let scale = width_ratio.min(height_ratio).min(1.0);
+
+                            let final_size = img_size * scale;
+                            let img_rect =
+                                egui::Rect::from_center_size(screen_rect.center(), final_size);
+
+                            // Render Image (Middle Priority)
+                            // ui.put places the widget at the exact rect, consuming clicks there
+                            ui.put(img_rect, img);
+                        }
+                        Ok(egui::load::TexturePoll::Pending { .. }) => {
+                            ui.spinner();
+                        }
+                        Err(_) => {
+                            ui.label("Failed to load image");
+                        }
+                    }
+
+                    // 3. Navigation Zones (Highest Priority)
+                    // These overlay everything.
+
+                    let nav_width = sw * 0.15;
+
+                    // Left Nav
+                    let left_nav_rect =
+                        egui::Rect::from_min_size(screen_rect.min, egui::vec2(nav_width, sh));
+                    let left_resp = ui.allocate_rect(left_nav_rect, egui::Sense::click());
+                    if left_resp.hovered() {
+                        ui.painter().rect_filled(
+                            left_nav_rect,
+                            0.0,
+                            egui::Color32::from_black_alpha(30),
+                        );
+                        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+                    }
+                    if left_resp.clicked() {
+                        if let Some(context) = &self.gallery_context {
+                            if let Some(idx) = context.iter().position(|u| u == uri) {
+                                let new_idx = if idx == 0 { context.len() - 1 } else { idx - 1 };
+                                next_image = Some(context[new_idx].clone());
+                            }
+                        }
+                    }
+
+                    // Right Nav
+                    let right_nav_rect = egui::Rect::from_min_size(
+                        egui::pos2(screen_rect.max.x - nav_width, screen_rect.min.y),
+                        egui::vec2(nav_width, sh),
+                    );
+                    let right_resp = ui.allocate_rect(right_nav_rect, egui::Sense::click());
+                    if right_resp.hovered() {
+                        ui.painter().rect_filled(
+                            right_nav_rect,
+                            0.0,
+                            egui::Color32::from_black_alpha(30),
+                        );
+                        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+                    }
+                    if right_resp.clicked() {
+                        if let Some(context) = &self.gallery_context {
+                            if let Some(idx) = context.iter().position(|u| u == uri) {
+                                let new_idx = (idx + 1) % context.len();
+                                next_image = Some(context[new_idx].clone());
+                            }
+                        }
+                    }
                 });
 
             // Handle Input
