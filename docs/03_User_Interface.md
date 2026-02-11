@@ -4,6 +4,22 @@ The UI is built using `egui` (Immediate Mode GUI). The rendering logic is primar
 
 ## Module Structure
 
+### 0. Core Logic (`ui/mod.rs`)
+The `mod.rs` file serves as the main entry point for the UI module. It implements the `eframe::App` trait and orchestrates the overall update loop, delegating specific tasks to specialized modules.
+
+### 0a. UI Event Loop (`ui/events.rs`)
+Handles all asynchronous events arriving from the backend via a channel.
+-   **Responsibilities**:
+    -   Processing `UiEvent` variants (Loaded data, Saved confirmations, Errors).
+    -   Updating the central application state (`CrapApp`) based on these events.
+    -   Triggering UI repaints when new data arrives.
+
+### 0b. Utility Functions (`ui/utils.rs`)
+Houses shared logic unrelated to direct rendering.
+-   **Key Functions**:
+    -   `get_image_uri`: Standardized path-to-URI conversion with caching.
+    -   `cleanup_avatar`: Logic for moving/renaming avatar files.
+
 ### 1. Central Panel (`ui/central_panel.rs`)
 The `central_panel.rs` module acts as the orchestrator for the main content area.
 -   **Responsibilities**:
@@ -102,8 +118,19 @@ Shared UI elements and helper functions.
 -   **Avatar Crop Rendering**: Unified logic for painting 1:1 cropped images with "Zoom/Cover" effects.
 -   **Snippet Extraction**: Heuristic logic for extracting search result snippets from large text blocks.
 
+-   `status_message`: Toast notifications.
+
+### 6. Lightbox Viewer (`ui/lightbox.rs`)
+A dedicated module for the high-priority image overlay.
+-   **Features**:
+    -   **Dynamic Interaction Zones**:
+        -   **Background**: The viewer intelligently calculates the image's centered position. Clicking any "empty" space (the dimmed background) immediately closes the viewer.
+        -   **Navigation**: High-priority left/right zones (15% screen width) allow cycling through the gallery context.
+        -   **Image Protection**: The image itself consumes click events, preventing accidental closure when interacting with the main view.
+    -   **Implementation**: Utilizes `egui::Image::load_for_size` to ensure accurate rect-to-screen mapping, avoiding common immediate-mode UI "dead zones" or "interaction bleed".
+
 ## UI Event Loop & State
-The `CrapApp` struct (in `ui/mod.rs`) holds all the transient UI state:
+The `CrapApp` struct (in `ui/app.rs` and `ui/types.rs`) holds all the transient UI state. The main update loop in `ui/mod.rs` calls `ui/events::handle_ui_events` at the start of every frame to process pending backend messages.
 -   `active_char_tab`: Current tab in Editor (Main/Notes/Lorebooks).
 -   `popup_state`: Handling of confirmation dialogs.
 -   `is_saving`: Visual feedback during async operations.
@@ -126,7 +153,7 @@ To ensure a responsive UI, especially with large numbers of characters (thousand
 
 ### 1. Asynchronous Image Loading
 -   **Old Approach**: Blocking `std::fs` calls and synchronous image decoding on the main thread.
--   **Current Approach**: Leverages `egui`'s asynchronous image loader. Path resolution uses a custom helper `crate::ui::get_image_uri` which:
+-   **Current Approach**: Leverages `egui`'s asynchronous image loader. Path resolution uses a custom helper `crate::ui::utils::get_image_uri` which:
     -   Converts paths to `file://` URIs efficiently.
     -   Caches the current working directory using `OnceLock` to avoid repeated system calls.
 

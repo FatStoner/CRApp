@@ -7,12 +7,15 @@ CRApp (Character Repository Application) is a desktop application built in Rust 
 The application is structured into four main layers:
 
 1.  **Entry Point (`main.rs`)**: Initializes the database, configures the window (eframe options), and launches the application loop.
-2.  **Application State (`ui/mod.rs` - `CrapApp`)**: Holds the runtime state, including database connection, cached data (characters, collections), and UI state (active tab, selected items).
-3.  **UI Layer (`ui/`)**: Handles rendering and user interaction.
-    -   **Orchestration**: `central_panel.rs` directs the main content area.
-    -   **Views**: `browser.rs` (Gallery), `editor.rs` (Edit specific items).
+2.  **Application State (`ui/app.rs`, `ui/types.rs`)**: Defines `CrapApp` and associated enums/structs. Holds runtime state, database connections, and UI flags.
+3.  **UI Layer (`ui/`)**: Specialized modules for rendering and logic.
+    -   **Event Handling**: `events.rs` manages the async event loop.
+    -   **Orchestration**: `mod.rs` (App trait) and `central_panel.rs` (Content routing).
+    -   **Views**: `browser.rs` (Gallery), `editor/` (Specific item editors), `options_window.rs`.
     -   **Navigation**: `side_panel.rs`.
-    -   **Parsing**: `parsing.rs` handles imports from external formats.
+    -   **Overlays**: `lightbox.rs` (Image viewer).
+    -   **Utilities**: `utils.rs` (Shared logic).
+    -   **Parsing**: `parsing.rs` handles imports.
 4.  **Data Layer (`db.rs`, `models.rs`)**:
     -   **Models**: Rust structs representing entities (Character, Lorebook, Tag).
     -   **Database**: Async SQLite operations via `sqlx`.
@@ -23,8 +26,8 @@ The application runs on the main thread using `eframe::run_native`. The `CrapApp
 ### State Management
 -   **Persistence**: Data is stored in `crap_data.db` (SQLite).
 -   **Runtime**: Data is loaded into `Vec<Character>` etc. in `CrapApp` for fast access during rendering. Major changes (Save/Delete) trigger database updates and a reload of runtime state.
--   **Navigation History**: A built-in history stack (in `ui/mod.rs`) tracks user movement between folders and app modes, enabling consistent "Back" button behavior across the interface.
--   **Communication**: `tokio::sync::mpsc` channels are used for async tasks (like file I/O or DB operations) to communicate back to the UI thread via `UiEvent`.
+-   **Navigation History**: A built-in history stack (in `CrapApp`) tracks user movement between folders and app modes, enabling consistent "Back" button behavior.
+-   **Event Loop**: `ui/events.rs` processes backend messages at the start of each frame, decoupling UI rendering from async data updates.
 
 ## Directory Structure
 ```
@@ -35,16 +38,18 @@ src/
 ├── cleaner.rs      # Unused media cleanup logic
 ├── models.rs       # Data structures
 ├── card_v2.rs      # Export/Import format compatibility
-└── ui/             # User Interface Logic
-    ├── mod.rs      # CrapApp struct and navigation logic
+└── ui/             # User Interface Layer
+    ├── mod.rs      # Main entry point and App trait implementation
+    ├── app.rs      # CrapApp struct definition
+    ├── types.rs    # UI-specific enums and data types
+    ├── events.rs   # Async event loop handler
+    ├── utils.rs    # Shared utility functions (get_image_uri, etc.)
+    ├── lightbox.rs # Fullscreen image viewer logic
     ├── central_panel.rs  # Main content area router
     ├── side_panel.rs     # Left navigation bar (with culling)
     ├── browser.rs        # Character Grid/List view (with culling)
-    ├── editor/           # Sub-modules for editors
-    │   ├── mod.rs        # Editor orchestration
-    │   ├── character.rs  # Character Editor
-    │   └── lorebook.rs   # Lorebook Editor
-    ├── parsing.rs        # Text and HTML parsing logic (Clipboard & Lorebook Import)
+    ├── editor/           # Sub-modules for editors (Character, Lorebook)
+    ├── parsing.rs        # Text and HTML parsing logic
     ├── global_search.rs  # Global Deep Search
     ├── popups.rs         # Unified modal handling
     ├── text_highlight.rs # Search highlight logic

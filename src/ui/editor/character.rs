@@ -784,15 +784,7 @@ pub fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                                          
                                          // Show image preview if available
                                          if let Some(path_str) = &character.avatar_path {
-                                             let uri = if path_str.contains("://") { 
-                                                 path_str.clone() 
-                                             } else {
-                                                 if let Ok(abs_path) = std::fs::canonicalize(path_str) {
-                                                      format!("file://{}", abs_path.to_string_lossy())
-                                                 } else {
-                                                      path_str.clone() 
-                                                 }
-                                             };
+                                             let uri = crate::ui::utils::get_image_uri(path_str);
                                              
                                              // Calculate preview size based on available width in this column
                                              let preview_width = ui.available_width() - 8.0;
@@ -1249,7 +1241,7 @@ pub fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                                          for path in &files {
                                              let path_str = path.to_string_lossy().to_string();
                                              // Use get_image_uri to handle caching and protocol
-                                             let uri = crate::ui::get_image_uri(&path_str);
+                                             let uri = crate::ui::utils::get_image_uri(&path_str);
                                              
                                              let size = 150.0;
                                              let (rect, response) = ui.allocate_exact_size(egui::vec2(size, size), egui::Sense::click());
@@ -1268,7 +1260,7 @@ pub fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                                                  app.gallery_context = Some(
                                                      files
                                                          .iter()
-                                                         .map(|p| crate::ui::get_image_uri(&p.to_string_lossy()))
+                                                         .map(|p| crate::ui::utils::get_image_uri(&p.to_string_lossy()))
                                                          .collect(),
                                                  );
                                              }

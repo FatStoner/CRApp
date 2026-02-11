@@ -359,7 +359,7 @@ pub fn render_lorebook_editor(app: &mut CrapApp, ui: &mut egui::Ui) {
                             ui.label(egui::RichText::new("Cover Image").strong());
 
                             if let Some(path_str) = &book.cover_path {
-                                let uri = crate::ui::get_image_uri(path_str);
+                                let uri = crate::ui::utils::get_image_uri(path_str);
 
                                 // Total height is limited to 1/3 of screen.
                                 // Subtracting ~80px for labels and buttons.

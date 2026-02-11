@@ -12,9 +12,9 @@ use std::time::{Duration, Instant};
 
 use super::spell_check;
 use super::types::*;
+use super::utils::cleanup_avatar;
 use super::{
-    cleanup_avatar, CharacterSearchFieldFilters, LorebookSearchFieldFilters, ParsedCharacterData,
-    PopupState,
+    CharacterSearchFieldFilters, LorebookSearchFieldFilters, ParsedCharacterData, PopupState,
 };
 
 pub struct CrapApp {

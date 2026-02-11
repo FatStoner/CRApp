@@ -68,7 +68,7 @@ pub fn render_browser_view(app: &mut CrapApp, ui: &mut egui::Ui) {
         } else {
             "data/background/default.png"
         };
-        let bg_uri = crate::ui::get_image_uri(bg_path);
+        let bg_uri = crate::ui::utils::get_image_uri(bg_path);
 
         // Async load check
         match ui
@@ -502,7 +502,7 @@ pub fn render_browser_view(app: &mut CrapApp, ui: &mut egui::Ui) {
 
                                             // Avatar Painting
                                             if let Some(path_str) = &char.avatar_path {
-                                                let uri = crate::ui::get_image_uri(path_str);
+                                                let uri = crate::ui::utils::get_image_uri(path_str);
                                                 crate::ui::widgets::paint_avatar_crop(
                                                     ui, rect, &uri, 4.0,
                                                 );
@@ -794,7 +794,7 @@ pub fn render_character_card(
         egui::Rect::from_min_size(content_rect.min, egui::vec2(avatar_size, avatar_size));
 
     if let Some(path_str) = &char.avatar_path {
-        let uri = crate::ui::get_image_uri(path_str);
+        let uri = crate::ui::utils::get_image_uri(path_str);
         crate::ui::widgets::paint_avatar_crop(ui, avatar_rect, &uri, 4.0);
     } else {
         ui.painter()

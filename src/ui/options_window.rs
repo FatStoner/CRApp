@@ -112,7 +112,7 @@ pub fn render_options_window(app: &mut CrapApp, ctx: &egui::Context) {
 
                         if std::fs::copy(path, &target).is_ok() {
                             // Invalidate cache
-                            let uri = crate::ui::get_image_uri("data/background/custom.png");
+                            let uri = crate::ui::utils::get_image_uri("data/background/custom.png");
                             ctx.forget_image(&uri);
                             ctx.request_repaint();
                         }

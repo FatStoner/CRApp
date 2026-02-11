@@ -266,7 +266,7 @@ pub fn render_side_panel(app: &mut CrapApp, ctx: &egui::Context) {
                                             );
 
                                             if let Some(path_str) = &book.cover_path {
-                                                let uri = crate::ui::get_image_uri(path_str);
+                                                let uri = crate::ui::utils::get_image_uri(path_str);
                                                 crate::ui::widgets::paint_avatar_crop(
                                                     ui, thumb_rect, &uri, 2.0,
                                                 );
@@ -845,7 +845,7 @@ pub fn render_tree(
         );
 
         if let Some(path_str) = &char.avatar_path {
-            let uri = crate::ui::get_image_uri(path_str);
+            let uri = crate::ui::utils::get_image_uri(path_str);
 
             crate::ui::widgets::paint_avatar_crop(ui, thumb_rect, &uri, 4.0);
         } else {
