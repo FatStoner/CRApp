@@ -123,6 +123,27 @@ pub fn render_options_window(app: &mut CrapApp, ctx: &egui::Context) {
                         .size(11.0)
                         .italics(),
                 );
+
+                ui.add_space(8.0);
+
+                // Version
+                let version = env!("CARGO_PKG_VERSION");
+                ui.label(egui::RichText::new(format!("Version: {}", version)).size(12.0));
+
+                ui.add_space(4.0);
+
+                // GitHub Link
+                let repo_url = env!("CARGO_PKG_REPOSITORY");
+                ui.horizontal(|ui| {
+                    ui.label("GitHub:");
+                    let link = ui.hyperlink(repo_url);
+                    link.context_menu(|ui| {
+                        if ui.button("📋 Copy URL").clicked() {
+                            ui.output_mut(|o| o.copied_text = repo_url.to_string());
+                            ui.close_menu();
+                        }
+                    });
+                });
             });
 
             ui.add_space(20.0);

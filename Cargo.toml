@@ -1,7 +1,8 @@
 [package]
 name = "crap"
-version = "0.1.4"
+version = "0.2.0"
 edition = "2021"
+repository = "https://github.com/JustJam-Dev/CRApp"
 
 [dependencies]
 eframe = "0.29"
