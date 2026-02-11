@@ -10,8 +10,31 @@ pub fn render_side_panel(app: &mut CrapApp, ctx: &egui::Context) {
 
             // Mode Switcher
             ui.horizontal(|ui| {
-                ui.selectable_value(&mut app.mode, AppMode::Characters, "Characters");
-                ui.selectable_value(&mut app.mode, AppMode::Lorebooks, "Lorebooks");
+                let char_mode = app.mode == AppMode::Characters;
+                if ui.selectable_label(char_mode, "Characters").clicked() {
+                    if !char_mode {
+                        if let Some(last_id) = app.last_active_character_id {
+                            app.load_character(last_id);
+                        } else if let Some(first) = app.characters.first().map(|c| c.id) {
+                            app.load_character(first);
+                        } else {
+                            app.mode = AppMode::Characters; // Fallback if no characters
+                        }
+                    }
+                }
+
+                let lore_mode = app.mode == AppMode::Lorebooks;
+                if ui.selectable_label(lore_mode, "Lorebooks").clicked() {
+                    if !lore_mode {
+                        if let Some(last_id) = app.last_active_lorebook_id {
+                            app.load_lorebook(last_id);
+                        } else if let Some(first) = app.lorebooks.first().map(|l| l.id) {
+                            app.load_lorebook(first);
+                        } else {
+                            app.mode = AppMode::Lorebooks; // Fallback
+                        }
+                    }
+                }
 
                 ui.add_space(8.0);
                 if ui.button("Options").clicked() {

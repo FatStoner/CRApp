@@ -145,9 +145,40 @@ pub fn render_browser_view(app: &mut CrapApp, ui: &mut egui::Ui) {
     ui.horizontal(|ui| {
         // Back only if in a collection, not in "All" mode which is top level.
         if !viewing_all && collection_id.is_some() {
-            if ui.button("⬅ Back").clicked() {
+            let back_btn = ui.button("⬅ Back");
+            if back_btn.clicked() {
                 app.request_back();
             }
+            back_btn.context_menu(|ui| {
+                ui.label("Navigation History");
+                ui.separator();
+                let history_len = app.navigation_history.len();
+                let start_index = history_len.saturating_sub(5);
+                let history_items: Vec<(usize, String)> = app
+                    .navigation_history
+                    .iter()
+                    .enumerate()
+                    .skip(start_index)
+                    .rev()
+                    .map(|(i, state)| (i, app.describe_state(state)))
+                    .collect();
+
+                for (i, label) in history_items {
+                    if ui.button(label).clicked() {
+                        if app.has_unsaved_changes() {
+                            app.popup_state = crate::ui::PopupState::UnsavedChanges {
+                                target: crate::ui::AppAction::GoToHistory(i),
+                            };
+                        } else {
+                            app.go_to_history(i);
+                        }
+                        ui.close_menu();
+                    }
+                }
+                if history_len == 0 {
+                    ui.label(egui::RichText::new("No history").italics().weak());
+                }
+            });
             if ui.button("⬆ Up").clicked() {
                 app.request_collection_switch(parent_id);
             }

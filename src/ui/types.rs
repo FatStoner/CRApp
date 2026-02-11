@@ -63,6 +63,7 @@ pub enum AppAction {
     SwitchToAll,
     Exit,
     GoBack,
+    GoToHistory(usize),
     CreateNewCharacter(Option<i64>),
     CreateNewLorebook,
     CreateNewTemplate,
@@ -77,6 +78,8 @@ pub struct NavigationState {
     pub selected_character_id: Option<i64>,
     pub selected_lorebook_id: Option<i64>,
     pub selected_collection_id: Option<i64>,
+    pub selected_lorebook_entry_id: Option<i64>,
+    pub selected_lorebook_entry_name: Option<String>,
     pub active_char_tab: CharacterTab,
     pub active_lorebook_tab: LorebookTab,
 }

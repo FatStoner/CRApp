@@ -60,10 +60,40 @@ pub fn render_lorebook_editor(app: &mut CrapApp, ui: &mut egui::Ui) {
         }
 
         ui.horizontal(|ui| {
-            if ui.button("⬅ Back").clicked() {
+            let back_btn = ui.button("⬅ Back");
+            if back_btn.clicked() {
                 // Use app.request_back() to handle checks
                 back_history_req = true;
             }
+            back_btn.context_menu(|ui| {
+                ui.label("Navigation History");
+                ui.separator();
+                let history_len = app.navigation_history.len();
+                let start_index = history_len.saturating_sub(5);
+                let history_items: Vec<(usize, String)> = app.navigation_history
+                    .iter()
+                    .enumerate()
+                    .skip(start_index)
+                    .rev()
+                    .map(|(i, state)| (i, app.describe_state(state)))
+                    .collect();
+
+                for (i, label) in history_items {
+                    if ui.button(label).clicked() {
+                        if is_dirty {
+                             app.popup_state = crate::ui::PopupState::UnsavedChanges {
+                                 target: crate::ui::AppAction::GoToHistory(i),
+                             };
+                        } else {
+                             app.go_to_history(i);
+                        }
+                        ui.close_menu();
+                    }
+                }
+                if history_len == 0 {
+                    ui.label(egui::RichText::new("No history").italics().weak());
+                }
+            });
 
             // Handle Esc key for Back navigation
             if ui.memory(|m| m.focused().is_none())
@@ -212,8 +242,9 @@ pub fn render_lorebook_editor(app: &mut CrapApp, ui: &mut egui::Ui) {
                         // But since we have the index, we can just grab it.
                         // Wait, did `test` borrow `book.entries`? No, it returned an index.
                         if let Some(entry) = book.entries.get(idx) {
+                             app.push_history();
                              app.selected_entry = Some(entry.clone());
-                             // Switch to Entries tab if not already there
+                             // Switch to Entries tab if not already salary there
                              app.active_lorebook_tab = crate::ui::LorebookTab::Entries;
                         }
                     }
@@ -589,6 +620,7 @@ pub fn render_lorebook_editor(app: &mut CrapApp, ui: &mut egui::Ui) {
 
                                               if let Some(new_entry) = switch_to_entry {
                                                   // SYNC BEFORE SWITCH
+                                                  app.push_history();
                                                   if let Some(current) = &app.selected_entry {
                                                       if let Some(existing) = book.entries.iter_mut().find(|e| e.id == current.id) {
                                                           *existing = current.clone();
@@ -722,7 +754,9 @@ pub fn render_lorebook_editor(app: &mut CrapApp, ui: &mut egui::Ui) {
                 *existing = current.clone();
             }
         }
-        app.selected_lorebook = Some(book);
+        if app.central_view == crate::ui::CentralView::Editor && app.selected_lorebook.is_none() {
+            app.selected_lorebook = Some(book);
+        }
 
         if back_history_req {
             app.request_back();

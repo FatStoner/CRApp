@@ -41,6 +41,8 @@ Handles the detailed editing interfaces.
     -   **Tags**: Management of App and External tags.
     -   **Lorebooks**: Selection of linked lorebooks with "Go to Lorebook" navigation button.
     -   **Navigation**: "Back" and "Up" buttons with **Unsaved Changes Protection**.
+        -   **History Context Menu**: Right-clicking the "Back" button opens a menu of the navigation stack, allowing jumping to specific past states.
+        -   **Lorebook Entry Tracking**: The navigation history captures the specific Lorebook entry being viewed, including its ID and Name, ensuring accurate restoration even if data isn't fully loaded in the background.
     -   **Export**: Export to .crapp (Native), .json (SpicyChat), .md, or .png (Card).
     -   **Legacy Compat**: Supports importing V1 and V2 PNG cards.
 -   **Lorebook Editor**:
@@ -88,6 +90,9 @@ The left-hand navigation bar.
         -   **Vertical Gaps**: Selection highlights are slightly shrunk (to **44.0px**) to ensure a clear 4.0px gap between items, preventing visual overlap.
         -   **Interaction**: Title labels are non-selectable and set to `Sense::hover()` to ensure smooth click-through for row selection.
         -   **Context Menu**: Right-click actions for quick deletion and management.
+    -   **Smart Tab Switching**:
+        -   The application tracks the `last_active_character_id` and `last_active_lorebook_id`.
+        -   Clicking "Characters" or "Lorebooks" automatically restores the last active item (or the first available), avoiding "empty editor" states in both the UI and navigation history.
 
 
 ### 6. Reusable Components (`ui/widgets.rs`)

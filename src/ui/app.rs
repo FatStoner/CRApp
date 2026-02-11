@@ -104,6 +104,10 @@ pub struct CrapApp {
     pub show_watermark: bool,
     pub show_background: bool,
     pub enable_spell_check: bool,
+
+    // Smart Tab Switching
+    pub last_active_character_id: Option<i64>,
+    pub last_active_lorebook_id: Option<i64>,
 }
 
 impl CrapApp {
@@ -182,6 +186,9 @@ impl CrapApp {
             show_watermark: true,
             show_background: true,
             enable_spell_check: true,
+
+            last_active_character_id: None,
+            last_active_lorebook_id: None,
         };
 
         // Initial Scale Load
@@ -542,10 +549,13 @@ impl CrapApp {
         // Find in logic, or reload if needed. Currently we just select from list.
         if let Some(c) = self.characters.iter().find(|c| c.id == id).cloned() {
             self.selected_character = Some(c);
+            self.selected_lorebook = None; // Clear other selection
+            self.selected_entry = None;
             self.load_links(id);
             self.load_tags(id);
             self.mode = AppMode::Characters;
             self.central_view = CentralView::Editor;
+            self.last_active_character_id = Some(id);
         }
     }
 
@@ -553,10 +563,12 @@ impl CrapApp {
         self.push_history();
         if let Some(book) = self.lorebooks.iter().find(|l| l.id == id).cloned() {
             self.selected_lorebook = Some(book);
+            self.selected_character = None; // Clear other selection
             self.load_lorebook_entries(id);
             self.load_lorebook_tags(id);
             self.mode = AppMode::Lorebooks;
             self.central_view = CentralView::Editor;
+            self.last_active_lorebook_id = Some(id);
         }
     }
 
@@ -937,6 +949,8 @@ impl CrapApp {
             selected_character_id: self.selected_character.as_ref().map(|c| c.id),
             selected_lorebook_id: self.selected_lorebook.as_ref().map(|l| l.id),
             selected_collection_id: self.selected_collection_id,
+            selected_lorebook_entry_id: self.selected_entry.as_ref().map(|e| e.id),
+            selected_lorebook_entry_name: self.selected_entry.as_ref().map(|e| e.name.clone()),
             active_char_tab: self.active_char_tab,
             active_lorebook_tab: self.active_lorebook_tab,
         };
@@ -949,6 +963,8 @@ impl CrapApp {
                 && last.selected_character_id == state.selected_character_id
                 && last.selected_lorebook_id == state.selected_lorebook_id
                 && last.selected_collection_id == state.selected_collection_id
+                && last.selected_lorebook_entry_id == state.selected_lorebook_entry_id
+                && last.selected_lorebook_entry_name == state.selected_lorebook_entry_name
             {
                 return;
             }
@@ -982,9 +998,113 @@ impl CrapApp {
                     self.selected_lorebook = Some(book);
                     self.load_lorebook_entries(lore_id);
                     self.load_lorebook_tags(lore_id);
+
+                    if let Some(entry_id) = state.selected_lorebook_entry_id {
+                        // We need access to the book's entries which might not be loaded yet if we rely on async load.
+                        // However, load_lorebook_entries trigger async.
+                        // BUT, self.selected_lorebook has entries if it was cloned?
+                        // Wait, 'book' comes from 'self.lorebooks' which usually only has metadata if it's the main list.
+                        // If we are lucky and it has entries (it might not), we can set selected_entry.
+                        // If not, we rely on the async load to eventually populate it? No, async load sends event.
+                        // We must set selected_entry here if possible, or set a "pending entry selection".
+                        // For now, let's try to find it in the book we just set.
+                        // NOTE: In CrapApp, self.lorebooks usually contains fully loaded books?
+                        // Or just summaries? 'Lorebook' struct has entries vec.
+                        // If it's empty, we might fail to show it immediately.
+                        // Let's attempt to set it.
+                        if let Some(b) = &self.selected_lorebook {
+                            if let Some(entry) =
+                                b.entries.iter().find(|e| e.id == entry_id).cloned()
+                            {
+                                self.selected_entry = Some(entry);
+                            } else {
+                                // If not found (maybe book entries not loaded), we clear it.
+                                // Or we could trigger a "load and select" sequence.
+                                self.selected_entry = None;
+                            }
+                        }
+                    } else {
+                        self.selected_entry = None;
+                    }
                 }
             } else {
                 self.selected_lorebook = None;
+                self.selected_entry = None;
+            }
+        }
+    }
+
+    pub fn go_to_history(&mut self, index: usize) {
+        if index < self.navigation_history.len() {
+            // Truncate history to the target index + 1 (so target becomes the last item)
+            // But wait, go_back() pops the last item to use it.
+            // If we want to go TO a state in history, we want that state to be active.
+            // The history stack represents previous states properly.
+            // go_back pops the TOP state and applies it.
+            // If we want to jumping to index 'i', we effectively want to discard everything after 'i+1',
+            // AND then pop 'i' to apply it? No.
+            // The history stores PAST states. The CURRENT state is in 'self'.
+            // If I have history [A, B, C] and current is D.
+            // If I want to go to B (index 1).
+            // I should truncate to [A, B] and then call go_back() which pops B and applies it?
+            // Yes, that makes B the current state, and history becomes [A].
+            // Wait, if B is the current state, it shouldn't be in history unless we push D?
+            // We only push current state to history when we navigate AWAY.
+            // So if we are compliant with go_back:
+            // go_back pops the top (C), applies it. Buffer is now C. History is [A, B].
+            // If we want to go to B.
+            // We should truncate navigation_history to contain A and B.
+            // Then pop B.
+            // So truncate length to index + 1.
+            self.navigation_history.truncate(index + 1);
+            self.go_back();
+        }
+    }
+
+    pub fn describe_state(&self, state: &crate::ui::NavigationState) -> String {
+        match state.central_view {
+            crate::ui::CentralView::Editor => {
+                match state.mode {
+                    crate::ui::AppMode::Characters => {
+                        if let Some(id) = state.selected_character_id {
+                            if let Some(c) = self.characters.iter().find(|c| c.id == id) {
+                                return format!("Character: {}", c.name);
+                            }
+                            return "Character Editor".to_string();
+                        }
+                    }
+                    crate::ui::AppMode::Lorebooks => {
+                        if let Some(id) = state.selected_lorebook_id {
+                            if let Some(l) = self.lorebooks.iter().find(|l| l.id == id) {
+                                let mut base = format!("Lorebook: {}", l.title);
+                                if let Some(entry_name) = &state.selected_lorebook_entry_name {
+                                    base.push_str(&format!(" ({})", entry_name));
+                                } else if let Some(entry_id) = state.selected_lorebook_entry_id {
+                                    if let Some(entry) = l.entries.iter().find(|e| e.id == entry_id)
+                                    {
+                                        base.push_str(&format!(" ({})", entry.name));
+                                    }
+                                }
+                                return base;
+                            }
+                            return "Lorebook Editor".to_string();
+                        }
+                    }
+                    _ => {}
+                }
+                "Editor".to_string()
+            }
+            crate::ui::CentralView::Browser => {
+                if let Some(id) = state.selected_collection_id {
+                    let path = self.get_collection_path(id);
+                    if path.is_empty() {
+                        "Browser (Root)".to_string()
+                    } else {
+                        format!("Folder: {}", path)
+                    }
+                } else {
+                    "Browser".to_string()
+                }
             }
         }
     }
@@ -1195,6 +1315,7 @@ impl CrapApp {
         match action {
             AppAction::SwitchCharacter(id) => self.load_character(id),
             AppAction::SwitchCollection(id) => {
+                self.push_history();
                 self.viewing_all_characters = false;
                 self.selected_collection_id = id;
                 self.mode = AppMode::Characters;
@@ -1216,6 +1337,9 @@ impl CrapApp {
             }
             AppAction::GoBack => {
                 self.go_back();
+            }
+            AppAction::GoToHistory(index) => {
+                self.go_to_history(index);
             }
             AppAction::CreateNewCharacter(coll_id) => {
                 self.perform_create_new_character(coll_id);
