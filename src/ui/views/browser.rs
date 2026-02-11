@@ -95,7 +95,7 @@ pub fn render_browser_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                         avail_w / img_w
                     };
 
-                    let final_scale = scale_factor * 0.9;
+                    let final_scale = scale_factor * app.background_scale;
 
                     let final_w = img_w * final_scale;
                     let final_h = img_h * final_scale;

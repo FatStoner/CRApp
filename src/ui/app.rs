@@ -104,6 +104,7 @@ pub struct CrapApp {
     pub use_custom_background: bool,
     pub show_watermark: bool,
     pub show_background: bool,
+    pub background_scale: f32,
     pub enable_spell_check: bool,
 
     // Smart Tab Switching
@@ -186,6 +187,7 @@ impl CrapApp {
             use_custom_background: false,
             show_watermark: true,
             show_background: true,
+            background_scale: 0.9,
             enable_spell_check: true,
 
             last_active_character_id: None,
@@ -275,6 +277,23 @@ impl CrapApp {
                     let _ = tx.send(UiEvent::BackgroundLoaded(true)).await;
                 }
                 Err(e) => eprintln!("Failed to load background visibility setting: {}", e),
+            }
+        });
+
+        // Initial Background Scale Load
+        let tx = app.tx.clone();
+        let db = app.db.clone();
+        let ctx = app.ctx.clone();
+        tokio::spawn(async move {
+            match db.get_setting("background_scale").await {
+                Ok(Some(val)) => {
+                    if let Ok(scale) = val.parse::<f32>() {
+                        let _ = tx.send(UiEvent::BackgroundScaleLoaded(scale)).await;
+                        ctx.request_repaint();
+                    }
+                }
+                Ok(None) => {} // Default 0.9
+                Err(e) => eprintln!("Failed to load background scale: {}", e),
             }
         });
 
@@ -2355,5 +2374,14 @@ impl CrapApp {
             self.selected_character = None;
             self.selected_lorebook = None;
         }
+    }
+    pub fn set_background_scale(&mut self, scale: f32) {
+        self.background_scale = scale;
+        self.ctx.request_repaint();
+
+        let db = self.db.clone();
+        tokio::spawn(async move {
+            let _ = db.set_setting("background_scale", &scale.to_string()).await;
+        });
     }
 }

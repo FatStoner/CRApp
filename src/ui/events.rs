@@ -67,6 +67,9 @@ pub fn handle_ui_events(app: &mut CrapApp, ctx: &egui::Context) {
             UiEvent::BackgroundLoaded(show) => {
                 app.show_background = show;
             }
+            UiEvent::BackgroundScaleLoaded(scale) => {
+                app.background_scale = scale;
+            }
             UiEvent::SpellCheckSettingLoaded(enabled) => {
                 app.enable_spell_check = enabled;
             }

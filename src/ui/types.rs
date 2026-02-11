@@ -128,4 +128,5 @@ pub enum UiEvent {
     WatermarkLoaded(bool),
     BackgroundLoaded(bool),
     SpellCheckSettingLoaded(bool),
+    BackgroundScaleLoaded(f32),
 }

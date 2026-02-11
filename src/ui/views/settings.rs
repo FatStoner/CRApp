@@ -96,6 +96,19 @@ pub fn render_options_window(app: &mut CrapApp, ctx: &egui::Context) {
                 }
             });
 
+            ui.add_space(8.0);
+
+            ui.horizontal(|ui| {
+                ui.label("Scale:");
+                let mut scale = app.background_scale;
+                if ui
+                    .add(egui::Slider::new(&mut scale, 0.1..=1.5).text("Ratio"))
+                    .changed()
+                {
+                    app.set_background_scale(scale);
+                }
+            });
+
             ui.add_space(5.0);
             if ui.button("Select Custom Image...").clicked() {
                 let ctx = ctx.clone();
