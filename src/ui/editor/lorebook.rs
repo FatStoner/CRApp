@@ -1,6 +1,8 @@
 use crate::ui::CrapApp;
 use eframe::egui;
 
+use crate::models::count_tokens;
+
 pub fn render_lorebook_editor(app: &mut CrapApp, ui: &mut egui::Ui) {
     if let Some(mut book) = app.selected_lorebook.take() {
         // --- SYNC START: Sync selected_entry back to book for accurate dirty check ---
@@ -253,7 +255,12 @@ pub fn render_lorebook_editor(app: &mut CrapApp, ui: &mut egui::Ui) {
                             }
                             ui.add_space(8.0);
 
-                            ui.label("Description");
+                            ui.horizontal(|ui| {
+                                ui.label("Description");
+                                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                     ui.label(egui::RichText::new(format!("Tokens: {} | Chars: {}", count_tokens(&book.content), book.content.chars().count())).size(12.0).color(egui::Color32::GRAY));
+                                });
+                            });
                             if app.editor_search_query.len() >= 3 {
                                 let mut layouter =
                                     crate::ui::text_highlight::create_highlight_layouter(
@@ -493,7 +500,12 @@ pub fn render_lorebook_editor(app: &mut CrapApp, ui: &mut egui::Ui) {
                                                       ui.text_edit_singleline(&mut entry.keywords);
                                                   }
                                                   
-                                                  ui.label("Content");
+                                                  ui.horizontal(|ui| {
+                                                      ui.label("Content");
+                                                      ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                                           ui.label(egui::RichText::new(format!("Tokens: {} | Chars: {}", count_tokens(&entry.content), entry.content.chars().count())).size(12.0).color(egui::Color32::GRAY));
+                                                      });
+                                                  });
                                                   egui::ScrollArea::vertical().id_salt("entry_content_scroll").show(ui, |ui| {
                                                       if app.editor_search_query.len() >= 3 {
                                                           let mut layouter = crate::ui::text_highlight::create_highlight_layouter(app.editor_search_query.clone());
