@@ -646,13 +646,22 @@ pub fn render_popups(ctx: &egui::Context, app: &mut CrapApp) {
                      ui.label("Choose a template to apply:");
                      ui.add_space(5.0);
                      
-                     egui::ScrollArea::vertical().show(ui, |ui| {
-                         for template in &app.templates {
-                            if ui.button(&template.name).clicked() {
-                                selected_template = Some(template.clone());
-                            }
+                     if app.templates.is_empty() {
+                         ui.colored_label(egui::Color32::YELLOW, "No templates found.");
+                         ui.add_space(5.0);
+                         if ui.button("➕ Go to Templates to create one").clicked() {
+                             app.popup_state = PopupState::None;
+                             app.request_switch_to_templates();
                          }
-                     });
+                     } else {
+                         egui::ScrollArea::vertical().show(ui, |ui| {
+                             for template in &app.templates {
+                                if ui.button(&template.name).clicked() {
+                                    selected_template = Some(template.clone());
+                                }
+                             }
+                         });
+                     }
 
                     ui.add_space(10.0);
                     if ui.button("Cancel").clicked() {
