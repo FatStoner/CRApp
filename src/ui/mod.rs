@@ -156,6 +156,16 @@ impl eframe::App for CrapApp {
                             self.load_links(c.id);
                             self.load_tags(c.id);
 
+                            // UPDATE CACHE (Critical for dirty check)
+                            // We do this BEFORE moving c into selected_character, or clone it.
+                            if let Some(existing) =
+                                self.characters.iter_mut().find(|char| char.id == c.id)
+                            {
+                                *existing = c.clone();
+                            } else {
+                                self.characters.push(c.clone());
+                            }
+
                             self.selected_character = Some(c);
                             self.set_status("Character Saved!".to_string(), egui::Color32::GREEN);
 

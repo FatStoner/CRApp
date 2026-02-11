@@ -51,7 +51,9 @@ Handles the detailed editing interfaces.
     -   **Tabbed Section**:
         -   **Entries Tab**: Master-Detail view for managing individual entries. Feature a swapped layout (Editor on Left, List on Right) and dynamic count badge.
         -   **Characters Tab**: Gallery view of all characters linked to this lorebook with dynamic count badge.
-    -   **Sync**: Automatically keeps description and content columns in sync.
+    -   **Sync**: Automatically synchronizes entry edits to the main lorebook object before saving or navigating, ensuring no data loss.
+    -   **Dirty State Tracking**: Implements robust dirty state detection by comparing deep copies of the lorebook (including entries and tags) with the saved state.
+        -   **Tag Reloading**: Reloads tags from the database immediately after saving to ensure ID consistency and prevent false "dirty" flags.
     -   **Safety**: Delete confirmation for lore entries.
     -   **Quick Search**: In-editor search bar that highlights matches and automatically jumps to matching entries.
 

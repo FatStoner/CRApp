@@ -614,6 +614,15 @@ impl CrapApp {
                     }
                 }
 
+                // Reload tags to ensure we have correct database IDs (otherwise dirty check fails)
+                // UPSERT handles URLs, but we manually handled Tags above, so we must reload them to get IDs.
+                if let Ok(saved_app_tags) = db.get_tags_for_character(cid, false).await {
+                    character.app_tags = saved_app_tags;
+                }
+                if let Ok(saved_ext_tags) = db.get_tags_for_character(cid, true).await {
+                    character.external_tags = saved_ext_tags;
+                }
+
                 let _ = tx.send(UiEvent::CharacterSaved(Ok(character))).await;
                 ctx.request_repaint();
                 let mut chars = db.get_all_characters().await.map_err(|e| e.to_string());
