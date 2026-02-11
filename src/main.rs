@@ -26,42 +26,44 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 async fn run_app() -> Result<(), Box<dyn std::error::Error>> {
-    // Check for updates before starting the app
+    // Spawn update check in background (non-blocking)
     #[cfg(not(debug_assertions))]
     {
-        match updater::check_and_update() {
-            Ok(true) => {
-                // Update was successful, show notification and restart
-                rfd::MessageDialog::new()
-                    .set_title("Update Installed")
-                    .set_description("CRApp has been updated to the latest version.\nThe application will now restart.")
-                    .set_level(rfd::MessageLevel::Info)
-                    .show();
-
-                // Restart the application
-                if let Err(e) = updater::restart_application() {
-                    eprintln!("Failed to restart application: {}", e);
+        std::thread::spawn(|| {
+            // Run update check in background
+            match updater::check_and_update() {
+                Ok(true) => {
+                    // Update was successful, show notification and restart
                     rfd::MessageDialog::new()
-                        .set_title("Restart Failed")
-                        .set_description(&format!(
-                            "Please restart the application manually.\n\nError: {}",
-                            e
-                        ))
-                        .set_level(rfd::MessageLevel::Warning)
+                        .set_title("Update Installed")
+                        .set_description("CRApp has been updated to the latest version.\nThe application will now restart.")
+                        .set_level(rfd::MessageLevel::Info)
                         .show();
+
+                    // Restart the application
+                    if let Err(e) = updater::restart_application() {
+                        eprintln!("Failed to restart application: {}", e);
+                        rfd::MessageDialog::new()
+                            .set_title("Restart Failed")
+                            .set_description(&format!(
+                                "Please restart the application manually.\n\nError: {}",
+                                e
+                            ))
+                            .set_level(rfd::MessageLevel::Warning)
+                            .show();
+                    }
                 }
-                return Ok(());
+                Ok(false) => {
+                    // No update available, continue normally
+                    println!("No updates available");
+                }
+                Err(e) => {
+                    // Update check failed, log but don't block app startup
+                    eprintln!("Update check failed: {}", e);
+                    // Don't show a dialog for update failures to avoid annoying users
+                }
             }
-            Ok(false) => {
-                // No update available, continue normally
-                println!("No updates available");
-            }
-            Err(e) => {
-                // Update check failed, log but don't block app startup
-                eprintln!("Update check failed: {}", e);
-                // Don't show a dialog for update failures to avoid annoying users
-            }
-        }
+        });
     }
 
     // Initialize Database
