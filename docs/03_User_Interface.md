@@ -38,6 +38,7 @@ A dedicated modal window for application-wide settings.
 Handles the "Gallery" or "Browser" view where characters are listed.
 -   **Features**:
     -   **Grid/List Display**: Renders characters and subfolders as cards.
+        -   **Character Tags**: Displays both App and External tags in List View (separately) and up to 3 tags in Grid View.
         -   **Folder Images**: Custom square icons can be assigned to folders.
     -   **Filtering**: By collection, search term, and tags.
     -   **Sorting**: Alphabetical, Date, etc. (Ascending/Descending).

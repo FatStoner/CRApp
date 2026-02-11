@@ -588,6 +588,40 @@ pub fn render_browser_view(app: &mut CrapApp, ui: &mut egui::Ui) {
 
                                                     ui.add_space(8.0);
 
+                                                    // Character Tags
+                                                    if !char.app_tags.is_empty() {
+                                                        ui.horizontal(|ui| {
+                                                            ui.label(
+                                                                egui::RichText::new("App Tags:")
+                                                                    .small()
+                                                                    .strong(),
+                                                            );
+                                                            render_tag_chips(
+                                                                ui,
+                                                                &char.app_tags,
+                                                                false,
+                                                            );
+                                                        });
+                                                    }
+                                                    if !char.external_tags.is_empty() {
+                                                        ui.horizontal(|ui| {
+                                                            ui.label(
+                                                                egui::RichText::new(
+                                                                    "External Tags:",
+                                                                )
+                                                                .small()
+                                                                .strong(),
+                                                            );
+                                                            render_tag_chips(
+                                                                ui,
+                                                                &char.external_tags,
+                                                                true,
+                                                            );
+                                                        });
+                                                    }
+
+                                                    ui.add_space(8.0);
+
                                                     // Token & Char Counts
                                                     app.ensure_token_count(char);
                                                     if let Some((tokens, chars)) =
@@ -881,9 +915,6 @@ pub fn render_character_card(
     cursor_y += 4.0;
 
     // Tags (Chips)
-    let tag_font = egui::FontId::proportional(10.0);
-    let mut tag_x = content_rect.min.x;
-
     let mut tags_to_show: Vec<&Tag> = char.app_tags.iter().collect();
     let mut is_external = false;
     if tags_to_show.is_empty() {
@@ -891,36 +922,75 @@ pub fn render_character_card(
         is_external = true;
     }
 
-    for tag in tags_to_show.iter().take(3) {
-        let tag_galley =
-            ui.painter()
-                .layout_no_wrap(tag.name.clone(), tag_font.clone(), egui::Color32::WHITE);
-        let pad = 4.0;
-        let chip_w = tag_galley.rect.width() + pad * 2.0;
-
-        if tag_x + chip_w > content_rect.max.x {
-            break;
-        }
-
-        let chip_rect =
-            egui::Rect::from_min_size(egui::pos2(tag_x, cursor_y), egui::vec2(chip_w, 16.0));
-
-        // Different color for external tags (Grayish vs Blueish)
+    if !tags_to_show.is_empty() {
+        let tag_font = egui::FontId::proportional(10.0);
+        let mut tag_x = content_rect.min.x;
         let bg_color = if is_external {
             egui::Color32::from_rgb(100, 100, 100)
         } else {
             egui::Color32::from_rgb(50, 80, 150)
         };
 
-        ui.painter().rect_filled(chip_rect, 8.0, bg_color);
-        ui.painter().galley(
-            egui::pos2(tag_x + pad, cursor_y + 2.0),
-            tag_galley,
-            egui::Color32::WHITE,
-        );
+        for tag in tags_to_show.iter().take(3) {
+            let tag_galley = ui.painter().layout_no_wrap(
+                tag.name.clone(),
+                tag_font.clone(),
+                egui::Color32::WHITE,
+            );
+            let pad = 4.0;
+            let chip_w = tag_galley.rect.width() + pad * 2.0;
 
-        tag_x += chip_w + 4.0;
+            if tag_x + chip_w > content_rect.max.x {
+                break;
+            }
+
+            let chip_rect =
+                egui::Rect::from_min_size(egui::pos2(tag_x, cursor_y), egui::vec2(chip_w, 16.0));
+
+            ui.painter().rect_filled(chip_rect, 8.0, bg_color);
+            ui.painter().galley(
+                egui::pos2(tag_x + pad, cursor_y + 2.0),
+                tag_galley,
+                egui::Color32::WHITE,
+            );
+
+            tag_x += chip_w + 4.0;
+        }
     }
+}
+
+pub fn render_tag_chips(ui: &mut egui::Ui, tags: &[Tag], is_external: bool) {
+    let tag_font = egui::FontId::proportional(10.0);
+    let bg_color = if is_external {
+        egui::Color32::from_rgb(100, 100, 100)
+    } else {
+        egui::Color32::from_rgb(50, 80, 150)
+    };
+
+    ui.horizontal_wrapped(|ui| {
+        ui.spacing_mut().item_spacing.x = 4.0;
+        ui.spacing_mut().item_spacing.y = 4.0;
+
+        for tag in tags {
+            let tag_galley = ui.painter().layout_no_wrap(
+                tag.name.clone(),
+                tag_font.clone(),
+                egui::Color32::WHITE,
+            );
+            let pad = 4.0;
+            let chip_w = tag_galley.rect.width() + pad * 2.0;
+
+            let (rect, _resp) =
+                ui.allocate_at_least(egui::vec2(chip_w, 16.0), egui::Sense::hover());
+
+            ui.painter().rect_filled(rect, 8.0, bg_color);
+            ui.painter().galley(
+                egui::pos2(rect.min.x + pad, rect.min.y + 2.0),
+                tag_galley,
+                egui::Color32::WHITE,
+            );
+        }
+    });
 }
 
 pub fn render_subfolder_card(
