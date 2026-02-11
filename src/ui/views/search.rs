@@ -1,5 +1,5 @@
 use crate::models::SearchResultKind;
-use crate::ui::{AppMode, CrapApp};
+use crate::ui::{AppMode, CharacterTab, CrapApp, LorebookTab};
 use eframe::egui;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -161,20 +161,16 @@ pub fn render_deep_search(app: &mut CrapApp, ui: &mut egui::Ui) {
             ui.label("Search in:");
 
             if ui.button("All").clicked() {
-                app.deep_search_char_field_filters =
-                    crate::ui::CharacterSearchFieldFilters::all_enabled();
-                app.deep_search_lore_field_filters =
-                    crate::ui::LorebookSearchFieldFilters::all_enabled();
+                app.deep_search_char_field_filters = CharacterSearchFieldFilters::all_enabled();
+                app.deep_search_lore_field_filters = LorebookSearchFieldFilters::all_enabled();
                 if !app.deep_search_query.trim().is_empty() {
                     app.perform_deep_search();
                 }
             }
 
             if ui.button("None").clicked() {
-                app.deep_search_char_field_filters =
-                    crate::ui::CharacterSearchFieldFilters::all_disabled();
-                app.deep_search_lore_field_filters =
-                    crate::ui::LorebookSearchFieldFilters::all_disabled();
+                app.deep_search_char_field_filters = CharacterSearchFieldFilters::all_disabled();
+                app.deep_search_lore_field_filters = LorebookSearchFieldFilters::all_disabled();
                 if !app.deep_search_query.trim().is_empty() {
                     app.perform_deep_search();
                 }
@@ -186,15 +182,13 @@ pub fn render_deep_search(app: &mut CrapApp, ui: &mut egui::Ui) {
             ui.label(egui::RichText::new("Character Fields:").strong());
             ui.add_space(8.0);
             if ui.button("All").clicked() {
-                app.deep_search_char_field_filters =
-                    crate::ui::CharacterSearchFieldFilters::all_enabled();
+                app.deep_search_char_field_filters = CharacterSearchFieldFilters::all_enabled();
                 if !app.deep_search_query.trim().is_empty() {
                     app.perform_deep_search();
                 }
             }
             if ui.button("None").clicked() {
-                app.deep_search_char_field_filters =
-                    crate::ui::CharacterSearchFieldFilters::all_disabled();
+                app.deep_search_char_field_filters = CharacterSearchFieldFilters::all_disabled();
                 if !app.deep_search_query.trim().is_empty() {
                     app.perform_deep_search();
                 }
@@ -253,15 +247,13 @@ pub fn render_deep_search(app: &mut CrapApp, ui: &mut egui::Ui) {
             ui.label(egui::RichText::new("Lorebook Fields:").strong());
             ui.add_space(8.0);
             if ui.button("All").clicked() {
-                app.deep_search_lore_field_filters =
-                    crate::ui::LorebookSearchFieldFilters::all_enabled();
+                app.deep_search_lore_field_filters = LorebookSearchFieldFilters::all_enabled();
                 if !app.deep_search_query.trim().is_empty() {
                     app.perform_deep_search();
                 }
             }
             if ui.button("None").clicked() {
-                app.deep_search_lore_field_filters =
-                    crate::ui::LorebookSearchFieldFilters::all_disabled();
+                app.deep_search_lore_field_filters = LorebookSearchFieldFilters::all_disabled();
                 if !app.deep_search_query.trim().is_empty() {
                     app.perform_deep_search();
                 }
@@ -409,10 +401,10 @@ pub fn render_deep_search(app: &mut CrapApp, ui: &mut egui::Ui) {
 
                             // If match is ONLY in notes, open Notes tab
                             if !in_main_fields && in_notes_fields {
-                                app.active_char_tab = crate::ui::CharacterTab::Notes;
+                                app.active_char_tab = CharacterTab::Notes;
                             } else {
                                 // Default to MainData tab
-                                app.active_char_tab = crate::ui::CharacterTab::MainData;
+                                app.active_char_tab = CharacterTab::MainData;
                             }
                         }
                     }
@@ -436,7 +428,7 @@ pub fn render_deep_search(app: &mut CrapApp, ui: &mut egui::Ui) {
                                     .iter()
                                     .any(|(field, _)| field.starts_with("Entry"));
                                 if has_entry_match {
-                                    app.active_lorebook_tab = crate::ui::LorebookTab::Entries;
+                                    app.active_lorebook_tab = LorebookTab::Entries;
                                 } else {
                                     // If no entry match, maybe it's in metadata. Use Entries as default if entries exist?
                                     // Actually, if it's metadata, staying in metadata view (managed by ScrollArea in render_lorebook_editor) is fine.

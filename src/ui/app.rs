@@ -14,7 +14,8 @@ use super::spell_check;
 use super::types::*;
 use super::utils::cleanup_avatar;
 use super::{
-    CharacterSearchFieldFilters, LorebookSearchFieldFilters, ParsedCharacterData, PopupState,
+    views::search::{CharacterSearchFieldFilters, LorebookSearchFieldFilters},
+    ParsedCharacterData, PopupState,
 };
 
 pub struct CrapApp {

@@ -1,4 +1,4 @@
-use super::app::CrapApp;
+use crate::ui::CrapApp;
 use eframe::egui;
 
 pub fn render_lightbox(app: &mut CrapApp, ctx: &egui::Context) {

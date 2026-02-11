@@ -1,36 +1,28 @@
 use eframe::egui;
-
 use std::time::{Duration, Instant};
 
-pub mod browser;
-pub mod central_panel;
-pub mod editor;
-pub mod global_search;
-pub mod popups;
-pub mod side_panel;
-pub mod text_highlight;
-pub mod widgets;
-
-pub use global_search::{CharacterSearchFieldFilters, LorebookSearchFieldFilters};
-pub use popups::PopupState;
-
-pub mod options_window;
-pub mod spell_check;
-pub mod spell_layout;
-
-pub mod parsing;
-
-// Re-export specific items if needed
-pub use parsing::ParsedCharacterData;
-
-pub mod types;
-pub use types::*;
+// Sub-modules (New Structure)
 pub mod app;
-pub use app::CrapApp;
-
+pub mod components;
 pub mod events;
-pub mod lightbox;
+pub mod panels;
+pub mod parsing;
+pub mod types;
 pub mod utils;
+pub mod views;
+
+// Re-exports for backward compatibility and convenience
+pub use app::CrapApp;
+pub use components::popups::PopupState;
+pub use components::spell_check;
+pub use components::spell_layout;
+pub use components::text_highlight;
+pub use components::widgets;
+
+pub use views::browser;
+
+pub use parsing::ParsedCharacterData;
+pub use types::*;
 
 impl eframe::App for CrapApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
@@ -84,7 +76,6 @@ impl eframe::App for CrapApp {
         }
 
         // Event Loop
-        // Event Loop
         events::handle_ui_events(self, ctx);
 
         // Timer
@@ -108,17 +99,16 @@ impl eframe::App for CrapApp {
         }
 
         // Side Panel
-        side_panel::render_side_panel(self, ctx);
+        panels::side::render_side_panel(self, ctx);
 
         // Central Panel
-        central_panel::render_central_panel(self, ctx);
+        panels::central::render_central_panel(self, ctx);
 
         // Global Popups
-        popups::render_popups(ctx, self);
+        components::popups::render_popups(ctx, self);
 
         // LIGHTBOX OVERLAY
-        // LIGHTBOX OVERLAY
-        lightbox::render_lightbox(self, ctx);
+        components::lightbox::render_lightbox(self, ctx);
 
         // Watermark: The Library of Snailexandria
         if self.show_watermark && ctx.screen_rect().width() > 300.0 {

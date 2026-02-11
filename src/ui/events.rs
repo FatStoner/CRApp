@@ -1,7 +1,7 @@
 use super::app::CrapApp;
 use super::types::UiEvent;
 use crate::models::Character;
-use crate::ui::{AppMode, CentralView, LorebookTab, ParsedCharacterData, PopupState};
+use crate::ui::{AppMode, CentralView, LorebookTab, PopupState};
 use eframe::egui;
 use std::time::Duration;
 
@@ -336,21 +336,19 @@ pub fn handle_ui_events(app: &mut CrapApp, ctx: &egui::Context) {
             UiEvent::ImportFileLoaded(res, target_id) => {
                 match res {
                     Ok(json_content) => {
-                        if let Ok(mut char_obj) = serde_json::from_str::<Character>(&json_content) {
+                        if let Ok(mut char_obj) =
+                            serde_json::from_str::<crate::models::Character>(&json_content)
+                        {
                             // Clean ID for new import only if we are not updating
                             if target_id.is_none() {
                                 char_obj.id = 0;
                             } else {
                                 // If updating, we keep the ID of the target, NOT the file content
-                                // Actually, let's logic this out:
-                                // If target_id is Some(id), we want to merge/overwrite THAT character.
-                                // The file content might have ID=123, but we might be pasting into ID=456.
-                                // We should probably ignore the file's ID if target_id is set.
                                 char_obj.id = target_id.unwrap() as i64;
                             }
 
                             // Map to ParsedCharacterData for review
-                            let parsed = ParsedCharacterData {
+                            let parsed = crate::ui::ParsedCharacterData {
                                 name: char_obj.name.clone(),
                                 title: char_obj.char_title.clone(),
                                 personality: char_obj.personality.clone(),
@@ -377,11 +375,12 @@ pub fn handle_ui_events(app: &mut CrapApp, ctx: &egui::Context) {
                                 {
                                     app.selected_character = Some(existing.clone());
                                 } else {
-                                    app.selected_character = Some(Character::default());
+                                    app.selected_character =
+                                        Some(crate::models::Character::default());
                                 }
                             } else {
                                 // Force "New Character" mode
-                                app.selected_character = Some(Character::default());
+                                app.selected_character = Some(crate::models::Character::default());
                             }
 
                             app.mode = AppMode::Characters;
@@ -393,7 +392,7 @@ pub fn handle_ui_events(app: &mut CrapApp, ctx: &egui::Context) {
                             app.set_status_with_duration(
                                 "File loaded for review.".to_string(),
                                 egui::Color32::GREEN,
-                                Duration::from_secs(10),
+                                std::time::Duration::from_secs(10),
                             );
                         } else {
                             app.set_status(

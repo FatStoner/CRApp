@@ -1,8 +1,7 @@
-use super::browser::render_browser_view;
-use super::editor::{render_editor_view, render_lorebook_editor};
-use super::parsing::parse_clipboard;
+use crate::ui::views::{render_browser_view, render_editor_view, render_lorebook_editor, render_template_editor};
+use crate::ui::parsing::parse_clipboard;
 use crate::models::Tag;
-use crate::ui::options_window::render_options_window;
+use crate::ui::views::render_options_window;
 use crate::ui::{AppMode, CrapApp};
 use eframe::egui;
 
@@ -65,7 +64,7 @@ pub fn render_central_panel(app: &mut CrapApp, ctx: &egui::Context) {
                         ui.separator();
                         
                         egui::ScrollArea::vertical()
-                            .id_source("review_parsed_data_scroll") // unique id
+                            .id_salt("review_parsed_data_scroll") // unique id
                             .auto_shrink([false, false]) // Don't shrink to content, fill window
                             .show(ui, |ui| {
                                 let data = app.parsed_data.as_mut().unwrap(); // FIX: Define data inside the closure!
@@ -270,7 +269,7 @@ pub fn render_central_panel(app: &mut CrapApp, ctx: &egui::Context) {
 
         // Global Search View
         if app.mode == AppMode::DeepSearch {
-            super::global_search::render_deep_search(app, ui);
+            crate::ui::views::search::render_deep_search(app, ui);
             return;
         }
 
@@ -290,7 +289,7 @@ pub fn render_central_panel(app: &mut CrapApp, ctx: &egui::Context) {
                 render_lorebook_editor(app, ui);
             },
             AppMode::Templates => {
-                crate::ui::editor::render_template_editor(app, ui);
+                render_template_editor(app, ui);
             },
             _ => {
                 ui.label("Unknown mode");

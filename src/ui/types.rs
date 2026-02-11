@@ -112,7 +112,6 @@ pub enum UiEvent {
     TemplatesLoaded(Result<Vec<Template>, String>),
     TemplateSaved(Result<Template, String>),
     TemplateDeleted(Result<i64, String>),
-
     ImportFileLoaded(Result<String, String>, Option<u64>),
     ImportCharacterData(Result<crate::ui::ParsedCharacterData, String>, Option<u64>),
     ThemeLoaded(Result<ThemeMode, String>),

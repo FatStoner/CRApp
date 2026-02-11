@@ -179,7 +179,7 @@ pub fn render_side_panel(app: &mut CrapApp, ctx: &egui::Context) {
 
                             // Root Characters & Collections
                             // We start with parent_id: None
-                            super::side_panel::render_tree(
+                            render_tree(
                                 ui,
                                 &app.collections,
                                 &app.characters,
