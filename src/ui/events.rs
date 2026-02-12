@@ -342,6 +342,7 @@ pub fn handle_ui_events(app: &mut CrapApp, ctx: &egui::Context) {
                         if let Ok(mut char_obj) =
                             serde_json::from_str::<crate::models::Character>(&json_content)
                         {
+                            // ... Existing Character Logic ...
                             // Clean ID for new import only if we are not updating
                             if target_id.is_none() {
                                 char_obj.id = 0;
@@ -382,18 +383,15 @@ pub fn handle_ui_events(app: &mut CrapApp, ctx: &egui::Context) {
                                         Some(crate::models::Character::default());
                                 }
                             } else {
-                                // Force "New Character" mode
                                 app.selected_character = Some(crate::models::Character::default());
                             }
 
                             app.mode = AppMode::Characters;
-
                             app.parsed_data = Some(parsed);
                             app.show_import_modal = true;
-                            app.import_text.clear(); // Clear clipboard text if any
-
+                            app.import_text.clear();
                             app.set_status_with_duration(
-                                "File loaded for review.".to_string(),
+                                "Character loaded for review.".to_string(),
                                 egui::Color32::GREEN,
                                 std::time::Duration::from_secs(10),
                             );
@@ -467,6 +465,7 @@ pub fn handle_ui_events(app: &mut CrapApp, ctx: &egui::Context) {
                 app.token_cache.insert(id, (tokens, chars));
                 app.token_calc_in_progress.remove(&id);
             }
+
             UiEvent::LorebookImported(lb) => {
                 app.set_status(
                     "Lorebook Imported Successfully".to_string(),
@@ -479,6 +478,7 @@ pub fn handle_ui_events(app: &mut CrapApp, ctx: &egui::Context) {
                 app.mode = AppMode::Lorebooks;
                 app.active_lorebook_tab = LorebookTab::Entries;
             }
+
             UiEvent::StatusMessage(msg, color) => {
                 app.set_status(msg, color);
             }

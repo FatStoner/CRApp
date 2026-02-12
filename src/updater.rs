@@ -3,6 +3,7 @@ use std::fs;
 use std::process::Command;
 
 /// Check for updates and perform the update if available
+#[allow(dead_code)]
 pub fn check_and_update() -> Result<bool, Box<dyn std::error::Error>> {
     // Clean up old executable first
     cleanup_old_executable()?;
@@ -74,6 +75,7 @@ fn cleanup_old_executable() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 /// Restart the application after an update
+#[allow(dead_code)]
 pub fn restart_application() -> Result<(), Box<dyn std::error::Error>> {
     let current_exe = env::current_exe()?;
 

@@ -26,11 +26,6 @@ pub enum LorebookTab {
 }
 
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
-pub enum TemplateTab {
-    Details,
-}
-
-#[derive(PartialEq, Eq, Clone, Copy, Debug)]
 pub enum CentralView {
     Editor,
     Browser,
