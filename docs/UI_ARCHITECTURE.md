@@ -49,13 +49,22 @@ src/ui/
 │   │   ├── character_card.rs # Character cards (241 LOC)
 │   │   └── collection_card.rs # Folder cards (231 LOC)
 │   │
-│   ├── editor/        # Content editors (1,976 LOC)
-│   │   ├── mod.rs     # Editor exports (9 LOC)
-│   │   ├── character.rs # Character editor (868 LOC)
-│   │   ├── lorebook.rs # Lorebook editor (736 LOC)
-│   │   ├── template.rs # Template editor (113 LOC)
-│   │   ├── toolbar.rs  # Editor toolbar (117 LOC)
-│   │   └── export.rs   # Export dialog (53 LOC)
+│   ├── editor/        # Content editors (2,323 LOC)
+│   │   ├── character/ # Character editor sub-modules
+│   │   │   ├── mod.rs
+│   │   │   ├── main_data.rs
+│   │   │   ├── notes.rs
+│   │   │   ├── lorebooks.rs
+│   │   │   └── gallery.rs
+│   │   ├── lorebook/  # Lorebook editor sub-modules
+│   │   │   ├── mod.rs
+│   │   │   ├── metadata.rs
+│   │   │   ├── entries.rs
+│   │   │   └── characters.rs
+│   │   ├── mod.rs     # Editor exports
+│   │   ├── template.rs # Template editor
+│   │   ├── toolbar.rs  # Editor toolbar
+│   │   └── export.rs   # Export dialog
 │   │
 │   ├── search.rs      # Deep search view (490 LOC)
 │   ├── settings.rs    # Settings window (183 LOC)
@@ -110,12 +119,16 @@ Large files (>1000 LOC) are split into focused modules:
 - `popups/import_export.rs` - Import/export dialogs
 - `popups/templates.rs` - Template selection
 
+**Editor Views** (was ~1,600 LOC → now 10+ files)
+- `editor/character/` - Modular character editor (5 modules)
+- `editor/lorebook/` - Modular lorebook editor (4 modules)
+
 ### 3. **Clear Responsibilities**
 
 | Module | Responsibility | Size |
 |--------|---------------|------|
 | `views/browser/` | Character/collection browsing | 1,208 LOC |
-| `views/editor/` | Content editing (char/lore/template) | 1,976 LOC |
+| `views/editor/` | Content editing (char/lore/template) | 2,323 LOC |
 | `panels/side/` | Navigation tree, mode switching | 1,027 LOC |
 | `components/popups/` | Modal dialogs | 827 LOC |
 | `controllers/` | Business logic, async ops | ~500 LOC |
@@ -190,17 +203,16 @@ pub use collection_card::render_subfolder_card;
 - ✅ All `components/` files < 300 LOC
 - ✅ All `browser/` files < 750 LOC
 - ✅ All `side/` files < 600 LOC
-- ⚠️ `editor/character.rs` (868 LOC) - acceptable for complex editor
-- ⚠️ `editor/lorebook.rs` (736 LOC) - acceptable for complex editor
+- ✅ `editor/character/` sub-modules < 700 LOC
+- ✅ `editor/lorebook/` sub-modules < 350 LOC
 
 ---
 
 ## Future Refactoring Opportunities
 
-1. **Editor Module** - Consider splitting character/lorebook editors further if they grow
-2. **Search View** - Extract search result rendering (currently 490 LOC)
-3. **Settings View** - Split into category-specific modules if expanded
-4. **Controllers** - Add more granular controllers as features grow
+1. **Search View** - Extract search result rendering (currently 490 LOC)
+2. **Settings View** - Split into category-specific modules if expanded
+3. **Controllers** - Add more granular controllers as features grow
 
 ---
 
@@ -230,5 +242,5 @@ pub use collection_card::render_subfolder_card;
 ---
 
 *Last Updated: 2026-02-12*
-*Total UI LOC: 12,268*
-*Modules: 30+ files across 10 directories*
+*Total UI LOC: 12,615*
+*Modules: 40+ files across 12 directories*
