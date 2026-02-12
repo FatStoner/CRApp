@@ -124,4 +124,5 @@ pub enum UiEvent {
     BackgroundLoaded(bool),
     SpellCheckSettingLoaded(bool),
     BackgroundScaleLoaded(f32),
+    GalleryImageAdded(String),
 }

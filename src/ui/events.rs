@@ -483,6 +483,12 @@ pub fn handle_ui_events(app: &mut CrapApp, ctx: &egui::Context) {
             UiEvent::StatusMessage(msg, color) => {
                 app.set_status(msg, color);
             }
+            UiEvent::GalleryImageAdded(path) => {
+                let uri = crate::ui::utils::get_image_uri(&path);
+                ctx.forget_image(&uri);
+                ctx.request_repaint();
+                app.set_status("Image added to gallery".to_string(), egui::Color32::GREEN);
+            }
         }
     }
 

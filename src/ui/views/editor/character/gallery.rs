@@ -20,37 +20,6 @@ pub fn render_gallery_tab(
     let _ = std::fs::create_dir_all(&gallery_dir);
     let mut refresh_gallery = false;
 
-    // Add Image Button
-    ui.horizontal(|ui| {
-        if ui.button("➕ Add Image").clicked() {
-            app.add_gallery_image_async(character.id);
-        }
-        if ui.button("📋 Paste").clicked() {
-            match app.paste_gallery_image_from_clipboard(character.id) {
-                Ok(_) => {
-                    *status_update =
-                        Some(("Image pasted to gallery!".to_string(), egui::Color32::GREEN));
-                    ui.ctx().request_repaint();
-                }
-                Err(e) => {
-                    *status_update = Some((e, egui::Color32::RED));
-                }
-            }
-        }
-        if ui.button("🔄 Refresh").clicked() {
-            // Just triggers repaint naturally
-        }
-        if ui.button("📂 Open Folder").clicked() {
-            #[cfg(target_os = "linux")]
-            {
-                if let Ok(abs_path) = std::fs::canonicalize(&gallery_dir) {
-                    let _ = std::process::Command::new("xdg-open").arg(abs_path).spawn();
-                }
-            }
-        }
-    });
-    ui.add_space(8.0);
-
     let mut files = Vec::new();
     if let Ok(entries) = std::fs::read_dir(&gallery_dir) {
         for entry in entries.flatten() {
@@ -71,6 +40,42 @@ pub fn render_gallery_tab(
         }
     }
     files.sort();
+
+    // Add Image Button
+    ui.horizontal(|ui| {
+        if ui.button("➕ Add Image").clicked() {
+            app.add_gallery_image_async(character.id);
+        }
+        if ui.button("📋 Paste").clicked() {
+            match app.paste_gallery_image_from_clipboard(character.id) {
+                Ok(_) => {
+                    *status_update =
+                        Some(("Image pasted to gallery!".to_string(), egui::Color32::GREEN));
+                    ui.ctx().request_repaint();
+                }
+                Err(e) => {
+                    *status_update = Some((e, egui::Color32::RED));
+                }
+            }
+        }
+        if ui.button("🔄 Refresh").clicked() {
+            for path in &files {
+                let path_str = path.to_string_lossy().to_string();
+                let uri = crate::ui::utils::get_image_uri(&path_str);
+                ui.ctx().forget_image(&uri);
+            }
+            ui.ctx().request_repaint();
+        }
+        if ui.button("📂 Open Folder").clicked() {
+            #[cfg(target_os = "linux")]
+            {
+                if let Ok(abs_path) = std::fs::canonicalize(&gallery_dir) {
+                    let _ = std::process::Command::new("xdg-open").arg(abs_path).spawn();
+                }
+            }
+        }
+    });
+    ui.add_space(8.0);
 
     egui::ScrollArea::vertical().show(ui, |ui| {
         ui.horizontal_wrapped(|ui| {

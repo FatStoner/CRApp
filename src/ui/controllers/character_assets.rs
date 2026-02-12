@@ -81,7 +81,13 @@ impl CrapApp {
                 let _ = std::fs::create_dir_all(&dest_dir);
                 if let Some(name) = path.file_name() {
                     let dest = dest_dir.join(name);
-                    let _ = std::fs::copy(path, dest);
+                    let _ = std::fs::copy(&path, &dest);
+                    // Send specific event to clear cache for this new image
+                    let _ = tx
+                        .send(UiEvent::GalleryImageAdded(
+                            dest.to_string_lossy().to_string(),
+                        ))
+                        .await;
                     let _ = tx.send(UiEvent::UiRepaint).await;
                 }
             }
@@ -110,6 +116,9 @@ impl CrapApp {
                         let dest_path = std::path::Path::new(&gallery_dir).join(&filename);
 
                         if let Ok(_) = image_buffer.save(&dest_path) {
+                            let _ = self.tx.try_send(UiEvent::GalleryImageAdded(
+                                dest_path.to_string_lossy().to_string(),
+                            ));
                             return Ok(());
                         }
                     }
@@ -129,6 +138,9 @@ impl CrapApp {
                                 let dest_path = std::path::Path::new(&gallery_dir).join(&filename);
 
                                 if let Ok(_) = dynamic_img.save(&dest_path) {
+                                    let _ = self.tx.try_send(UiEvent::GalleryImageAdded(
+                                        dest_path.to_string_lossy().to_string(),
+                                    ));
                                     return Ok(());
                                 }
                             }
