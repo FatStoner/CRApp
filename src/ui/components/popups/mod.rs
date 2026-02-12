@@ -60,6 +60,45 @@ pub enum PopupState {
     ExportCollectionOptions {
         collection_id: i64,
     },
+    ExportCollectionAdvanced {
+        collection_id: i64,
+        settings: AdvancedExportSettings,
+    },
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct AdvancedExportSettings {
+    pub format: AdvancedExportFormat,
+    // Grid Settings
+    pub grid_columns: u32,
+    pub grid_show_names: bool,
+    // List Settings
+    pub list_include_avatar: bool,
+    pub list_include_name: bool,
+    pub list_include_description: bool,
+    pub list_include_tags: bool,
+    pub list_include_tokens: bool,
+}
+
+impl Default for AdvancedExportSettings {
+    fn default() -> Self {
+        Self {
+            format: AdvancedExportFormat::Grid,
+            grid_columns: 4,
+            grid_show_names: true,
+            list_include_avatar: true,
+            list_include_name: true,
+            list_include_description: true,
+            list_include_tags: true,
+            list_include_tokens: true,
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum AdvancedExportFormat {
+    Grid,
+    List,
 }
 
 pub fn render_popups(ctx: &egui::Context, app: &mut CrapApp) {
@@ -90,7 +129,8 @@ pub fn render_popups(ctx: &egui::Context, app: &mut CrapApp) {
         PopupState::ImportDbWarning
         | PopupState::LorebookImport { .. }
         | PopupState::ExportDbSelection
-        | PopupState::ExportCollectionOptions { .. } => {
+        | PopupState::ExportCollectionOptions { .. }
+        | PopupState::ExportCollectionAdvanced { .. } => {
             import_export::render_import_export_popups(ctx, app, &state);
         }
 

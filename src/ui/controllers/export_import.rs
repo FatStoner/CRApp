@@ -1,5 +1,7 @@
 use super::state::CrapApp;
 use crate::ui::types::UiEvent;
+use base64::Engine as _;
+use image::GenericImageView;
 
 impl CrapApp {
     /// Exports database to a file (DB only, no data folder)
@@ -296,6 +298,258 @@ impl CrapApp {
             }
         });
     }
+
+    pub fn trigger_advanced_export(
+        &self,
+        collection_id: i64,
+        settings: crate::ui::components::popups::AdvancedExportSettings,
+    ) {
+        let collections = self.collections.clone();
+        let characters = self.characters.clone();
+
+        let collection_name = self
+            .collections
+            .iter()
+            .find(|c| c.id == collection_id)
+            .map(|c| c.name.clone())
+            .unwrap_or("Collection".to_string());
+
+        tokio::task::spawn_blocking(move || {
+            let suggested_name = format!(
+                "{}_{}",
+                collection_name.replace(" ", "_"),
+                match settings.format {
+                    crate::ui::components::popups::AdvancedExportFormat::Grid => "grid.png",
+                    crate::ui::components::popups::AdvancedExportFormat::List => "list.html",
+                }
+            );
+
+            if let Some(path) = rfd::FileDialog::new()
+                .set_title("Save Export As...")
+                .set_file_name(suggested_name)
+                .save_file()
+            {
+                // 1. Collect all characters recursively
+                let mut all_chars = Vec::new();
+                collect_characters_recursively(
+                    &collections,
+                    &characters,
+                    collection_id,
+                    &mut all_chars,
+                );
+
+                // 2. Generate Output
+                match settings.format {
+                    crate::ui::components::popups::AdvancedExportFormat::Grid => {
+                        let _ = generate_collection_grid_png(&all_chars, &path, &settings);
+                    }
+                    crate::ui::components::popups::AdvancedExportFormat::List => {
+                        let _ = generate_collection_list_html(&all_chars, &path, &settings);
+                    }
+                }
+            }
+        });
+    }
+}
+
+fn collect_characters_recursively(
+    collections: &[crate::models::Collection],
+    characters: &[crate::models::Character],
+    collection_id: i64,
+    acc: &mut Vec<crate::models::Character>,
+) {
+    // Add chars from this collection
+    for c in characters
+        .iter()
+        .filter(|c| c.collection_id == Some(collection_id))
+    {
+        acc.push(c.clone());
+    }
+
+    // Recurse
+    for sub in collections
+        .iter()
+        .filter(|c| c.parent_id == Some(collection_id))
+    {
+        collect_characters_recursively(collections, characters, sub.id, acc);
+    }
+}
+
+fn generate_collection_grid_png(
+    characters: &[crate::models::Character],
+    path: &std::path::Path,
+    settings: &crate::ui::components::popups::AdvancedExportSettings,
+) -> Result<(), String> {
+    if characters.is_empty() {
+        return Err("No characters found".to_string());
+    }
+
+    let cols = settings.grid_columns as u32;
+    let count = characters.len() as u32;
+    let rows = (count as f32 / cols as f32).ceil() as u32;
+
+    let tile_w = 300;
+    let tile_h = 450;
+    let margin = 20;
+
+    let canvas_w = cols * (tile_w + margin) + margin;
+    let canvas_h = rows * (tile_h + margin) + margin;
+
+    let mut canvas = image::RgbaImage::new(canvas_w, canvas_h);
+
+    // Fill background safely
+    for p in canvas.pixels_mut() {
+        *p = image::Rgba([30, 30, 30, 255]); // Dark grey background
+    }
+
+    // Attempt to load font
+    let font_data = std::fs::read("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
+        .or_else(|_| std::fs::read("/usr/share/fonts/TTF/DejaVuSans.ttf"))
+        .or_else(|_| std::fs::read("/usr/share/fonts/liberation/LiberationSans-Regular.ttf"));
+
+    let font = font_data
+        .ok()
+        .and_then(|data| rusttype::Font::try_from_vec(data));
+
+    for (i, character) in characters.iter().enumerate() {
+        let r = (i as u32) / cols;
+        let c = (i as u32) % cols;
+
+        let x = margin + c * (tile_w + margin);
+        let y = margin + r * (tile_h + margin);
+
+        // Load Avatar
+        if let Some(avatar_path) = &character.avatar_path {
+            if let Ok(img) = image::open(avatar_path) {
+                // Resize
+                let resized =
+                    img.resize_to_fill(tile_w, tile_h, image::imageops::FilterType::Lanczos3);
+                // Overlay
+                image::imageops::overlay(&mut canvas, &resized, x as i64, y as i64);
+            }
+        }
+
+        // Draw Name
+        if settings.grid_show_names {
+            // Draw text background with proper blending using overlay
+            let name_h = 40;
+            let name_y = y + tile_h - name_h;
+
+            let mut bg_bar = image::RgbaImage::new(tile_w, name_h);
+            for p in bg_bar.pixels_mut() {
+                *p = image::Rgba([0, 0, 0, 180]);
+            }
+            image::imageops::overlay(&mut canvas, &bg_bar, x as i64, name_y as i64);
+
+            if let Some(font) = &font {
+                let scale = rusttype::Scale::uniform(24.0);
+                imageproc::drawing::draw_text_mut(
+                    &mut canvas,
+                    image::Rgba([255, 255, 255, 255]),
+                    x as i32 + 10,
+                    name_y as i32 + 8,
+                    scale,
+                    font,
+                    &character.char_name,
+                );
+            }
+        }
+    }
+
+    canvas.save(path).map_err(|e| e.to_string())
+}
+
+fn generate_collection_list_html(
+    characters: &[crate::models::Character],
+    path: &std::path::Path,
+    settings: &crate::ui::components::popups::AdvancedExportSettings,
+) -> Result<(), String> {
+    let mut html = String::from("<html><head><style>
+        body { font-family: sans-serif; background: #1e1e1e; color: #ddd; padding: 20px; }
+        .character { background: #2d2d2d; margin-bottom: 20px; padding: 15px; border-radius: 8px; display: flex; gap: 20px; }
+        .avatar { width: 150px; height: 225px; object-fit: cover; border-radius: 4px; flex-shrink: 0; }
+        .info { flex-grow: 1; }
+        h2 { margin-top: 0; margin-bottom: 5px; color: #fff; }
+        .subtitle { color: #aaa; font-style: italic; margin-bottom: 10px; }
+        .tags span { background: #444; padding: 2px 6px; border-radius: 4px; font-size: 0.9em; margin-right: 5px; }
+        .desc { white-space: pre-wrap; margin-top: 10px; color: #bbb; }
+        .tokens { font-size: 0.8em; color: #888; margin-top: 5px; font-weight: bold; }
+    </style></head><body>");
+
+    html.push_str(&format!(
+        "<h1>Exported Collection ({} characters)</h1>",
+        characters.len()
+    ));
+
+    for char in characters {
+        html.push_str("<div class='character'>");
+
+        if settings.list_include_avatar {
+            if let Some(avatar_path) = &char.avatar_path {
+                if let Ok(bytes) = std::fs::read(avatar_path) {
+                    let b64 = base64::engine::general_purpose::STANDARD.encode(bytes);
+                    html.push_str(&format!(
+                        "<img class='avatar' src='data:image/png;base64,{}'>",
+                        b64
+                    ));
+                } else {
+                    html.push_str("<div class='avatar' style='background:#000'></div>");
+                }
+            } else {
+                html.push_str("<div class='avatar' style='background:#000'></div>");
+            }
+        }
+
+        html.push_str("<div class='info'>");
+
+        if settings.list_include_name {
+            html.push_str(&format!(
+                "<h2>{}</h2>",
+                html_escape::encode_text(&char.char_name)
+            ));
+        }
+
+        if settings.list_include_tokens {
+            // Calculate total tokens
+            let mut total_text = String::new();
+            total_text.push_str(&char.char_name);
+            total_text.push_str(&char.char_title);
+            total_text.push_str(&char.personality);
+            total_text.push_str(&char.scenario);
+            total_text.push_str(&char.first_message);
+            total_text.push_str(&char.example_dialogue);
+            let count = crate::models::count_tokens(&total_text);
+            html.push_str(&format!("<div class='tokens'>Tokens: {}</div>", count));
+        }
+
+        if settings.list_include_tags {
+            html.push_str("<div class='tags'>");
+            for t in &char.app_tags {
+                html.push_str(&format!(
+                    "<span>{}</span>",
+                    html_escape::encode_text(&t.name)
+                ));
+            }
+            html.push_str("</div>");
+        }
+
+        if settings.list_include_description {
+            // User requested Title/Description, not full personality/scenario dump
+            if !char.char_title.is_empty() {
+                html.push_str(&format!(
+                    "<div class='subtitle'>{}</div>",
+                    html_escape::encode_text(&char.char_title)
+                ));
+            }
+            // maybe include author notes as "description" if title is short?
+            // For now, adhere to "not personality/scenario".
+        }
+
+        html.push_str("</div></div>");
+    }
+
+    html.push_str("</body></html>");
+    std::fs::write(path, html).map_err(|e| e.to_string())
 }
 
 fn recursive_export_helper(

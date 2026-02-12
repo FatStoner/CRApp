@@ -109,6 +109,14 @@ pub fn render_import_export_popups(ctx: &egui::Context, app: &mut CrapApp, state
                         close = true;
                     }
 
+                    ui.separator();
+                    if ui.button("🛠 Advanced Export...").on_hover_text("Export as Grid Image vs Detailed List.").clicked() {
+                        app.popup_state = super::PopupState::ExportCollectionAdvanced {
+                            collection_id: id,
+                            settings: super::AdvancedExportSettings::default(),
+                        };
+                    }
+
                     ui.add_space(15.0);
                     if ui.button("Cancel").clicked() {
                         close = true;
@@ -116,6 +124,71 @@ pub fn render_import_export_popups(ctx: &egui::Context, app: &mut CrapApp, state
                 });
             if close {
                 app.popup_state = super::PopupState::None;
+            }
+        }
+
+        super::PopupState::ExportCollectionAdvanced { collection_id, settings } => {
+            let id = *collection_id;
+            // Create a local copy of settings to mutate
+            let mut current_settings = settings.clone();
+            let mut close = false;
+            let mut do_export = false;
+
+            egui::Window::new("Advanced Export")
+                .collapsible(false)
+                .resizable(false)
+                .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
+                .show(ctx, |ui| {
+                    ui.horizontal(|ui| {
+                        ui.selectable_value(&mut current_settings.format, super::AdvancedExportFormat::Grid, "Grid Image");
+                        ui.selectable_value(&mut current_settings.format, super::AdvancedExportFormat::List, "Detailed List");
+                    });
+                    ui.separator();
+
+                    match current_settings.format {
+                        super::AdvancedExportFormat::Grid => {
+                            ui.label("Grid Settings");
+                            ui.add(egui::Slider::new(&mut current_settings.grid_columns, 1..=10).text("Columns"));
+                            ui.checkbox(&mut current_settings.grid_show_names, "Show Names");
+                        }
+                        super::AdvancedExportFormat::List => {
+                            ui.label("List Fields");
+                            ui.checkbox(&mut current_settings.list_include_avatar, "Avatar");
+                            ui.checkbox(&mut current_settings.list_include_name, "Name");
+                            ui.checkbox(&mut current_settings.list_include_description, "Description");
+                            ui.checkbox(&mut current_settings.list_include_tags, "Tags");
+                            ui.checkbox(&mut current_settings.list_include_tokens, "Tokens");
+                        }
+                    }
+
+                    ui.add_space(20.0);
+                    ui.horizontal(|ui| {
+                        if ui.button("Export").clicked() {
+                            do_export = true;
+                        }
+                        if ui.button("Cancel").clicked() {
+                            close = true;
+                        }
+                    });
+                });
+
+            if do_export {
+                app.trigger_advanced_export(id, current_settings);
+                app.popup_state = super::PopupState::None;
+            } else if close {
+                app.popup_state = super::PopupState::None;
+            } else {
+                // Determine if settings changed to update state? 
+                // Since this is immediate mode, we re-create the state each frame unless we persist it. 
+                // But wait, `settings` comes from `state` which is `&state` (immutable borrow).
+                // So we can't mutate `settings` in place in `app.popup_state`.
+                // We must update `app.popup_state` with the new settings if they changed.
+                if current_settings != *settings {
+                    app.popup_state = super::PopupState::ExportCollectionAdvanced {
+                        collection_id: id,
+                        settings: current_settings,
+                    };
+                }
             }
         }
 
