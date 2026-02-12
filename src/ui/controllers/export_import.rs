@@ -1,7 +1,6 @@
 use super::state::CrapApp;
 use crate::ui::types::UiEvent;
 use base64::Engine as _;
-use image::GenericImageView;
 
 impl CrapApp {
     /// Exports database to a file (DB only, no data folder)
@@ -270,49 +269,74 @@ impl CrapApp {
         });
     }
 
-    /// Triggers the mass export of a collection
-    pub fn trigger_collection_export(&self, collection_id: i64, format: crate::ui::ExportFormat) {
+    /// Triggers the mass export of a collection (or All/Favorites)
+    pub fn trigger_collection_export(
+        &self,
+        target: crate::ui::ExportTarget,
+        format: crate::ui::ExportFormat,
+    ) {
         // Clone data needed for export (Snapshot)
         let collections = self.collections.clone();
         let characters = self.characters.clone();
 
-        let collection_name = self
-            .collections
-            .iter()
-            .find(|c| c.id == collection_id)
-            .map(|c| c.name.clone())
-            .unwrap_or("Collection".to_string());
+        let collection_name = match target {
+            crate::ui::ExportTarget::Collection(id) => self
+                .collections
+                .iter()
+                .find(|c| c.id == id)
+                .map(|c| c.name.clone())
+                .unwrap_or("Collection".to_string()),
+            crate::ui::ExportTarget::All => "All_Characters".to_string(),
+            crate::ui::ExportTarget::Favorites => "Favorites".to_string(),
+        };
 
         tokio::task::spawn_blocking(move || {
             if let Some(target_dir) = rfd::FileDialog::new()
                 .set_title(format!("Export '{}' to...", collection_name))
                 .pick_folder()
             {
-                let _ = recursive_export_helper(
-                    &collections,
-                    &characters,
-                    collection_id,
-                    &target_dir,
-                    format,
-                );
+                match target {
+                    crate::ui::ExportTarget::Collection(id) => {
+                        let _ = recursive_export_helper(
+                            &collections,
+                            &characters,
+                            id,
+                            &target_dir,
+                            format,
+                        );
+                    }
+                    crate::ui::ExportTarget::All => {
+                        let chars_ref: Vec<&crate::models::Character> = characters.iter().collect();
+                        let _ = export_flat_list(&chars_ref, &collection_name, &target_dir, format);
+                    }
+                    crate::ui::ExportTarget::Favorites => {
+                        let chars_ref: Vec<&crate::models::Character> =
+                            characters.iter().filter(|c| c.is_favorite).collect();
+                        let _ = export_flat_list(&chars_ref, &collection_name, &target_dir, format);
+                    }
+                }
             }
         });
     }
 
     pub fn trigger_advanced_export(
         &self,
-        collection_id: i64,
+        target: crate::ui::ExportTarget,
         settings: crate::ui::components::popups::AdvancedExportSettings,
     ) {
         let collections = self.collections.clone();
         let characters = self.characters.clone();
 
-        let collection_name = self
-            .collections
-            .iter()
-            .find(|c| c.id == collection_id)
-            .map(|c| c.name.clone())
-            .unwrap_or("Collection".to_string());
+        let collection_name = match target {
+            crate::ui::ExportTarget::Collection(id) => self
+                .collections
+                .iter()
+                .find(|c| c.id == id)
+                .map(|c| c.name.clone())
+                .unwrap_or("Collection".to_string()),
+            crate::ui::ExportTarget::All => "All_Characters".to_string(),
+            crate::ui::ExportTarget::Favorites => "Favorites".to_string(),
+        };
 
         tokio::task::spawn_blocking(move || {
             let suggested_name = format!(
@@ -329,14 +353,24 @@ impl CrapApp {
                 .set_file_name(suggested_name)
                 .save_file()
             {
-                // 1. Collect all characters recursively
+                // 1. Collect all characters
                 let mut all_chars = Vec::new();
-                collect_characters_recursively(
-                    &collections,
-                    &characters,
-                    collection_id,
-                    &mut all_chars,
-                );
+                match target {
+                    crate::ui::ExportTarget::Collection(id) => {
+                        collect_characters_recursively(
+                            &collections,
+                            &characters,
+                            id,
+                            &mut all_chars,
+                        );
+                    }
+                    crate::ui::ExportTarget::All => {
+                        all_chars = characters;
+                    }
+                    crate::ui::ExportTarget::Favorites => {
+                        all_chars = characters.into_iter().filter(|c| c.is_favorite).collect();
+                    }
+                }
 
                 // 2. Generate Output
                 match settings.format {
@@ -350,6 +384,44 @@ impl CrapApp {
             }
         });
     }
+}
+
+fn export_flat_list(
+    characters: &[&crate::models::Character],
+    folder_name: &str,
+    parent_dir: &std::path::Path,
+    format: crate::ui::ExportFormat,
+) -> Result<(), String> {
+    let my_dir = parent_dir.join(folder_name);
+    if !my_dir.exists() {
+        std::fs::create_dir_all(&my_dir).map_err(|e| e.to_string())?;
+    }
+
+    for char in characters {
+        let name_slug = char.name.replace(" ", "_").replace("/", "-");
+        let file_name = match format {
+            crate::ui::ExportFormat::Png => format!("{}.png", name_slug),
+            crate::ui::ExportFormat::V2 => format!("{}.json", name_slug),
+            crate::ui::ExportFormat::Native => format!("{}.crapp", name_slug),
+            crate::ui::ExportFormat::Markdown => format!("{}.md", name_slug),
+        };
+        let target_path = my_dir.join(file_name);
+
+        let _ = match format {
+            crate::ui::ExportFormat::Png => CrapApp::write_character_png_static(char, &target_path),
+            crate::ui::ExportFormat::V2 => {
+                CrapApp::write_character_v2_json_static(char, &target_path)
+            }
+            crate::ui::ExportFormat::Native => {
+                CrapApp::write_character_native_static(char, &target_path)
+            }
+            crate::ui::ExportFormat::Markdown => {
+                CrapApp::write_character_markdown_static(char, &target_path)
+            }
+        };
+    }
+
+    Ok(())
 }
 
 fn collect_characters_recursively(

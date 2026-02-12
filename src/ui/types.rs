@@ -58,6 +58,13 @@ pub enum ExportFormat {
     Markdown,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum ExportTarget {
+    Collection(i64),
+    All,
+    Favorites,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum AppAction {
     SwitchCharacter(i64),

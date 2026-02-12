@@ -79,40 +79,47 @@ pub fn render_import_export_popups(ctx: &egui::Context, app: &mut CrapApp, state
             render_lorebook_import(ctx, app, source_code.clone(), parsed_data.clone());
         }
 
-        super::PopupState::ExportCollectionOptions { collection_id } => {
-            let id = *collection_id;
+        super::PopupState::ExportCollectionOptions { target } => {
+            let target = *target;
             let mut close = false;
-            let collection_name = app.collections.iter().find(|c| c.id == id).map(|c| c.name.clone()).unwrap_or_default();
+            
+            let collection_name = match target {
+                crate::ui::ExportTarget::Collection(id) => {
+                    app.collections.iter().find(|c| c.id == id).map(|c| c.name.clone()).unwrap_or_else(|| "Unknown Collection".to_string())
+                },
+                crate::ui::ExportTarget::All => "All Characters".to_string(),
+                crate::ui::ExportTarget::Favorites => "Favorites".to_string(),
+            };
             
             egui::Window::new(format!("Export '{}'", collection_name))
                 .collapsible(false)
                 .resizable(false)
                 .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
                 .show(ctx, |ui| {
-                    ui.label("Select export format for all characters in this folder:");
+                    ui.label("Select export format for all characters in this view:");
                     ui.add_space(10.0);
 
                     if ui.button("🖼 PNG Cards (TavernAI)").on_hover_text("Standard format with embedded character data.").clicked() {
-                        app.trigger_collection_export(id, crate::ui::ExportFormat::Png);
+                        app.trigger_collection_export(target, crate::ui::ExportFormat::Png);
                         close = true;
                     }
                     if ui.button("📄 V2 JSON (SpicyChat)").on_hover_text("Newer JSON format supported by SillyTavern/SpicyChat.").clicked() {
-                        app.trigger_collection_export(id, crate::ui::ExportFormat::V2);
+                        app.trigger_collection_export(target, crate::ui::ExportFormat::V2);
                         close = true;
                     }
                     if ui.button("📝 Native JSON (.crapp)").on_hover_text("Full data backup including all CRAPP-specific fields.").clicked() {
-                        app.trigger_collection_export(id, crate::ui::ExportFormat::Native);
+                        app.trigger_collection_export(target, crate::ui::ExportFormat::Native);
                         close = true;
                     }
                     if ui.button("📜 Markdown (Text Only)").on_hover_text("Readable text description/scenario.").clicked() {
-                        app.trigger_collection_export(id, crate::ui::ExportFormat::Markdown);
+                        app.trigger_collection_export(target, crate::ui::ExportFormat::Markdown);
                         close = true;
                     }
 
                     ui.separator();
                     if ui.button("🛠 Advanced Export...").on_hover_text("Export as Grid Image vs Detailed List.").clicked() {
                         app.popup_state = super::PopupState::ExportCollectionAdvanced {
-                            collection_id: id,
+                            target,
                             settings: super::AdvancedExportSettings::default(),
                         };
                     }
@@ -127,8 +134,8 @@ pub fn render_import_export_popups(ctx: &egui::Context, app: &mut CrapApp, state
             }
         }
 
-        super::PopupState::ExportCollectionAdvanced { collection_id, settings } => {
-            let id = *collection_id;
+        super::PopupState::ExportCollectionAdvanced { target, settings } => {
+            let target = *target;
             // Create a local copy of settings to mutate
             let mut current_settings = settings.clone();
             let mut close = false;
@@ -173,19 +180,14 @@ pub fn render_import_export_popups(ctx: &egui::Context, app: &mut CrapApp, state
                 });
 
             if do_export {
-                app.trigger_advanced_export(id, current_settings);
+                app.trigger_advanced_export(target, current_settings);
                 app.popup_state = super::PopupState::None;
             } else if close {
                 app.popup_state = super::PopupState::None;
             } else {
-                // Determine if settings changed to update state? 
-                // Since this is immediate mode, we re-create the state each frame unless we persist it. 
-                // But wait, `settings` comes from `state` which is `&state` (immutable borrow).
-                // So we can't mutate `settings` in place in `app.popup_state`.
-                // We must update `app.popup_state` with the new settings if they changed.
                 if current_settings != *settings {
                     app.popup_state = super::PopupState::ExportCollectionAdvanced {
-                        collection_id: id,
+                        target,
                         settings: current_settings,
                     };
                 }

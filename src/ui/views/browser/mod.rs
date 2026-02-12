@@ -18,7 +18,7 @@ pub enum BrowserAction {
     UpdateCollectionIcon(i64),
     OpenCharacter(i64),
     OpenCollection(i64),
-    ExportCollection(i64),
+    ExportCollection(crate::ui::ExportTarget),
 }
 
 pub fn render_collection_move_menu(
@@ -263,22 +263,36 @@ pub fn render_browser_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                     };
                 }
                 if ui.button("📤 Export Collection").clicked() {
-                    app.popup_state =
-                        crate::ui::PopupState::ExportCollectionOptions { collection_id: id };
+                    app.popup_state = crate::ui::PopupState::ExportCollectionOptions {
+                        target: crate::ui::ExportTarget::Collection(id),
+                    };
                 }
             } else {
-                // Root View: Show DB Management
-                if collection_id.is_none() {
+                // Not a specific collection (Root, All, or Favorites)
+                if viewing_all {
+                    if ui.button("📤 Export All").clicked() {
+                        app.popup_state = crate::ui::PopupState::ExportCollectionOptions {
+                            target: crate::ui::ExportTarget::All,
+                        };
+                    }
+                } else if app.viewing_favorites {
+                    if ui.button("📤 Export Favorites").clicked() {
+                        app.popup_state = crate::ui::PopupState::ExportCollectionOptions {
+                            target: crate::ui::ExportTarget::Favorites,
+                        };
+                    }
+                } else {
+                    // Root View: Show DB Management
                     if ui.button("📥 Import DB").clicked() {
                         app.popup_state = crate::ui::PopupState::ImportDbWarning;
                     }
                     if ui.button("📤 Export DB").clicked() {
                         app.popup_state = crate::ui::PopupState::ExportDbSelection;
                     }
-                    ui.add_space(8.0);
-                    ui.separator();
-                    ui.add_space(8.0);
                 }
+                ui.add_space(8.0);
+                ui.separator();
+                ui.add_space(8.0);
             }
         });
     });
@@ -724,9 +738,8 @@ pub fn render_browser_view(app: &mut CrapApp, ui: &mut egui::Ui) {
             BrowserAction::OpenCollection(id) => {
                 app.request_collection_switch(Some(id));
             }
-            BrowserAction::ExportCollection(id) => {
-                app.popup_state =
-                    crate::ui::PopupState::ExportCollectionOptions { collection_id: id };
+            BrowserAction::ExportCollection(target) => {
+                app.popup_state = crate::ui::PopupState::ExportCollectionOptions { target };
             }
         }
     }

@@ -108,7 +108,9 @@ pub fn render_subfolder_card(
             ui.close_menu();
         }
         if ui.button("📤 Export Folder").clicked() {
-            actions.push(BrowserAction::ExportCollection(folder.id));
+            actions.push(BrowserAction::ExportCollection(
+                crate::ui::ExportTarget::Collection(folder.id),
+            ));
             ui.close_menu();
         }
     });
@@ -186,7 +188,9 @@ pub fn render_subfolder_list_item(
                         ui.close_menu();
                     }
                     if ui.button("📤 Export Folder").clicked() {
-                        actions.push(BrowserAction::ExportCollection(folder.id));
+                        actions.push(BrowserAction::ExportCollection(
+                            crate::ui::ExportTarget::Collection(folder.id),
+                        ));
                         ui.close_menu();
                     }
                 });

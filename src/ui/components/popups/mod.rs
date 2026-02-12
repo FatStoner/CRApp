@@ -58,10 +58,10 @@ pub enum PopupState {
         target_char_id: i64,
     },
     ExportCollectionOptions {
-        collection_id: i64,
+        target: crate::ui::ExportTarget,
     },
     ExportCollectionAdvanced {
-        collection_id: i64,
+        target: crate::ui::ExportTarget,
         settings: AdvancedExportSettings,
     },
 }

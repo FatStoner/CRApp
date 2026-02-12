@@ -462,7 +462,7 @@ pub fn render_side_panel(app: &mut CrapApp, ctx: &egui::Context) {
                             app.save_collection(0, "New Folder".to_string(), None);
                         }
                         TreeAction::ExportCollection(id) => {
-                             app.popup_state = crate::ui::PopupState::ExportCollectionOptions { collection_id: id };
+                             app.popup_state = crate::ui::PopupState::ExportCollectionOptions { target: crate::ui::ExportTarget::Collection(id) };
                         }
                         TreeAction::MoveCharacter(char_id, target_id) => {
                             app.move_character(char_id, target_id);
