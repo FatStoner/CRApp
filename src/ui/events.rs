@@ -1,4 +1,4 @@
-use super::app::CrapApp;
+use super::controllers::CrapApp;
 use super::types::UiEvent;
 use crate::models::Character;
 use crate::ui::{AppMode, CentralView, LorebookTab, PopupState};

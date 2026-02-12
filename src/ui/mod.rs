@@ -2,8 +2,8 @@ use eframe::egui;
 use std::time::{Duration, Instant};
 
 // Sub-modules (New Structure)
-pub mod app;
 pub mod components;
+pub mod controllers;
 pub mod events;
 pub mod panels;
 pub mod parsing;
@@ -12,12 +12,12 @@ pub mod utils;
 pub mod views;
 
 // Re-exports for backward compatibility and convenience
-pub use app::CrapApp;
 pub use components::popups::PopupState;
 pub use components::spell_check;
 pub use components::spell_layout;
 pub use components::text_highlight;
 pub use components::widgets;
+pub use controllers::CrapApp;
 
 pub use views::browser;
 
