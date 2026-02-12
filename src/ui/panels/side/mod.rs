@@ -168,6 +168,10 @@ pub fn render_side_panel(app: &mut CrapApp, ctx: &egui::Context) {
                                     actions.push(TreeAction::FoldAllFolders);
                                     ui.close_menu();
                                 }
+                                if ui.button("Unfold all").clicked() {
+                                    actions.push(TreeAction::UnfoldAllFolders);
+                                    ui.close_menu();
+                                }
                             });
 
                             if let Some(_) = response.dnd_hover_payload::<i64>() {
@@ -489,8 +493,11 @@ pub fn render_side_panel(app: &mut CrapApp, ctx: &egui::Context) {
                             app.toggle_favorite(id);
                         }
                         TreeAction::FoldAllFolders => {
-                            // Deselect any collection so that ancestor logic doesn't force folders back open
-                            app.request_collection_switch(None);
+                            // Removed: app.request_collection_switch(None);
+                            // We don't want to reset selection, just fold folders.
+                            // Note: If the currently selected character is deep in folders,
+                            // the auto-expand logic in render_tree will likely re-open
+                            // the path to it on the next frame. This is expected behavior.
 
                             for col in &app.collections {
                                 let id = egui::Id::new(("folder", col.id));
@@ -500,6 +507,18 @@ pub fn render_side_panel(app: &mut CrapApp, ctx: &egui::Context) {
                                     state.set_open(false);
                                     state.store(ctx);
                                 }
+                            }
+                        }
+                        TreeAction::UnfoldAllFolders => {
+                            for col in &app.collections {
+                                let id = egui::Id::new(("folder", col.id));
+                                // load_with_default_open returns CollapsingState directly, not Option
+                                let mut state =
+                                    egui::collapsing_header::CollapsingState::load_with_default_open(
+                                        ctx, id, true,
+                                    );
+                                state.set_open(true);
+                                state.store(ctx);
                             }
                         }
                     }

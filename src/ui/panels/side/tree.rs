@@ -18,6 +18,7 @@ pub enum TreeAction {
     MoveCollection(i64, bool), // id, move_up
     ToggleFavorite(i64),
     FoldAllFolders,
+    UnfoldAllFolders,
 }
 
 pub fn render_tree(
