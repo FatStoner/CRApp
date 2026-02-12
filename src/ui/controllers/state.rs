@@ -103,6 +103,10 @@ pub struct CrapApp {
     pub background_scale: f32,
     pub enable_spell_check: bool,
 
+    // Gallery Zoom
+    pub gallery_zoom: f32,
+    pub gallery_pan: egui::Vec2,
+
     // Smart Tab Switching
     pub last_active_character_id: Option<i64>,
     pub last_active_lorebook_id: Option<i64>,
@@ -184,6 +188,9 @@ impl CrapApp {
             show_background: true,
             background_scale: 0.9,
             enable_spell_check: true,
+
+            gallery_zoom: 1.0,
+            gallery_pan: egui::vec2(0.0, 0.0),
 
             last_active_character_id: None,
             last_active_lorebook_id: None,

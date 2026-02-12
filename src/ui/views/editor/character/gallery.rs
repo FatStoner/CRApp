@@ -108,6 +108,8 @@ pub fn render_gallery_tab(
                             .map(|p| crate::ui::utils::get_image_uri(&p.to_string_lossy()))
                             .collect(),
                     );
+                    app.gallery_zoom = 1.0;
+                    app.gallery_pan = egui::vec2(0.0, 0.0);
                 }
 
                 response.context_menu(|ui| {

@@ -32,25 +32,38 @@ pub fn render_lightbox(app: &mut CrapApp, ctx: &egui::Context) {
                 let img = egui::Image::new(uri)
                     .shrink_to_fit()
                     .max_size(max_size)
-                    .sense(egui::Sense::click());
+                    .sense(egui::Sense::click_and_drag()); // Changed to click_and_drag for panning support
 
-                // Attempt to load image to get dimensions
+                // Handle Mouse Wheel Zoom
+                let scroll_delta = ui.input(|i| i.raw_scroll_delta.y);
+                if scroll_delta != 0.0 {
+                    let zoom_factor = if scroll_delta > 0.0 { 1.1 } else { 0.9 };
+                    app.gallery_zoom = (app.gallery_zoom * zoom_factor).clamp(0.1, 5.0);
+                }
 
                 match img.load_for_size(ui.ctx(), max_size) {
                     Ok(egui::load::TexturePoll::Ready { texture, .. }) => {
                         let img_size = texture.size;
-                        // Scale down if larger than max_size while maintaining aspect ratio
+                        // Initial scale to fit screen
                         let width_ratio = max_size.x / img_size.x;
                         let height_ratio = max_size.y / img_size.y;
-                        let scale = width_ratio.min(height_ratio).min(1.0);
+                        let base_scale = width_ratio.min(height_ratio).min(1.0);
 
-                        let final_size = img_size * scale;
-                        let img_rect =
-                            egui::Rect::from_center_size(screen_rect.center(), final_size);
+                        // Apply zoom
+                        let current_scale = base_scale * app.gallery_zoom;
+                        let final_size = img_size * current_scale;
 
-                        // Render Image (Middle Priority)
-                        // ui.put places the widget at the exact rect, consuming clicks there
-                        ui.put(img_rect, img);
+                        // Apply Pan
+                        let center_pos = screen_rect.center() + app.gallery_pan;
+                        let img_rect = egui::Rect::from_center_size(center_pos, final_size);
+
+                        // Render Image
+                        let img_response = ui.put(img_rect, img);
+
+                        // Handle Panning (if zoomed in or just generally)
+                        if img_response.dragged() {
+                            app.gallery_pan += img_response.drag_delta();
+                        }
                     }
                     Ok(egui::load::TexturePoll::Pending { .. }) => {
                         ui.spinner();
@@ -61,8 +74,6 @@ pub fn render_lightbox(app: &mut CrapApp, ctx: &egui::Context) {
                 }
 
                 // 3. Navigation Zones (Highest Priority)
-                // These overlay everything.
-
                 let nav_width = sw * 0.15;
 
                 // Left Nav
@@ -108,6 +119,33 @@ pub fn render_lightbox(app: &mut CrapApp, ctx: &egui::Context) {
                         }
                     }
                 }
+
+                // 4. Zoom Controls (Overlay)
+                let control_area_size = egui::vec2(160.0, 50.0);
+                let control_rect = egui::Rect::from_center_size(
+                    egui::pos2(screen_rect.center().x, screen_rect.max.y - 50.0),
+                    control_area_size,
+                );
+
+                // Background for controls
+                ui.painter()
+                    .rect_filled(control_rect, 20.0, egui::Color32::from_black_alpha(200));
+
+                ui.allocate_new_ui(egui::UiBuilder::new().max_rect(control_rect), |ui| {
+                    ui.horizontal_centered(|ui| {
+                        if ui.button("➖").clicked() {
+                            app.gallery_zoom = (app.gallery_zoom - 0.1).max(0.1);
+                        }
+                        ui.label(format!("{:.0}%", app.gallery_zoom * 100.0));
+                        if ui.button("➕").clicked() {
+                            app.gallery_zoom = (app.gallery_zoom + 0.1).min(5.0);
+                        }
+                        if ui.button("Reset").clicked() {
+                            app.gallery_zoom = 1.0;
+                            app.gallery_pan = egui::vec2(0.0, 0.0);
+                        }
+                    });
+                });
             });
 
         // Handle Input
@@ -140,6 +178,9 @@ pub fn render_lightbox(app: &mut CrapApp, ctx: &egui::Context) {
 
         if let Some(next) = next_image {
             app.fullscreen_image = Some(next);
+            // Reset zoom/pan on navigation
+            app.gallery_zoom = 1.0;
+            app.gallery_pan = egui::vec2(0.0, 0.0);
         }
     }
 }

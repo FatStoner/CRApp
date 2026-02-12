@@ -130,7 +130,12 @@ A dedicated module for the high-priority image overlay.
         -   **Background**: The viewer intelligently calculates the image's centered position. Clicking any "empty" space (the dimmed background) immediately closes the viewer.
         -   **Navigation**: High-priority left/right zones (15% screen width) allow cycling through the gallery context.
         -   **Image Protection**: The image itself consumes click events, preventing accidental closure when interacting with the main view.
-    -   **Implementation**: Utilizes `egui::Image::load_for_size` to ensure accurate rect-to-screen mapping, avoiding common immediate-mode UI "dead zones" or "interaction bleed".
+    -   **Zoom and Pan**:
+        -   **Controls**: Supports mouse scroll wheel for zooming and click-and-drag for panning.
+        -   **On-Screen UI**: Overlay controls for zooming in/out, current zoom percentage, and a "Reset" button.
+        -   **Constraints**: Zoom levels restricted between 10% (0.1x) and 500% (5.0x).
+        -   **Navigation Reset**: Zoom and pan state are automatically reset when navigating to another image or closing the viewer.
+    -   **Implementation**: Utilizes `egui::Image::load_for_size` and custom `gallery_zoom`/`gallery_pan` state in `CrapApp` to ensure accurate rect-to-screen mapping and smooth interactivity.
 
 ## UI Event Loop & State
 The `CrapApp` struct (in `ui/app.rs` and `ui/types.rs`) holds all the transient UI state. The main update loop in `ui/mod.rs` calls `ui/events::handle_ui_events` at the start of every frame to process pending backend messages.
@@ -167,9 +172,10 @@ Renders and processes only the items currently visible in the viewport.
 -   **Browser List**: Skips expensive avatar painting for non-visible rows.
 
 ### 3. Lightbox (Fullscreen Gallery Viewer)
--   **Dynamic Interaction Zones**:
-    -   **Background**: The viewer intelligently calculates the image's centered position. Clicking any "empty" space (the dimmed background) immediately closes the viewer.
-    -   **Navigation**: High-priority left/right zones (15% screen width) allow cycling through the gallery context.
-    -   **Image Protection**: The image itself consumes click events, preventing accidental closure when interacting with the main view.
--   **Implementation**: Utilizes `egui::Image::load_for_size` to ensure accurate rect-to-screen mapping, avoiding common immediate-mode UI "dead zones" or "interaction bleed".
-
+-   **Features**:
+    -   **Dynamic Interaction Zones**:
+        -   **Background**: Clicking dimmed background closes the viewer.
+        -   **Navigation**: Left/right 15% width zones for cycling.
+        -   **Zoom/Pan**: Mouse wheel zoom (0.1x - 5.0x) and drag-to-pan.
+        -   **UI Controls**: Percentage display, +/- buttons, and Reset.
+-   **Implementation**: Accurate rect-to-screen mapping using `load_for_size` and transient state reset on navigation.
