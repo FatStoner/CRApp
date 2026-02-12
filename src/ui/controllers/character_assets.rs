@@ -3,20 +3,35 @@ use crate::ui::UiEvent;
 
 impl CrapApp {
     /// Update character avatar from file (copies to data/avatars/)
-    pub fn update_avatar_from_file(&self, source_path: std::path::PathBuf) -> Option<String> {
+    /// If character_id > 0, appends _{id} to filename.
+    /// If character_id == 0, appends _{uuid} to filename.
+    pub fn update_avatar_from_file(
+        &self,
+        source_path: std::path::PathBuf,
+        character_id: i64,
+    ) -> Option<String> {
         let dest_dir = std::path::Path::new("data/avatars");
         let _ = std::fs::create_dir_all(dest_dir);
-        if let Some(name) = source_path.file_name() {
-            let dest = dest_dir.join(name);
-            if let Ok(_) = std::fs::copy(&source_path, &dest) {
-                return Some(dest.to_string_lossy().to_string());
+
+        if let Some(file_stem) = source_path.file_stem().and_then(|s| s.to_str()) {
+            if let Some(extension) = source_path.extension().and_then(|s| s.to_str()) {
+                let new_filename = if character_id > 0 {
+                    format!("{}_{}.{}", file_stem, character_id, extension)
+                } else {
+                    format!("{}_{}.{}", file_stem, uuid::Uuid::new_v4(), extension)
+                };
+
+                let dest = dest_dir.join(new_filename);
+                if let Ok(_) = std::fs::copy(&source_path, &dest) {
+                    return Some(dest.to_string_lossy().to_string());
+                }
             }
         }
         None
     }
 
     /// Paste avatar from clipboard (saves to data/avatars/)
-    pub fn paste_avatar_from_clipboard(&self) -> Result<String, String> {
+    pub fn paste_avatar_from_clipboard(&self, character_id: i64) -> Result<String, String> {
         match arboard::Clipboard::new() {
             Ok(mut clipboard) => {
                 // 1. Try raw image
@@ -31,7 +46,11 @@ impl CrapApp {
                         )
                     {
                         let timestamp = chrono::Utc::now().timestamp_millis();
-                        let filename = format!("pasted_avatar_{}.png", timestamp);
+                        let filename = if character_id > 0 {
+                            format!("pasted_avatar_{}_{}.png", timestamp, character_id)
+                        } else {
+                            format!("pasted_avatar_{}_{}.png", timestamp, uuid::Uuid::new_v4())
+                        };
                         let dest_dir = std::path::Path::new("data/avatars");
                         let _ = std::fs::create_dir_all(dest_dir);
                         let dest_path = dest_dir.join(&filename);
@@ -50,7 +69,15 @@ impl CrapApp {
                         if let Ok(bytes) = std::fs::read(path) {
                             if let Ok(dynamic_img) = image::load_from_memory(&bytes) {
                                 let timestamp = chrono::Utc::now().timestamp_millis();
-                                let filename = format!("pasted_avatar_{}.png", timestamp);
+                                let filename = if character_id > 0 {
+                                    format!("pasted_avatar_{}_{}.png", timestamp, character_id)
+                                } else {
+                                    format!(
+                                        "pasted_avatar_{}_{}.png",
+                                        timestamp,
+                                        uuid::Uuid::new_v4()
+                                    )
+                                };
                                 let dest_dir = std::path::Path::new("data/avatars");
                                 let _ = std::fs::create_dir_all(dest_dir);
                                 let dest_path = dest_dir.join(&filename);

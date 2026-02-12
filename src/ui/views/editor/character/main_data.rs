@@ -609,16 +609,16 @@ pub fn render_main_data_tab(
             ui.horizontal(|ui| {
                 if ui.button("Browse Avatar").clicked() {
                     if let Some(path) = rfd::FileDialog::new()
-                        .add_filter("image", &["png", "jpg", "jpeg"])
+                        .add_filter("image", &["png", "jpg", "jpeg", "webp"])
                         .pick_file()
                     {
-                        if let Some(avatar_path) = app.update_avatar_from_file(path) {
+                        if let Some(avatar_path) = app.update_avatar_from_file(path, character.id) {
                             character.avatar_path = Some(avatar_path);
                         }
                     }
                 }
                 if ui.button("Paste from Clipboard").clicked() {
-                    match app.paste_avatar_from_clipboard() {
+                    match app.paste_avatar_from_clipboard(character.id) {
                         Ok(avatar_path) => {
                             character.avatar_path = Some(avatar_path);
                             *status_update = Some((
