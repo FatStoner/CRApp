@@ -76,9 +76,9 @@ pub fn render_toolbar(
         ui.heading(format!("Edit Character ({})", character.name));
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             // Export menu
-            super::export::render_export_menu(ui, character);
+            super::export::render_export_menu(ui, app, character);
             // Import menu
-            super::export::render_import_menu(ui, character, &app.tx, trigger_import);
+            super::export::render_import_menu(ui, app, character, trigger_import);
 
             ui.add_space(10.0);
             if ui.button("APPLY TEMPLATE").clicked() {
