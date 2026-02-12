@@ -77,7 +77,7 @@ Handles the detailed editing interfaces.
 ### 4. Parsing (`ui/parsing/`)
 Dedicated logic for parsing character data from external text sources (clipboard).
 -   **Structure**: Split into format-specific modules (`janitor.rs`, `spicychat.rs`, `crave.rs`, etc.) for maintainability.
--   **Entry Point**: `ui/parsing/mod.rs` handles format detection and dispatches to the correct parser.
+-   **Entry Point**: `ui/parsing/mod.rs` serves as a facade, exporting types and delegating detection to `detection.rs`.
 -   **Function**: `parse_clipboard(text: &str) -> ParsedCharacterData`.
 -   **Function**: `parse_spicychat_lorebook(html: &str) -> ParsedLorebookData`.
 -   **Logic**:

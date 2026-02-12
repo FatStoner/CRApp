@@ -15,8 +15,8 @@ The application is structured into four main layers:
     -   **Navigation**: `side_panel.rs`.
     -   **Overlays**: `lightbox.rs` (Image viewer).
     -   **Utilities**: `utils.rs` (Shared logic).
-    -   **Parsing**: `parsing/` module handles format-specific logic.
-4.  **Data Layer (`db.rs`, `models.rs`)**:
+    -   **Parsing**: `parsing/` module handles format-specific logic (split into `types`, `detection`, `utils`).
+4.  **Data Layer (`db/`, `models.rs`)**:
     -   **Models**: Rust structs representing entities (Character, Lorebook, Tag).
     -   **Database**: Async SQLite operations via `sqlx`.
 
@@ -34,7 +34,11 @@ The application runs on the main thread using `eframe::run_native`. The `CrapApp
 src/
 ├── main.rs         # Entry point
 ├── lib.rs          # (Implicit/Optional) Shared logic
-├── db.rs           # Database connection and queries
+├── db/             # Database Layer
+│   ├── mod.rs      # Facade and connection logic
+│   ├── characters.rs
+│   ├── lorebooks.rs
+│   └── ...
 ├── cleaner.rs      # Unused media cleanup logic
 ├── models.rs       # Data structures
 ├── card_v2.rs      # Export/Import format compatibility
@@ -50,7 +54,9 @@ src/
     ├── browser.rs        # Character Grid/List view (with culling)
     ├── editor/           # Sub-modules for editors (Character, Lorebook)
     ├── parsing/    # Modular text and HTML parsing logic
-    │   ├── mod.rs  # Entry point and format detection
+    │   ├── mod.rs  # Facade and re-exports
+    │   ├── detection.rs # Format detection logic
+    │   ├── types.rs # Data structures
     │   └── ...     # Format-specific modules (janitor, spicychat, etc.)
     ├── global_search.rs  # Global Deep Search
     ├── popups.rs         # Unified modal handling

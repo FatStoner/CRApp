@@ -25,7 +25,7 @@ To modify the database (e.g., add a column):
 
 ## Safety & Backups
 
-To prevent data loss during updates, the application performs a **Safety Backup** during initialization (`src/db.rs`):
+To prevent data loss during updates, the application performs a **Safety Backup** during initialization (`src/db/mod.rs`):
 
 1.  **Check**: Does `crap_data.db` exist?
 2.  **Backup**: If yes, copy it to `crap_data.db.bak` immediately.
