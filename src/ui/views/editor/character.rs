@@ -1,5 +1,5 @@
-use crate::models::count_tokens;
-use crate::ui::{CharacterTab, CrapApp, UiEvent};
+use crate::models::{count_tokens, Character};
+use crate::ui::{CharacterTab, CrapApp};
 use eframe::egui;
 
 pub fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
@@ -552,87 +552,25 @@ pub fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                                          } else {
                                              ui.label(egui::RichText::new("No avatar selected").italics());
                                          }
-                                         
-                                         ui.horizontal(|ui| {
-                                             if ui.button("Browse Avatar").clicked() {
-                                                 if let Some(path) = rfd::FileDialog::new().add_filter("image", &["png", "jpg", "jpeg"]).pick_file() {
-                                                      let dest_dir = std::path::Path::new("data/avatars");
-                                                      let _ = std::fs::create_dir_all(dest_dir);
-                                                      if let Some(name) = path.file_name() {
-                                                          let dest = dest_dir.join(name);
-                                                          let _ = std::fs::copy(&path, &dest);
-                                                          character.avatar_path = Some(dest.to_string_lossy().to_string());
-                                                      }
-                                                 }
-                                             }
-                                             
-                                             if ui.button("Paste from Clipboard").clicked() {
-                                                  match arboard::Clipboard::new() {
-                                                      Ok(mut clipboard) => {
-                                                          let mut paste_success = false;
-                                                          
-                                                          // 1. Try raw image
-                                                          match clipboard.get_image() {
-                                                              Ok(img_data) => {
-                                                                  let width = img_data.width as u32;
-                                                                  let height = img_data.height as u32;
-                                                                  let bytes = img_data.bytes.into_owned();
-                                                                  
-                                                                  if let Some(image_buffer) = image::ImageBuffer::<image::Rgba<u8>, Vec<u8>>::from_raw(width, height, bytes) {
-                                                                       let timestamp = chrono::Utc::now().timestamp_millis();
-                                                                       let filename = format!("pasted_avatar_{}.png", timestamp);
-                                                                       let dest_dir = std::path::Path::new("data/avatars");
-                                                                       let _ = std::fs::create_dir_all(dest_dir);
-                                                                       let dest_path = dest_dir.join(&filename);
-                                                                       
-                                                                       if let Ok(_) = image_buffer.save(&dest_path) {
-                                                                           character.avatar_path = Some(dest_path.to_string_lossy().to_string());
-                                                                           status_update = Some(("Avatar pasted successfully!".to_string(), egui::Color32::GREEN));
-                                                                           paste_success = true;
-                                                                       }
-                                                                  }
-                                                              },
-                                                              Err(_) => {}
-                                                          }
-
-                                                          // 2. Try text (file path) if image failed
-                                                          if !paste_success {
-                                                              if let Ok(text) = clipboard.get_text() {
-                                                                  let clean_path = text.trim().trim_start_matches("file://");
-                                                                  let path = std::path::Path::new(clean_path);
-                                                                  if path.exists() && path.is_file() {
-                                                                      if let Ok(bytes) = std::fs::read(path) {
-                                                                          if let Ok(dynamic_img) = image::load_from_memory(&bytes) {
-                                                                              let timestamp = chrono::Utc::now().timestamp_millis();
-                                                                              let filename = format!("pasted_avatar_{}.png", timestamp);
-                                                                              let dest_dir = std::path::Path::new("data/avatars");
-                                                                              let _ = std::fs::create_dir_all(dest_dir);
-                                                                              let dest_path = dest_dir.join(&filename);
-                                                                              
-                                                                              if let Ok(_) = dynamic_img.save(&dest_path) {
-                                                                                  character.avatar_path = Some(dest_path.to_string_lossy().to_string());
-                                                                                  status_update = Some(("Avatar pasted from file path!".to_string(), egui::Color32::GREEN));
-                                                                                  paste_success = true;
-                                                                              }
-                                                                          }
-                                                                      }
-                                                                  }
-                                                              }
-                                                          }
-
-                                                          if !paste_success {
-                                                              let err_msg = match clipboard.get_image() {
-                                                                  Err(e) => format!("Clipboard error: {}", e),
-                                                                  _ => "Clipboard does not contain image or valid path.".to_string(),
-                                                              };
-                                                              status_update = Some((err_msg, egui::Color32::RED));
-                                                          }
-                                                      },
-                                                      Err(e) => {
-                                                          status_update = Some((format!("Clipboard access failed: {}", e), egui::Color32::RED));
+                                                                                  ui.horizontal(|ui| {
+                                              if ui.button("Browse Avatar").clicked() {
+                                                  if let Some(path) = rfd::FileDialog::new().add_filter("image", &["png", "jpg", "jpeg"]).pick_file() {
+                                                      if let Some(avatar_path) = app.update_avatar_from_file(path) {
+                                                          character.avatar_path = Some(avatar_path);
                                                       }
                                                   }
-                                             }
+                                              }
+                                                                                          if ui.button("Paste from Clipboard").clicked() {
+                                                  match app.paste_avatar_from_clipboard() {
+                                                      Ok(avatar_path) => {
+                                                          character.avatar_path = Some(avatar_path);
+                                                          status_update = Some(("Avatar pasted successfully!".to_string(), egui::Color32::GREEN));
+                                                      }
+                                                      Err(e) => {
+                                                          status_update = Some((e, egui::Color32::RED));
+                                                      }
+                                                  }
+                                              }
                                          });
                                          
                                          ui.add_space(8.0);
@@ -792,86 +730,16 @@ pub fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                                 // Add Image Button
                                 ui.horizontal(|ui| {
                                     if ui.button("➕ Add Image").clicked() {
-                                        let tx_clone = app.tx.clone();
-                                        let gid = character.id;
-                                        tokio::spawn(async move {
-                                            if let Some(path) = rfd::FileDialog::new().add_filter("image", &["png", "jpg", "jpeg", "webp"]).pick_file() {
-                                                let dest_dir = std::path::PathBuf::from(format!("data/gallery/{}", gid));
-                                                let _ = std::fs::create_dir_all(&dest_dir);
-                                                if let Some(name) = path.file_name() {
-                                                    let dest = dest_dir.join(name);
-                                                    let _ = std::fs::copy(path, dest);
-                                                    let _ = tx_clone.send(UiEvent::UiRepaint).await;
-                                                }
-                                            }
-                                        });
+                                        app.add_gallery_image_async(character.id);
                                     }
                                      if ui.button("📋 Paste").clicked() {
-                                        match arboard::Clipboard::new() {
-                                            Ok(mut clipboard) => {
-                                                let mut paste_success = false;
-                                                
-                                                // 1. Try raw image
-                                                match clipboard.get_image() {
-                                                    Ok(img_data) => {
-                                                        let width = img_data.width as u32;
-                                                        let height = img_data.height as u32;
-                                                        let bytes = img_data.bytes.into_owned();
-                                                        
-                                                        if let Some(image_buffer) = image::ImageBuffer::<image::Rgba<u8>, Vec<u8>>::from_raw(width, height, bytes) {
-                                                            let timestamp = chrono::Utc::now().timestamp_millis();
-                                                            let filename = format!("pasted_{}.png", timestamp);
-                                                            let gid = character.id;
-                                                            let gallery_dir = format!("data/gallery/{}", gid);
-                                                            let _ = std::fs::create_dir_all(&gallery_dir);
-                                                            let dest_path = std::path::Path::new(&gallery_dir).join(&filename);
-                                                            
-                                                            if let Ok(_) = image_buffer.save(&dest_path) {
-                                                                status_update = Some(("Image pasted to gallery!".to_string(), egui::Color32::GREEN));
-                                                                ui.ctx().request_repaint();
-                                                                paste_success = true;
-                                                            }
-                                                        }
-                                                    },
-                                                    Err(_) => {}
-                                                }
-
-                                                // 2. Try text (file path) if image failed
-                                                if !paste_success {
-                                                    if let Ok(text) = clipboard.get_text() {
-                                                       let clean_path = text.trim().trim_start_matches("file://");
-                                                       let path = std::path::Path::new(clean_path);
-                                                       if path.exists() && path.is_file() {
-                                                           if let Ok(bytes) = std::fs::read(path) {
-                                                               if let Ok(dynamic_img) = image::load_from_memory(&bytes) {
-                                                                   let timestamp = chrono::Utc::now().timestamp_millis();
-                                                                   let filename = format!("pasted_{}.png", timestamp);
-                                                                   let gid = character.id;
-                                                                   let gallery_dir = format!("data/gallery/{}", gid);
-                                                                   let _ = std::fs::create_dir_all(&gallery_dir);
-                                                                   let dest_path = std::path::Path::new(&gallery_dir).join(&filename);
-                                                                   
-                                                                   if let Ok(_) = dynamic_img.save(&dest_path) {
-                                                                       status_update = Some(("Image pasted from file path!".to_string(), egui::Color32::GREEN));
-                                                                       ui.ctx().request_repaint();
-                                                                       paste_success = true;
-                                                                   }
-                                                               }
-                                                           }
-                                                       }
-                                                    }
-                                                }
-
-                                                if !paste_success {
-                                                    let err_msg = match clipboard.get_image() {
-                                                        Err(e) => format!("Clipboard error: {}", e),
-                                                        _ => "Clipboard does not contain image or valid path.".to_string(),
-                                                    };
-                                                    status_update = Some((err_msg, egui::Color32::RED));
-                                                }
-                                            },
+                                        match app.paste_gallery_image_from_clipboard(character.id) {
+                                            Ok(_) => {
+                                                status_update = Some(("Image pasted to gallery!".to_string(), egui::Color32::GREEN));
+                                                ui.ctx().request_repaint();
+                                            }
                                             Err(e) => {
-                                                status_update = Some((format!("Clipboard access failed: {}", e), egui::Color32::RED));
+                                                status_update = Some((e, egui::Color32::RED));
                                             }
                                         }
                                     }
