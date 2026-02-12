@@ -131,7 +131,7 @@ Large files (>1000 LOC) are split into focused modules:
 | `views/editor/` | Content editing (char/lore/template) | 2,323 LOC |
 | `panels/side/` | Navigation tree, mode switching | 1,027 LOC |
 | `components/popups/` | Modal dialogs | 827 LOC |
-| `controllers/` | Business logic, async ops | ~500 LOC |
+| `controllers/` | Business logic, async ops, Mass Export | ~500 LOC |
 | `parsing/` | Data format parsing | ~400 LOC |
 
 ---

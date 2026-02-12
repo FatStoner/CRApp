@@ -19,6 +19,7 @@ pub enum TreeAction {
     ToggleFavorite(i64),
     FoldAllFolders,
     UnfoldAllFolders,
+    ExportCollection(i64),
 }
 
 pub fn render_tree(
@@ -159,6 +160,10 @@ pub fn render_tree(
 
                 if ui.button("📁 New Folder").clicked() {
                     actions.push(TreeAction::CreateSubfolder(col.id));
+                    ui.close_menu();
+                }
+                if ui.button("📤 Export Collection").clicked() {
+                    actions.push(TreeAction::ExportCollection(col.id));
                     ui.close_menu();
                 }
                 if ui.button("➕ New Character").clicked() {

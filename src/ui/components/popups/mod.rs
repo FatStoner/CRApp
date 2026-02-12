@@ -57,6 +57,9 @@ pub enum PopupState {
         template_data: crate::models::Template,
         target_char_id: i64,
     },
+    ExportCollectionOptions {
+        collection_id: i64,
+    },
 }
 
 pub fn render_popups(ctx: &egui::Context, app: &mut CrapApp) {
@@ -86,7 +89,8 @@ pub fn render_popups(ctx: &egui::Context, app: &mut CrapApp) {
         // Import/Export popups
         PopupState::ImportDbWarning
         | PopupState::LorebookImport { .. }
-        | PopupState::ExportDbSelection => {
+        | PopupState::ExportDbSelection
+        | PopupState::ExportCollectionOptions { .. } => {
             import_export::render_import_export_popups(ctx, app, &state);
         }
 

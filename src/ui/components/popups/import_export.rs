@@ -1,4 +1,5 @@
 use crate::ui::CrapApp;
+use crate::ui::PopupState;
 use eframe::egui;
 
 /// Render import/export popups
@@ -71,11 +72,51 @@ pub fn render_import_export_popups(ctx: &egui::Context, app: &mut CrapApp, state
             }
         }
 
-        super::PopupState::LorebookImport {
+        PopupState::LorebookImport {
             source_code,
             parsed_data,
         } => {
             render_lorebook_import(ctx, app, source_code.clone(), parsed_data.clone());
+        }
+
+        super::PopupState::ExportCollectionOptions { collection_id } => {
+            let id = *collection_id;
+            let mut close = false;
+            let collection_name = app.collections.iter().find(|c| c.id == id).map(|c| c.name.clone()).unwrap_or_default();
+            
+            egui::Window::new(format!("Export '{}'", collection_name))
+                .collapsible(false)
+                .resizable(false)
+                .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
+                .show(ctx, |ui| {
+                    ui.label("Select export format for all characters in this folder:");
+                    ui.add_space(10.0);
+
+                    if ui.button("🖼 PNG Cards (TavernAI)").on_hover_text("Standard format with embedded character data.").clicked() {
+                        app.trigger_collection_export(id, crate::ui::ExportFormat::Png);
+                        close = true;
+                    }
+                    if ui.button("📄 V2 JSON (SpicyChat)").on_hover_text("Newer JSON format supported by SillyTavern/SpicyChat.").clicked() {
+                        app.trigger_collection_export(id, crate::ui::ExportFormat::V2);
+                        close = true;
+                    }
+                    if ui.button("📝 Native JSON (.crapp)").on_hover_text("Full data backup including all CRAPP-specific fields.").clicked() {
+                        app.trigger_collection_export(id, crate::ui::ExportFormat::Native);
+                        close = true;
+                    }
+                    if ui.button("📜 Markdown (Text Only)").on_hover_text("Readable text description/scenario.").clicked() {
+                        app.trigger_collection_export(id, crate::ui::ExportFormat::Markdown);
+                        close = true;
+                    }
+
+                    ui.add_space(15.0);
+                    if ui.button("Cancel").clicked() {
+                        close = true;
+                    }
+                });
+            if close {
+                app.popup_state = super::PopupState::None;
+            }
         }
 
         _ => {}

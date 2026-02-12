@@ -86,6 +86,7 @@ pub fn render_lorebook_characters(app: &mut CrapApp, ui: &mut egui::Ui, book: &L
                 app.load_character(id);
             }
             crate::ui::browser::BrowserAction::OpenCollection(_) => {}
+            crate::ui::browser::BrowserAction::ExportCollection(_) => {}
         }
     }
 }

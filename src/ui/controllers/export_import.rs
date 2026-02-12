@@ -267,4 +267,96 @@ impl CrapApp {
             }
         });
     }
+
+    /// Triggers the mass export of a collection
+    pub fn trigger_collection_export(&self, collection_id: i64, format: crate::ui::ExportFormat) {
+        // Clone data needed for export (Snapshot)
+        let collections = self.collections.clone();
+        let characters = self.characters.clone();
+
+        let collection_name = self
+            .collections
+            .iter()
+            .find(|c| c.id == collection_id)
+            .map(|c| c.name.clone())
+            .unwrap_or("Collection".to_string());
+
+        tokio::task::spawn_blocking(move || {
+            if let Some(target_dir) = rfd::FileDialog::new()
+                .set_title(format!("Export '{}' to...", collection_name))
+                .pick_folder()
+            {
+                let _ = recursive_export_helper(
+                    &collections,
+                    &characters,
+                    collection_id,
+                    &target_dir,
+                    format,
+                );
+            }
+        });
+    }
+}
+
+fn recursive_export_helper(
+    collections: &[crate::models::Collection],
+    characters: &[crate::models::Character],
+    collection_id: i64,
+    parent_dir: &std::path::Path,
+    format: crate::ui::ExportFormat,
+) -> Result<(), String> {
+    // 1. Get Collection Name and create dir
+    let collection = collections
+        .iter()
+        .find(|c| c.id == collection_id)
+        .ok_or("Collection not found")?;
+    let sanitized_name = collection.name.replace("/", "_").replace("\\", "_");
+    let my_dir = parent_dir.join(sanitized_name);
+
+    if !my_dir.exists() {
+        std::fs::create_dir_all(&my_dir).map_err(|e| e.to_string())?;
+    }
+
+    // 2. Export Characters in this collection
+    let chars_in_col: Vec<&crate::models::Character> = characters
+        .iter()
+        .filter(|c| c.collection_id == Some(collection_id))
+        .collect();
+
+    for char in chars_in_col {
+        // inline export_character_in_format logic to avoid referencing CrapApp instance
+        let name_slug = char.name.replace(" ", "_");
+        let file_name = match format {
+            crate::ui::ExportFormat::Png => format!("{}.png", name_slug),
+            crate::ui::ExportFormat::V2 => format!("{}.json", name_slug),
+            crate::ui::ExportFormat::Native => format!("{}.crapp", name_slug),
+            crate::ui::ExportFormat::Markdown => format!("{}.md", name_slug),
+        };
+        let target_path = my_dir.join(file_name);
+
+        let _ = match format {
+            crate::ui::ExportFormat::Png => CrapApp::write_character_png_static(char, &target_path),
+            crate::ui::ExportFormat::V2 => {
+                CrapApp::write_character_v2_json_static(char, &target_path)
+            }
+            crate::ui::ExportFormat::Native => {
+                CrapApp::write_character_native_static(char, &target_path)
+            }
+            crate::ui::ExportFormat::Markdown => {
+                CrapApp::write_character_markdown_static(char, &target_path)
+            }
+        };
+    }
+
+    // 3. Recurse for sub-collections
+    let sub_cols: Vec<i64> = collections
+        .iter()
+        .filter(|c| c.parent_id == Some(collection_id))
+        .map(|c| c.id)
+        .collect();
+    for sub_id in sub_cols {
+        let _ = recursive_export_helper(collections, characters, sub_id, &my_dir, format);
+    }
+
+    Ok(())
 }

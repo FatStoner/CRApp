@@ -1,6 +1,6 @@
 mod tree;
 
-pub use tree::{has_matches, render_tree, TreeAction};
+pub use tree::{render_tree, TreeAction};
 
 use crate::models::Lorebook;
 use crate::ui::{AppMode, CrapApp, SortDirection, SortMode};
@@ -460,6 +460,9 @@ pub fn render_side_panel(app: &mut CrapApp, ctx: &egui::Context) {
                         }
                         TreeAction::CreateRootFolder => {
                             app.save_collection(0, "New Folder".to_string(), None);
+                        }
+                        TreeAction::ExportCollection(id) => {
+                             app.popup_state = crate::ui::PopupState::ExportCollectionOptions { collection_id: id };
                         }
                         TreeAction::MoveCharacter(char_id, target_id) => {
                             app.move_character(char_id, target_id);

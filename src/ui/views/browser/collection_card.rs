@@ -107,6 +107,10 @@ pub fn render_subfolder_card(
             actions.push(BrowserAction::DeleteCollection(folder.id));
             ui.close_menu();
         }
+        if ui.button("📤 Export Folder").clicked() {
+            actions.push(BrowserAction::ExportCollection(folder.id));
+            ui.close_menu();
+        }
     });
 }
 
@@ -179,6 +183,10 @@ pub fn render_subfolder_list_item(
                     }
                     if ui.button("Delete Folder").clicked() {
                         actions.push(BrowserAction::DeleteCollection(folder.id));
+                        ui.close_menu();
+                    }
+                    if ui.button("📤 Export Folder").clicked() {
+                        actions.push(BrowserAction::ExportCollection(folder.id));
                         ui.close_menu();
                     }
                 });

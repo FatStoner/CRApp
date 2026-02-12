@@ -50,6 +50,14 @@ pub enum BrowserViewMode {
     List, // Title + URLs
 }
 
+#[derive(PartialEq, Eq, Clone, Copy, Debug)]
+pub enum ExportFormat {
+    Png,
+    V2,
+    Native,
+    Markdown,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum AppAction {
     SwitchCharacter(i64),

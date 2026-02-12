@@ -18,6 +18,7 @@ pub enum BrowserAction {
     UpdateCollectionIcon(i64),
     OpenCharacter(i64),
     OpenCollection(i64),
+    ExportCollection(i64),
 }
 
 pub fn render_collection_move_menu(
@@ -260,6 +261,10 @@ pub fn render_browser_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                         id,
                         name: current_name,
                     };
+                }
+                if ui.button("📤 Export Collection").clicked() {
+                    app.popup_state =
+                        crate::ui::PopupState::ExportCollectionOptions { collection_id: id };
                 }
             } else {
                 // Root View: Show DB Management
@@ -718,6 +723,10 @@ pub fn render_browser_view(app: &mut CrapApp, ui: &mut egui::Ui) {
             }
             BrowserAction::OpenCollection(id) => {
                 app.request_collection_switch(Some(id));
+            }
+            BrowserAction::ExportCollection(id) => {
+                app.popup_state =
+                    crate::ui::PopupState::ExportCollectionOptions { collection_id: id };
             }
         }
     }

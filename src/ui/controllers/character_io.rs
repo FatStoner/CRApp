@@ -5,25 +5,98 @@ use crate::ui::UiEvent;
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
 
 impl CrapApp {
-    /// Export character as native .crapp format (full character JSON)
-    pub fn export_character_native(&self, character: &Character) {
-        if let Ok(json) = serde_json::to_string_pretty(&character) {
-            let name_slug = character.name.replace(" ", "_");
-            let task_name = format!("{}.crapp", name_slug);
-            tokio::spawn(async move {
-                if let Some(path) = rfd::FileDialog::new()
-                    .set_directory("exports")
-                    .set_file_name(task_name)
-                    .save_file()
-                {
-                    let _ = std::fs::write(path, json);
-                }
-            });
+    /// Export character in a specific format to a target folder
+    pub fn export_character_in_format(
+        &self,
+        character: &Character,
+        target_folder: &std::path::Path,
+        format: crate::ui::ExportFormat,
+    ) -> Result<String, String> {
+        let name_slug = character.name.replace(" ", "_");
+        let file_name = match format {
+            crate::ui::ExportFormat::Png => format!("{}.png", name_slug),
+            crate::ui::ExportFormat::V2 => format!("{}.json", name_slug),
+            crate::ui::ExportFormat::Native => format!("{}.crapp", name_slug),
+            crate::ui::ExportFormat::Markdown => format!("{}.md", name_slug),
+        };
+        let target_path = target_folder.join(file_name);
+
+        match format {
+            crate::ui::ExportFormat::Png => self.write_character_png(character, &target_path),
+            crate::ui::ExportFormat::V2 => self.write_character_v2_json(character, &target_path),
+            crate::ui::ExportFormat::Native => self.write_character_native(character, &target_path),
+            crate::ui::ExportFormat::Markdown => {
+                self.write_character_markdown(character, &target_path)
+            }
         }
+        .map(|_| target_path.to_string_lossy().to_string())
     }
 
-    /// Export character as SpicyChat-compatible JSON (Character Card V2 format)
-    pub fn export_character_v2_json(&self, character: &Character) {
+    /// Export character as native .crapp format (full character JSON)
+    pub fn export_character_native(&self, character: &Character) {
+        let char_clone = character.clone();
+
+        let name_slug = character.name.replace(" ", "_");
+        let task_name = format!("{}.crapp", name_slug);
+
+        // We can't call self methods inside tokio::spawn unless we clone self or the methods are static/don't need self.
+        // But write_character_native doesn't strictly need self state, it just needs the character.
+        // However, I made them methods of CrapApp.
+        // To keep it simple, I'll copy the logic OR just invoke the helper in the main thread if it's fast (disk I/O might block UI).
+        // Better: The helpers are pure IO. I can wrap them in a struct or just clone the helper logic...
+        // Actually, I can just create a small closure or move the helper logic out of impl CrapApp if I wanted to be 100% clean,
+        // but for now, I will just clone the `character` and run the helper logic inside the async block by instantiating a localized helper or just calling the code.
+        // Wait, I can't call `self.write_character_native` inside `tokio::spawn` because `self` is not 'static.
+        // I should make the helpers associated functions (static) or just stand-alone functions.
+        // For now, to minimize valid code changes, I will simply duplicate the tiny wrapper calls or better yet:
+        // Make the helpers `pub fn` separate from CrapApp impl or static methods.
+
+        // Let's refactor the helpers to be non-methods of CrapApp to make it easier.
+        // Actually, I'll just put the helpers in `tokio::spawn` by re-implementing the call or making them static.
+        // But wait, `self.write_character_png` etc are just logic.
+        // Let's DO NOT use `self` in the helpers. They don't use `self` anyway.
+        // So I will make them part of `CrapApp` but usage in async block requires care.
+        // Actually, the easiest way is to NOT `tokio::spawn` the helpers directly from `self`.
+
+        // Revised plan:
+        // 1. Keep helpers as `impl CrapApp` for synchronous calls (like mass export which might run in one big async task).
+        // 2. For single export, I will use the helpers synchronously? No, FileDialog should be async-ish or blocking.
+        //    rfd::FileDialog is blocking.
+        //    The previous code spawned a thread.
+
+        // I will make the helpers static (no &self) so they can be called easily.
+        // check `write_character_native` - it uses nothing from `self`.
+        // check `write_character_png` - it uses `BASE64` which is imported.
+
+        // So I will remove `&self` from helpers and make them associated functions, OR just ignore `self`.
+        // But `export_character_in_format` uses `self` to call them.
+
+        // Let's just implement the UI triggers here reusing the helpers.
+
+        tokio::task::spawn_blocking(move || {
+            if let Some(path) = rfd::FileDialog::new()
+                .set_directory("exports")
+                .set_file_name(task_name)
+                .save_file()
+            {
+                let _ = CrapApp::write_character_native_static(&char_clone, &path);
+            }
+        });
+    }
+
+    // Static versions for Async usage
+    pub fn write_character_native_static(
+        character: &Character,
+        path: &std::path::Path,
+    ) -> Result<(), String> {
+        let json = serde_json::to_string_pretty(&character).map_err(|e| e.to_string())?;
+        std::fs::write(path, json).map_err(|e| e.to_string())
+    }
+
+    pub fn write_character_v2_json_static(
+        character: &Character,
+        path: &std::path::Path,
+    ) -> Result<(), String> {
         let v2 = CharacterCardV2::new(
             character.char_name.clone(),
             character.personality.clone(),
@@ -32,23 +105,14 @@ impl CrapApp {
             character.first_message.clone(),
             character.example_dialogue.clone(),
         );
-        if let Ok(json) = serde_json::to_string_pretty(&v2) {
-            let name_slug = character.name.replace(" ", "_");
-            let task_name = format!("{}.json", name_slug);
-            tokio::spawn(async move {
-                if let Some(path) = rfd::FileDialog::new()
-                    .set_directory("exports")
-                    .set_file_name(task_name)
-                    .save_file()
-                {
-                    let _ = std::fs::write(path, json);
-                }
-            });
-        }
+        let json = serde_json::to_string_pretty(&v2).map_err(|e| e.to_string())?;
+        std::fs::write(path, json).map_err(|e| e.to_string())
     }
 
-    /// Export character as Markdown document
-    pub fn export_character_markdown(&self, character: &Character) {
+    pub fn write_character_markdown_static(
+        character: &Character,
+        path: &std::path::Path,
+    ) -> Result<(), String> {
         let md = format!(
             "# {}\n\n## Description\n{}\n\n## Personality\n{}\n\n## Scenario\n{}\n\n## First Message\n{}\n\n## Example Dialogue\n{}\n",
             character.char_name,
@@ -58,21 +122,13 @@ impl CrapApp {
             character.first_message,
             character.example_dialogue
         );
-        let name_slug = character.name.replace(" ", "_");
-        let task_name = format!("{}.md", name_slug);
-        tokio::spawn(async move {
-            if let Some(path) = rfd::FileDialog::new()
-                .set_directory("exports")
-                .set_file_name(task_name)
-                .save_file()
-            {
-                let _ = std::fs::write(path, md);
-            }
-        });
+        std::fs::write(path, md).map_err(|e| e.to_string())
     }
 
-    /// Export character as PNG card (TavernAI format with embedded metadata)
-    pub fn export_character_png(&self, character: &Character) {
+    pub fn write_character_png_static(
+        character: &Character,
+        path: &std::path::Path,
+    ) -> Result<(), String> {
         if let Some(avatar_path) = &character.avatar_path {
             let mut v2 = TavernCardV2::new(
                 character.char_name.clone(),
@@ -90,50 +146,121 @@ impl CrapApp {
                 .map(|t| t.name.clone())
                 .collect();
 
-            if let Ok(json) = serde_json::to_string(&v2) {
-                let b64 = BASE64.encode(json);
-                let path_clone = avatar_path.clone();
-                let name_slug = character.name.replace(" ", "_");
-                let task_name = format!("{}.png", name_slug);
+            let json = serde_json::to_string(&v2).map_err(|e| e.to_string())?;
+            let b64 = BASE64.encode(json);
 
-                tokio::spawn(async move {
-                    if let Ok(img_bytes) = std::fs::read(&path_clone) {
-                        if let Some(save_path) = rfd::FileDialog::new()
-                            .set_directory("exports")
-                            .set_file_name(task_name)
-                            .save_file()
-                        {
-                            if let Ok(img) = image::load_from_memory(&img_bytes) {
-                                let (w, h) = (img.width(), img.height());
-                                let color_type = img.color();
-                                let pixels = img.into_bytes();
+            let img_bytes = std::fs::read(avatar_path).map_err(|e| e.to_string())?;
+            let img = image::load_from_memory(&img_bytes).map_err(|e| e.to_string())?;
 
-                                if let Ok(mut out_file) = std::fs::File::create(save_path) {
-                                    let mut encoder = png::Encoder::new(&mut out_file, w, h);
-                                    encoder.set_color(match color_type {
-                                        image::ColorType::Rgb8 => png::ColorType::Rgb,
-                                        image::ColorType::Rgba8 => png::ColorType::Rgba,
-                                        image::ColorType::L8 => png::ColorType::Grayscale,
-                                        image::ColorType::La8 => png::ColorType::GrayscaleAlpha,
-                                        _ => png::ColorType::Rgba,
-                                    });
-                                    encoder.set_depth(png::BitDepth::Eight);
-                                    let _ = encoder
-                                        .add_text_chunk("chara".to_string(), b64.to_string());
+            let (w, h) = (img.width(), img.height());
+            let color_type = img.color();
+            let pixels = img.into_bytes();
 
-                                    if let Ok(mut writer) = encoder.write_header() {
-                                        let _ = writer.write_image_data(&pixels);
-                                        let _ = writer.finish();
-                                    }
-                                }
-                            }
-                        }
-                    }
-                });
-            }
+            let mut out_file = std::fs::File::create(path).map_err(|e| e.to_string())?;
+            let mut encoder = png::Encoder::new(&mut out_file, w, h);
+            encoder.set_color(match color_type {
+                image::ColorType::Rgb8 => png::ColorType::Rgb,
+                image::ColorType::Rgba8 => png::ColorType::Rgba,
+                image::ColorType::L8 => png::ColorType::Grayscale,
+                image::ColorType::La8 => png::ColorType::GrayscaleAlpha,
+                _ => png::ColorType::Rgba,
+            });
+            encoder.set_depth(png::BitDepth::Eight);
+            encoder
+                .add_text_chunk("chara".to_string(), b64.to_string())
+                .map_err(|e| e.to_string())?;
+
+            let mut writer = encoder.write_header().map_err(|e| e.to_string())?;
+            writer
+                .write_image_data(&pixels)
+                .map_err(|e| e.to_string())?;
+            writer.finish().map_err(|e| e.to_string())?;
+
+            Ok(())
         } else {
-            eprintln!("Cannot export PNG: No avatar.");
+            CrapApp::write_character_v2_json_static(
+                character,
+                path.with_extension("json").as_path(),
+            )
         }
+    }
+
+    // Instance methods wrappers for compatibility and cleaner calls
+    pub fn write_character_native(
+        &self,
+        character: &Character,
+        path: &std::path::Path,
+    ) -> Result<(), String> {
+        Self::write_character_native_static(character, path)
+    }
+    pub fn write_character_v2_json(
+        &self,
+        character: &Character,
+        path: &std::path::Path,
+    ) -> Result<(), String> {
+        Self::write_character_v2_json_static(character, path)
+    }
+    pub fn write_character_markdown(
+        &self,
+        character: &Character,
+        path: &std::path::Path,
+    ) -> Result<(), String> {
+        Self::write_character_markdown_static(character, path)
+    }
+    pub fn write_character_png(
+        &self,
+        character: &Character,
+        path: &std::path::Path,
+    ) -> Result<(), String> {
+        Self::write_character_png_static(character, path)
+    }
+
+    /// Export character as SpicyChat-compatible JSON (Character Card V2 format)
+    pub fn export_character_v2_json(&self, character: &Character) {
+        let char_clone = character.clone();
+        let name_slug = character.name.replace(" ", "_");
+        let task_name = format!("{}.json", name_slug);
+        tokio::task::spawn_blocking(move || {
+            if let Some(path) = rfd::FileDialog::new()
+                .set_directory("exports")
+                .set_file_name(task_name)
+                .save_file()
+            {
+                let _ = CrapApp::write_character_v2_json_static(&char_clone, &path);
+            }
+        });
+    }
+
+    /// Export character as Markdown document
+    pub fn export_character_markdown(&self, character: &Character) {
+        let char_clone = character.clone();
+        let name_slug = character.name.replace(" ", "_");
+        let task_name = format!("{}.md", name_slug);
+        tokio::task::spawn_blocking(move || {
+            if let Some(path) = rfd::FileDialog::new()
+                .set_directory("exports")
+                .set_file_name(task_name)
+                .save_file()
+            {
+                let _ = CrapApp::write_character_markdown_static(&char_clone, &path);
+            }
+        });
+    }
+
+    /// Export character as PNG card (TavernAI format with embedded metadata)
+    pub fn export_character_png(&self, character: &Character) {
+        let char_clone = character.clone();
+        let name_slug = character.name.replace(" ", "_");
+        let task_name = format!("{}.png", name_slug);
+        tokio::task::spawn_blocking(move || {
+            if let Some(path) = rfd::FileDialog::new()
+                .set_directory("exports")
+                .set_file_name(task_name)
+                .save_file()
+            {
+                let _ = CrapApp::write_character_png_static(&char_clone, &path);
+            }
+        });
     }
 
     /// Import character from file (JSON, PNG, or CRAPP)
