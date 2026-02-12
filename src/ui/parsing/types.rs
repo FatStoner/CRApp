@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Default, Clone, Debug)]
 pub struct ParsedCharacterData {
     pub name: String,
+    pub char_name: String,
     pub title: String,
     pub personality: String,
     pub scenario: String,
@@ -44,6 +45,7 @@ pub enum ImportFormat {
 impl ParsedCharacterData {
     pub fn cleanup(&mut self) {
         self.name = self.name.trim().to_string();
+        self.char_name = self.char_name.trim().to_string();
         self.title = self.title.trim().to_string();
         self.personality = self.personality.trim().to_string();
         self.scenario = self.scenario.trim().to_string();

@@ -182,6 +182,7 @@ impl CrapApp {
                                             char_obj.id = 0;
                                             let parsed = crate::ui::parsing::ParsedCharacterData {
                                                 name: char_obj.name,
+                                                char_name: char_obj.char_name,
                                                 title: char_obj.char_title,
                                                 personality: char_obj.personality,
                                                 scenario: char_obj.scenario,
@@ -220,6 +221,7 @@ impl CrapApp {
                                                 let parsed =
                                                     crate::ui::parsing::ParsedCharacterData {
                                                         name: char_obj.name,
+                                                        char_name: char_obj.char_name,
                                                         title: char_obj.char_title,
                                                         personality: char_obj.personality,
                                                         scenario: char_obj.scenario,

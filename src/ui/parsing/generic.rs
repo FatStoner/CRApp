@@ -13,6 +13,7 @@ pub fn parse_edit_view(lines: &[&str]) -> ParsedCharacterData {
             // Next line might be "*", then Value
             if let Some(val_idx) = find_next_value_index(lines, i) {
                 data.name = lines[val_idx].to_string();
+                data.char_name = data.name.clone();
             }
             continue;
         }
@@ -136,6 +137,7 @@ pub fn parse_profile_view(lines: &[&str]) -> ParsedCharacterData {
             // Find first non-empty line starting from name_idx
             if let Some(name_val) = lines.iter().skip(name_idx).find(|l| !l.trim().is_empty()) {
                 data.name = name_val.to_string();
+                data.char_name = data.name.clone();
             }
         }
     }
@@ -243,6 +245,7 @@ pub fn parse_profile_view(lines: &[&str]) -> ParsedCharacterData {
         if current_section == "personality" && lower.starts_with("name:") && data.name.is_empty() {
             if let Some((_, val)) = line.split_once(':') {
                 data.name = val.trim().to_string();
+                data.char_name = data.name.clone();
             }
         }
 

@@ -354,6 +354,7 @@ pub fn handle_ui_events(app: &mut CrapApp, ctx: &egui::Context) {
                             // Map to ParsedCharacterData for review
                             let parsed = crate::ui::ParsedCharacterData {
                                 name: char_obj.name.clone(),
+                                char_name: char_obj.char_name.clone(),
                                 title: char_obj.char_title.clone(),
                                 personality: char_obj.personality.clone(),
                                 scenario: char_obj.scenario.clone(),

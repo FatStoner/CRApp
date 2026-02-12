@@ -79,8 +79,12 @@ pub fn render_central_panel(app: &mut CrapApp, ctx: &egui::Context) {
                                 let input_width = (avail_width - 150.0).max(200.0);
 
                                 egui::Grid::new("review_grid").striped(true).num_columns(2).min_col_width(100.0).show(ui, |ui| {
-                                    ui.label("Name:");
+                                    ui.label("Name (File Name):");
                                     ui.add(egui::TextEdit::singleline(&mut data.name).desired_width(input_width));
+                                    ui.end_row();
+
+                                    ui.label("Character Name:");
+                                    ui.add(egui::TextEdit::singleline(&mut data.char_name).desired_width(input_width));
                                     ui.end_row();
                                     
                                     ui.label("Title (Bio):");
@@ -188,7 +192,9 @@ pub fn render_central_panel(app: &mut CrapApp, ctx: &egui::Context) {
                                     
                                     if !d.name.is_empty() { 
                                         c.name = d.name.clone(); 
-                                        c.char_name = d.name.clone();
+                                    }
+                                    if !d.char_name.is_empty() {
+                                        c.char_name = d.char_name.clone();
                                     }
                                     if !d.title.is_empty() { c.char_title = d.title.clone(); }
                                     if !d.personality.is_empty() { c.personality = d.personality.clone(); }

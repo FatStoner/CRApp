@@ -63,7 +63,8 @@ pub fn parse_png_card(bytes: &[u8]) -> Result<ParsedCharacterData, String> {
 
 fn from_v2(card: TavernCardV2) -> ParsedCharacterData {
     ParsedCharacterData {
-        name: card.data.name,
+        name: card.data.name.clone(),
+        char_name: card.data.name,
         title: card.data.personality,
         personality: card.data.description,
         scenario: card.data.scenario,
@@ -78,7 +79,8 @@ fn from_v2(card: TavernCardV2) -> ParsedCharacterData {
 
 fn from_char_v2(card: crate::card_v2::CharacterCardV2) -> ParsedCharacterData {
     ParsedCharacterData {
-        name: card.name,
+        name: card.name.clone(),
+        char_name: card.name,
         title: card.personality,
         personality: card.description,
         scenario: card.scenario,
