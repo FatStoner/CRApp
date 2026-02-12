@@ -151,6 +151,46 @@ pub fn render_deletion_popups(ctx: &egui::Context, app: &mut CrapApp, state: &su
             }
         }
 
+        super::PopupState::DeleteGalleryImageConfirmation { path } => {
+            let mut close = false;
+            let mut deleted = false;
+            egui::Window::new("Delete Image?")
+                .collapsible(false)
+                .resizable(false)
+                .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
+                .show(ctx, |ui| {
+                    ui.label("Are you sure you want to delete this image?");
+                    ui.colored_label(egui::Color32::RED, "This action cannot be undone.");
+                    ui.add_space(10.0);
+
+                    ui.horizontal(|ui| {
+                        if ui
+                            .button(egui::RichText::new("Delete").color(egui::Color32::RED))
+                            .clicked()
+                        {
+                            let _ = std::fs::remove_file(path);
+                            // Clear cache
+                            let uri = crate::ui::utils::get_image_uri(path);
+                            ctx.forget_image(&uri);
+
+                            deleted = true;
+                            close = true;
+                        }
+                        if ui.button("Cancel").clicked() {
+                            close = true;
+                        }
+                    });
+                });
+
+            if deleted {
+                app.set_status("Image deleted".to_string(), egui::Color32::GREEN);
+                ctx.request_repaint();
+                app.popup_state = super::PopupState::None;
+            } else if close {
+                app.popup_state = super::PopupState::None;
+            }
+        }
+
         _ => {}
     }
 }

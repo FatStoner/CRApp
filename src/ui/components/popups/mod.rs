@@ -35,6 +35,9 @@ pub enum PopupState {
         id: i64,
         name: String,
     },
+    DeleteGalleryImageConfirmation {
+        path: String,
+    },
     UnsavedChanges {
         target: AppAction,
     },
@@ -68,7 +71,8 @@ pub fn render_popups(ctx: &egui::Context, app: &mut CrapApp) {
         | PopupState::DeleteCharacterConfirmation { .. }
         | PopupState::DeleteLorebookConfirmation { .. }
         | PopupState::DeleteLorebookEntryConfirmation { .. }
-        | PopupState::DeleteTemplateConfirmation { .. } => {
+        | PopupState::DeleteTemplateConfirmation { .. }
+        | PopupState::DeleteGalleryImageConfirmation { .. } => {
             deletion::render_deletion_popups(ctx, app, &state);
         }
 

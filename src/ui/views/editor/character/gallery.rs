@@ -18,7 +18,6 @@ pub fn render_gallery_tab(
 
     let gallery_dir = format!("data/gallery/{}", character.id);
     let _ = std::fs::create_dir_all(&gallery_dir);
-    let mut refresh_gallery = false;
 
     let mut files = Vec::new();
     if let Ok(entries) = std::fs::read_dir(&gallery_dir) {
@@ -113,16 +112,13 @@ pub fn render_gallery_tab(
 
                 response.context_menu(|ui| {
                     if ui.button("🗑 Delete").clicked() {
-                        let _ = std::fs::remove_file(path);
-                        refresh_gallery = true;
+                        app.popup_state = crate::ui::PopupState::DeleteGalleryImageConfirmation {
+                            path: path.to_string_lossy().to_string(),
+                        };
                         ui.close_menu();
                     }
                 });
             }
         });
     });
-
-    if refresh_gallery {
-        ui.ctx().request_repaint();
-    }
 }
