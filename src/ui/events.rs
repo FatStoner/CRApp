@@ -211,10 +211,53 @@ pub fn handle_ui_events(app: &mut CrapApp, ctx: &egui::Context) {
                     if let Some(l) = app.lorebooks.iter_mut().find(|l| l.id == lid) {
                         l.entries = entries.clone();
                     }
-                    // Update selected
+
+                    // Handle Selection Persistence / Smart Selection
                     if let Some(l) = &mut app.selected_lorebook {
                         if l.id == lid {
+                            // 1. Capture current selection index before update
+                            let mut current_idx = None;
+                            if let Some(selected) = &app.selected_entry {
+                                // We check against the OLD entries in the selected lorebook
+                                current_idx = l.entries.iter().position(|e| e.id == selected.id);
+                            }
+
+                            // 2. Update the entries
                             l.entries = entries;
+
+                            // 3. Try to restore selection or pick nearest
+                            if let Some(old_idx) = current_idx {
+                                // First, try to find the EXACT same entry by ID (in case of reorder/edit)
+                                let new_pos_by_id = l
+                                    .entries
+                                    .iter()
+                                    .position(|e| e.id == app.selected_entry.as_ref().unwrap().id);
+
+                                if let Some(new_idx) = new_pos_by_id {
+                                    // It still exists! Just update the selected_entry data directly
+                                    app.selected_entry = Some(l.entries[new_idx].clone());
+                                } else {
+                                    // It's gone! (Deleted)
+                                    // Pick the entry at the same index, or the last one if we were at the end
+                                    if !l.entries.is_empty() {
+                                        let new_idx = if old_idx >= l.entries.len() {
+                                            l.entries.len() - 1
+                                        } else {
+                                            old_idx
+                                        };
+                                        app.selected_entry = Some(l.entries[new_idx].clone());
+                                    } else {
+                                        // No entries left
+                                        app.selected_entry = None;
+                                    }
+                                }
+                            } else {
+                                // No previous selection, or it wasn't in the list?
+                                // Just ensure selected_entry is None if the list is now empty, otherwise leave it alone
+                                if l.entries.is_empty() {
+                                    app.selected_entry = None;
+                                }
+                            }
                         }
                     }
                 }
