@@ -118,6 +118,40 @@ impl CrapApp {
         });
     }
 
+    /// Adds a SPECIFIC entry object to a lorebook (used for Paste / Import)
+    pub fn add_specific_entry_to_lorebook(&self, mut entry: crate::models::LorebookEntry) {
+        let tx = self.tx.clone();
+        let db = self.db.clone();
+        let ctx = self.ctx.clone();
+
+        // Ensure ID is 0 for insert
+        entry.id = 0;
+
+        tokio::spawn(async move {
+            let lid = entry.lorebook_id;
+            match db.add_entry_to_lorebook(&entry).await {
+                Ok(id) => {
+                    let _ = tx.send(UiEvent::LorebookEntryAdded(Ok(id))).await;
+                    // Auto-reload
+                    match db.get_entries_for_lorebook(lid).await {
+                        Ok(entries) => {
+                            let _ = tx
+                                .send(UiEvent::LorebookEntriesLoaded(Ok((lid, entries))))
+                                .await;
+                        }
+                        Err(_) => {}
+                    }
+                }
+                Err(e) => {
+                    let _ = tx
+                        .send(UiEvent::LorebookEntryAdded(Err(e.to_string())))
+                        .await;
+                }
+            }
+            ctx.request_repaint();
+        });
+    }
+
     /// Saves (updates) a lorebook entry
     pub fn save_lorebook_entry(&self, entry: crate::models::LorebookEntry) {
         let tx = self.tx.clone();

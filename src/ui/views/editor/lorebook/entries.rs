@@ -1,5 +1,6 @@
 use crate::models::{count_tokens, Lorebook, LorebookEntry};
 use crate::ui::CrapApp;
+use arboard::Clipboard;
 use eframe::egui;
 
 pub fn render_lorebook_entries(
@@ -8,6 +9,7 @@ pub fn render_lorebook_entries(
     book: &mut Lorebook,
     entry_save_req: &mut Option<LorebookEntry>,
     entry_add_req: &mut bool,
+    status_update: &mut Option<(String, egui::Color32)>,
 ) {
     // --- Master-Detail Entries View ---
     ui.allocate_ui(ui.available_size(), |ui| {
@@ -87,6 +89,18 @@ pub fn render_lorebook_entries(
                                 if ui.button("Save Entry").clicked() {
                                     *entry_save_req = Some(entry.clone());
                                 }
+                                if ui.button("📋 Copy").clicked() {
+                                    if let Ok(mut clipboard) = Clipboard::new() {
+                                        if let Ok(json) = serde_json::to_string(&entry) {
+                                            if let Ok(_) = clipboard.set_text(json) {
+                                                *status_update = Some((
+                                                    "Entry copied to clipboard".to_string(),
+                                                    egui::Color32::GREEN,
+                                                ));
+                                            }
+                                        }
+                                    }
+                                }
                             });
 
                             ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
@@ -118,6 +132,30 @@ pub fn render_lorebook_entries(
             columns[1].vertical(|ui| {
                 ui.horizontal(|ui| {
                     ui.heading("Entries");
+                    if ui
+                        .button("📋")
+                        .on_hover_text("Paste Entry from Clipboard")
+                        .clicked()
+                    {
+                        if let Ok(mut clipboard) = Clipboard::new() {
+                            if let Ok(text) = clipboard.get_text() {
+                                if let Ok(mut new_entry) =
+                                    serde_json::from_str::<LorebookEntry>(&text)
+                                {
+                                    new_entry.lorebook_id = book.id;
+                                    new_entry.id = 0; // Ensure new ID
+                                    app.add_specific_entry_to_lorebook(new_entry);
+                                    *status_update =
+                                        Some(("Entry pasted!".to_string(), egui::Color32::GREEN));
+                                } else {
+                                    *status_update = Some((
+                                        "Clipboard does not contain valid entry data".to_string(),
+                                        egui::Color32::RED,
+                                    ));
+                                }
+                            }
+                        }
+                    }
                     if ui.small_button("+").clicked() {
                         *entry_add_req = true;
                     }

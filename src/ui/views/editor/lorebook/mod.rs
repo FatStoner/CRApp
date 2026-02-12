@@ -270,6 +270,7 @@ pub fn render_lorebook_editor(app: &mut CrapApp, ui: &mut egui::Ui) {
                     &mut book,
                     &mut entry_save_req,
                     &mut entry_add_req,
+                    &mut status_update,
                 );
             }
             crate::ui::LorebookTab::Characters => {
