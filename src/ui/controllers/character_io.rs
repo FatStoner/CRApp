@@ -39,40 +39,6 @@ impl CrapApp {
         let name_slug = character.name.replace(" ", "_");
         let task_name = format!("{}.crapp", name_slug);
 
-        // We can't call self methods inside tokio::spawn unless we clone self or the methods are static/don't need self.
-        // But write_character_native doesn't strictly need self state, it just needs the character.
-        // However, I made them methods of CrapApp.
-        // To keep it simple, I'll copy the logic OR just invoke the helper in the main thread if it's fast (disk I/O might block UI).
-        // Better: The helpers are pure IO. I can wrap them in a struct or just clone the helper logic...
-        // Actually, I can just create a small closure or move the helper logic out of impl CrapApp if I wanted to be 100% clean,
-        // but for now, I will just clone the `character` and run the helper logic inside the async block by instantiating a localized helper or just calling the code.
-        // Wait, I can't call `self.write_character_native` inside `tokio::spawn` because `self` is not 'static.
-        // I should make the helpers associated functions (static) or just stand-alone functions.
-        // For now, to minimize valid code changes, I will simply duplicate the tiny wrapper calls or better yet:
-        // Make the helpers `pub fn` separate from CrapApp impl or static methods.
-
-        // Let's refactor the helpers to be non-methods of CrapApp to make it easier.
-        // Actually, I'll just put the helpers in `tokio::spawn` by re-implementing the call or making them static.
-        // But wait, `self.write_character_png` etc are just logic.
-        // Let's DO NOT use `self` in the helpers. They don't use `self` anyway.
-        // So I will make them part of `CrapApp` but usage in async block requires care.
-        // Actually, the easiest way is to NOT `tokio::spawn` the helpers directly from `self`.
-
-        // Revised plan:
-        // 1. Keep helpers as `impl CrapApp` for synchronous calls (like mass export which might run in one big async task).
-        // 2. For single export, I will use the helpers synchronously? No, FileDialog should be async-ish or blocking.
-        //    rfd::FileDialog is blocking.
-        //    The previous code spawned a thread.
-
-        // I will make the helpers static (no &self) so they can be called easily.
-        // check `write_character_native` - it uses nothing from `self`.
-        // check `write_character_png` - it uses `BASE64` which is imported.
-
-        // So I will remove `&self` from helpers and make them associated functions, OR just ignore `self`.
-        // But `export_character_in_format` uses `self` to call them.
-
-        // Let's just implement the UI triggers here reusing the helpers.
-
         tokio::task::spawn_blocking(move || {
             if let Some(path) = rfd::FileDialog::new()
                 .set_directory("exports")
