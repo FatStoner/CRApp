@@ -1,4 +1,4 @@
-use crate::ui::{AppAction, CrapApp, UiEvent};
+use crate::ui::{AppAction, CrapApp};
 use eframe::egui;
 
 #[derive(Clone)]
@@ -186,31 +186,11 @@ pub fn render_popups(ctx: &egui::Context, app: &mut CrapApp) {
                     ui.add_space(10.0);
 
                     ui.horizontal(|ui| {
-                        if ui.button("Yes, Delete").clicked() {
-                            let tx = app.tx.clone();
-                            let db = app.db.clone();
-                            let entry_id = id;
-                            let lid = lorebook_id;
-                            tokio::spawn(async move {
-                                match db.delete_lorebook_entry(entry_id).await {
-                                    Ok(_) => {
-                                        let _ = tx
-                                            .send(UiEvent::LorebookEntryDeleted(Ok(entry_id)))
-                                            .await;
-                                    }
-                                    Err(e) => {
-                                        let _ = tx
-                                            .send(UiEvent::LorebookEntryDeleted(Err(e.to_string())))
-                                            .await;
-                                    }
-                                }
-                                // Trigger reload of entries for this lorebook
-                                if let Ok(entries) = db.get_entries_for_lorebook(lid).await {
-                                    let _ = tx
-                                        .send(UiEvent::LorebookEntriesLoaded(Ok((lid, entries))))
-                                        .await;
-                                }
-                            });
+                        if ui
+                            .button(egui::RichText::new("Delete").color(egui::Color32::RED))
+                            .clicked()
+                        {
+                            app.delete_lorebook_entry_async(id, lorebook_id);
                             close = true;
                         }
                         if ui.button("Cancel").clicked() {
