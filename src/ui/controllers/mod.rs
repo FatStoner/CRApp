@@ -2,6 +2,7 @@ pub mod actions;
 pub mod character_io;
 pub mod export_import;
 pub mod loader;
+pub mod lorebook_io;
 pub mod navigation;
 pub mod search;
 pub mod settings;

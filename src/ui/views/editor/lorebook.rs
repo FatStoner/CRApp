@@ -107,34 +107,8 @@ pub fn render_lorebook_editor(app: &mut CrapApp, ui: &mut egui::Ui) {
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 // EXPORT
                 if ui.button("EXPORT").clicked() {
-                    let export_data = crate::ui::parsing::ParsedLorebookData {
-                        title: book.title.clone(),
-                        description: book.description.clone(),
-                        tags: book.tags.iter().map(|t| t.name.clone()).collect(),
-                        entries: book.entries.iter().map(|e| crate::ui::parsing::ParsedLorebookEntry {
-                            name: e.name.clone(),
-                            keywords: e.keywords.split(',').map(|k| k.trim().to_string()).filter(|k| !k.is_empty()).collect(),
-                            content: e.content.clone(),
-                        }).collect(),
-                    };
-
-                    if let Ok(json) = serde_json::to_string_pretty(&export_data) {
-                        let safe_title: String = book.title.chars().filter(|c| c.is_alphanumeric() || *c == ' ' || *c == '-' || *c == '_').collect();
-                        let filename = format!("{}.crappbook", safe_title.replace(" ", "_"));
-                        
-                         if let Some(path) = rfd::FileDialog::new()
-                            .set_file_name(&filename)
-                            .add_filter("Crappbook", &["crappbook", "json"])
-                            .save_file()
-                        {
-                            if let Err(e) = std::fs::write(&path, json) {
-                                status_update = Some((format!("Export failed: {}", e), egui::Color32::RED));
-                            } else {
-                                status_update = Some(("Export successful!".to_string(), egui::Color32::GREEN));
-                            }
-                        }
-                    } else {
-                         status_update = Some(("Serialization failed!".to_string(), egui::Color32::RED));
+                    if let Some(result) = app.export_lorebook(&book) {
+                        status_update = Some(result);
                     }
                 }
 
@@ -407,13 +381,8 @@ pub fn render_lorebook_editor(app: &mut CrapApp, ui: &mut egui::Ui) {
                                         .add_filter("image", &["png", "jpg", "jpeg"])
                                         .pick_file()
                                     {
-                                        let dest_dir = std::path::Path::new("data/covers");
-                                        let _ = std::fs::create_dir_all(dest_dir);
-                                        if let Some(name) = path.file_name() {
-                                            let dest = dest_dir.join(name);
-                                            let _ = std::fs::copy(&path, &dest);
-                                            book.cover_path =
-                                                Some(dest.to_string_lossy().to_string());
+                                        if let Some(cover_path) = app.update_lorebook_cover(book.id, path) {
+                                            book.cover_path = Some(cover_path);
                                         }
                                     }
                                 }
