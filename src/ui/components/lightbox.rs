@@ -30,8 +30,8 @@ pub fn render_lightbox(app: &mut CrapApp, ctx: &egui::Context) {
                 // 2. Image Handling
                 let max_size = screen_rect.size() * 0.9;
                 let img = egui::Image::new(uri)
-                    .shrink_to_fit()
-                    .max_size(max_size)
+                    // .shrink_to_fit() // Removed to allow zooming in
+                    // .max_size(max_size) // Removed to allow zooming in
                     .sense(egui::Sense::click_and_drag()); // Changed to click_and_drag for panning support
 
                 // Handle Mouse Wheel Zoom
