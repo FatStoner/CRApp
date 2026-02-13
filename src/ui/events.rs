@@ -540,6 +540,64 @@ pub fn handle_ui_events(app: &mut CrapApp, ctx: &egui::Context) {
             UiEvent::StatusMessage(msg, color) => {
                 app.set_status(msg, color);
             }
+
+            UiEvent::UpdateAvailable(version) => {
+                app.popup_state = PopupState::UpdateAvailable { version };
+            }
+
+            UiEvent::UpdateCheckFinished(res, is_manual) => {
+                app.is_checking_for_updates = false;
+                match res {
+                    Ok(Some(version)) => {
+                        app.popup_state = PopupState::UpdateAvailable { version };
+                    }
+                    Ok(None) => {
+                        if is_manual {
+                            // Show "Up to Date" popup for manual checks
+                            app.popup_state = PopupState::UpToDate;
+                        }
+                    }
+                    Err(e) => {
+                        if is_manual {
+                            app.set_status(
+                                format!("Update check failed: {}", e),
+                                egui::Color32::RED,
+                            );
+                        } else {
+                            eprintln!("Background update check failed: {}", e);
+                        }
+                    }
+                }
+            }
+
+            UiEvent::CheckUpdatesAtStartLoaded(enabled) => {
+                app.check_updates_at_start = enabled;
+
+                // Triggers the check if enabled (only in release or forced)
+                // We use a flag or cfg to decide if we run it.
+                // Since this event comes from async load at startup, it's a good place to trigger the check.
+
+                #[cfg(not(debug_assertions))]
+                if enabled {
+                    // Prevent check if already running (though unlikely at very start, but good safety)
+                    if !app.is_checking_for_updates {
+                        app.is_checking_for_updates = true;
+                        let tx = app.tx.clone();
+                        std::thread::spawn(move || match crate::updater::check_for_updates() {
+                            Ok(res) => {
+                                let _ =
+                                    tx.blocking_send(UiEvent::UpdateCheckFinished(Ok(res), false));
+                            }
+                            Err(e) => {
+                                let _ = tx.blocking_send(UiEvent::UpdateCheckFinished(
+                                    Err(e.to_string()),
+                                    false,
+                                ));
+                            }
+                        });
+                    }
+                }
+            }
         }
     }
 

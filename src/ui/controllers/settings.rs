@@ -84,4 +84,13 @@ impl CrapApp {
             let _ = db.set_setting("background_scale", &scale.to_string()).await;
         });
     }
+
+    pub fn set_check_updates_at_start(&mut self, enabled: bool) {
+        self.check_updates_at_start = enabled;
+        let db = self.db.clone();
+        let val = enabled.to_string();
+        tokio::spawn(async move {
+            let _ = db.set_setting("check_updates_at_start", &val).await;
+        });
+    }
 }

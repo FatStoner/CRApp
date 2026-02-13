@@ -23,6 +23,7 @@ pub enum CharacterTab {
 pub enum SettingsTab {
     General,
     Tokens,
+    Updates,
     About,
 }
 
@@ -148,6 +149,9 @@ pub enum UiEvent {
     BackgroundScaleLoaded(f32),
     GalleryImageAdded(String),
     StatisticsCalculated(StatisticsData),
+    UpdateAvailable(String),
+    UpdateCheckFinished(Result<Option<String>, String>, bool), // (Result, is_manual_check)
+    CheckUpdatesAtStartLoaded(bool),
 }
 
 #[derive(Clone, Debug, Default)]

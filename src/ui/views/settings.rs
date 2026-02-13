@@ -18,6 +18,11 @@ pub fn render_options_window(app: &mut CrapApp, ctx: &egui::Context) {
                     "General",
                 );
                 ui.selectable_value(&mut app.active_settings_tab, SettingsTab::Tokens, "Tokens");
+                ui.selectable_value(
+                    &mut app.active_settings_tab,
+                    SettingsTab::Updates,
+                    "Updates",
+                );
                 ui.selectable_value(&mut app.active_settings_tab, SettingsTab::About, "About");
             });
             ui.separator();
@@ -194,6 +199,56 @@ pub fn render_options_window(app: &mut CrapApp, ctx: &egui::Context) {
                                 app.token_cache.clear();
                                 if let Some(c) = app.selected_character.clone() {
                                     app.ensure_token_count(&c);
+                                }
+                            }
+                        });
+                    }
+                    SettingsTab::Updates => {
+                        ui.heading("Updates");
+                        ui.add_space(8.0);
+
+                        ui.horizontal(|ui| {
+                            let mut check = app.check_updates_at_start;
+                            if ui
+                                .checkbox(&mut check, "Check for updates at the start")
+                                .changed()
+                            {
+                                app.set_check_updates_at_start(check);
+                            }
+                        });
+
+                        ui.horizontal(|ui| {
+                            if app.is_checking_for_updates {
+                                ui.spinner();
+                                ui.label("Checking for updates...");
+                            } else {
+                                if ui.button("Check for updates now").clicked() {
+                                    // Manual check
+                                    app.is_checking_for_updates = true;
+                                    let tx = app.tx.clone();
+                                    let ctx = app.ctx.clone();
+                                    std::thread::spawn(move || {
+                                        match crate::updater::check_for_updates() {
+                                            Ok(res) => {
+                                                let _ = tx.blocking_send(
+                                                    crate::ui::UiEvent::UpdateCheckFinished(
+                                                        Ok(res),
+                                                        true,
+                                                    ),
+                                                );
+                                                ctx.request_repaint();
+                                            }
+                                            Err(e) => {
+                                                let _ = tx.blocking_send(
+                                                    crate::ui::UiEvent::UpdateCheckFinished(
+                                                        Err(e.to_string()),
+                                                        true,
+                                                    ),
+                                                );
+                                                ctx.request_repaint();
+                                            }
+                                        }
+                                    });
                                 }
                             }
                         });

@@ -119,6 +119,8 @@ pub struct CrapApp {
     // Smart Tab Switching
     pub last_active_character_id: Option<i64>,
     pub last_active_lorebook_id: Option<i64>,
+    pub check_updates_at_start: bool,
+    pub is_checking_for_updates: bool,
 }
 
 impl CrapApp {
@@ -212,6 +214,8 @@ impl CrapApp {
 
             last_active_character_id: None,
             last_active_lorebook_id: None,
+            check_updates_at_start: true,
+            is_checking_for_updates: false,
         };
 
         // Initialize Settings
@@ -338,6 +342,23 @@ impl CrapApp {
                     let _ = tx.send(UiEvent::SpellCheckSettingLoaded(true)).await;
                 }
                 Err(e) => eprintln!("Failed to load spell check setting: {}", e),
+            }
+        });
+
+        // Initial Check Updates at Start Load
+        let tx = self.tx.clone();
+        let db = self.db.clone();
+        tokio::spawn(async move {
+            match db.get_setting("check_updates_at_start").await {
+                Ok(Some(val)) => {
+                    let enabled = val != "false"; // Default true if present but somehow empty? "false" is explicit false.
+                    let _ = tx.send(UiEvent::CheckUpdatesAtStartLoaded(enabled)).await;
+                }
+                Ok(None) => {
+                    // Default to true
+                    let _ = tx.send(UiEvent::CheckUpdatesAtStartLoaded(true)).await;
+                }
+                Err(e) => eprintln!("Failed to load check updates setting: {}", e),
             }
         });
 

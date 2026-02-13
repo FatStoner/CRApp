@@ -2,6 +2,7 @@ mod deletion;
 mod editing;
 mod import_export;
 mod templates;
+mod updates;
 
 use crate::ui::{AppAction, CrapApp};
 use eframe::egui;
@@ -64,6 +65,10 @@ pub enum PopupState {
         target: crate::ui::ExportTarget,
         settings: AdvancedExportSettings,
     },
+    UpdateAvailable {
+        version: String,
+    },
+    UpToDate,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -137,6 +142,11 @@ pub fn render_popups(ctx: &egui::Context, app: &mut CrapApp) {
         // Template popups
         PopupState::TemplateSelector | PopupState::TemplatePreview { .. } => {
             templates::render_template_popups(ctx, app, &state);
+        }
+
+        // Update popups
+        PopupState::UpdateAvailable { .. } | PopupState::UpToDate => {
+            updates::render_update_popups(ctx, app, &state);
         }
     }
 }

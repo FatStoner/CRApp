@@ -27,43 +27,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 async fn run_app() -> Result<(), Box<dyn std::error::Error>> {
     // Spawn update check in background (non-blocking)
+    // Spawn update check in background (non-blocking)
     #[cfg(not(debug_assertions))]
     {
-        std::thread::spawn(|| {
-            // Run update check in background
-            match updater::check_and_update() {
-                Ok(true) => {
-                    // Update was successful, show notification and restart
-                    rfd::MessageDialog::new()
-                        .set_title("Update Installed")
-                        .set_description("CRApp has been updated to the latest version.\nThe application will now restart.")
-                        .set_level(rfd::MessageLevel::Info)
-                        .show();
+        // We only check if the setting allows it
+        let db_check = Database::init().await.ok();
+        // Note: we can't easily access the DB here properly without init, but we init below.
+        // Actually, we should probably do this AFTER db init or read the file manually?
+        // Simpler: Just spawn it, and inside the thread check the DB?
+        // Or better: Let CrapApp handle it in its init!
+        // Moving update check to CrapApp::new or CrapApp::update is better for access to settings.
+        // BUT, CrapApp::new is synchronous.
 
-                    // Restart the application
-                    if let Err(e) = updater::restart_application() {
-                        eprintln!("Failed to restart application: {}", e);
-                        rfd::MessageDialog::new()
-                            .set_title("Restart Failed")
-                            .set_description(&format!(
-                                "Please restart the application manually.\n\nError: {}",
-                                e
-                            ))
-                            .set_level(rfd::MessageLevel::Warning)
-                            .show();
-                    }
-                }
-                Ok(false) => {
-                    // No update available, continue normally
-                    println!("No updates available");
-                }
-                Err(e) => {
-                    // Update check failed, log but don't block app startup
-                    eprintln!("Update check failed: {}", e);
-                    // Don't show a dialog for update failures to avoid annoying users
-                }
-            }
-        });
+        // Let's defer this to CrapApp initialization where we load settings.
     }
 
     // Initialize Database
