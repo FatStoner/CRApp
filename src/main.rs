@@ -27,7 +27,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 async fn run_app() -> Result<(), Box<dyn std::error::Error>> {
     // Spawn update check in background (non-blocking)
-    // Spawn update check in background (non-blocking)
     #[cfg(not(debug_assertions))]
     {
         // We only check if the setting allows it
