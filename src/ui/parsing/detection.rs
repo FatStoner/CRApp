@@ -6,6 +6,13 @@ pub fn detect_format(lines: &[&str]) -> ImportFormat {
         return ImportFormat::CraveEdit;
     }
 
+    if lines
+        .iter()
+        .any(|l| l.contains("| AfterHours") || l.contains("afterhour.app"))
+    {
+        return ImportFormat::AfterHour;
+    }
+
     if lines.iter().any(|l| l.contains("GirlfriendGPT")) {
         return ImportFormat::GirlfriendGpt;
     }

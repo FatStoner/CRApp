@@ -1,3 +1,4 @@
+pub mod afterhour;
 pub mod charactercard;
 pub mod crave;
 pub mod detection;

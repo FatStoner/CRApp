@@ -1,6 +1,6 @@
 use super::detection::detect_format;
 use super::types::{ImportFormat, ParsedCharacterData, ParsedLorebookData};
-use super::{crave, generic, girlfriendgpt, janitor};
+use super::{afterhour, crave, generic, girlfriendgpt, janitor};
 
 pub fn parse_crappbook_json(json: &str) -> Result<ParsedLorebookData, serde_json::Error> {
     serde_json::from_str(json)
@@ -20,6 +20,7 @@ pub fn parse_clipboard(text: &str) -> ParsedCharacterData {
     match detect_format(&lines) {
         ImportFormat::Edit => generic::parse_edit_view(&lines),
         ImportFormat::CraveEdit => crave::parse_crave_edit_view(&lines),
+        ImportFormat::AfterHour => afterhour::parse_afterhour_view(&lines),
         ImportFormat::GirlfriendGpt => girlfriendgpt::parse_ggpt_view(&lines),
         ImportFormat::JanitorEdit => janitor::parse_janitor_edit(&lines),
         ImportFormat::JanitorProfile => janitor::parse_janitor_profile(&lines),
