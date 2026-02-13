@@ -8,7 +8,7 @@ pub fn render_options_window(app: &mut CrapApp, ctx: &egui::Context) {
     egui::Window::new("Options")
         .collapsible(false)
         .resizable(false)
-        .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
+        .fixed_size([400.0, 500.0])
         .show(ctx, |ui| {
             // Tab Bar
             ui.horizontal(|ui| {
