@@ -149,8 +149,10 @@ pub enum UiEvent {
     BackgroundScaleLoaded(f32),
     GalleryImageAdded(String),
     StatisticsCalculated(StatisticsData),
-    UpdateAvailable(String),
-    UpdateCheckFinished(Result<Option<String>, String>, bool), // (Result, is_manual_check)
+    UpdateAvailable(String, String), // (version, tag)
+    UpdateCheckFinished(Result<Option<(String, String)>, String>, bool), // (Result<(version, tag)>, is_manual_check)
+    UpdateStarted,
+    UpdateFailed(String),
     CheckUpdatesAtStartLoaded(bool),
 }
 

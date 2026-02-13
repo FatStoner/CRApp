@@ -541,15 +541,23 @@ pub fn handle_ui_events(app: &mut CrapApp, ctx: &egui::Context) {
                 app.set_status(msg, color);
             }
 
-            UiEvent::UpdateAvailable(version) => {
-                app.popup_state = PopupState::UpdateAvailable { version };
+            UiEvent::UpdateAvailable(version, tag) => {
+                app.popup_state = PopupState::UpdateAvailable { version, tag };
+            }
+
+            UiEvent::UpdateStarted => {
+                app.popup_state = PopupState::Updating;
+            }
+
+            UiEvent::UpdateFailed(error) => {
+                app.popup_state = PopupState::UpdateError { error };
             }
 
             UiEvent::UpdateCheckFinished(res, is_manual) => {
                 app.is_checking_for_updates = false;
                 match res {
-                    Ok(Some(version)) => {
-                        app.popup_state = PopupState::UpdateAvailable { version };
+                    Ok(Some((version, tag))) => {
+                        app.popup_state = PopupState::UpdateAvailable { version, tag };
                     }
                     Ok(None) => {
                         if is_manual {

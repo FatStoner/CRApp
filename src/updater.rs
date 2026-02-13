@@ -2,28 +2,23 @@ use std::env;
 use std::fs;
 use std::process::Command;
 
-/// Perform the update
-pub fn perform_update(target_version: Option<String>) -> Result<bool, Box<dyn std::error::Error>> {
+/// Perform the update using the specific tag
+pub fn perform_update(tag: String) -> Result<bool, Box<dyn std::error::Error>> {
     // Clean up old executable first
     cleanup_old_executable()?;
 
     let current_version = env!("CARGO_PKG_VERSION");
     println!("Current version: {}", current_version);
 
-    let mut builder = self_update::backends::github::Update::configure();
-    builder
+    let status = self_update::backends::github::Update::configure()
         .repo_owner("JustJam-Dev")
         .repo_name("CRApp")
         .bin_name("crap")
         .target(&get_target_triple())
-        .current_version(current_version);
-
-    if let Some(v) = target_version {
-        builder.target_version_tag(&v);
-    }
-
-    // Build the updater
-    let status = builder.build()?.update()?;
+        .current_version(current_version)
+        .target_version_tag(&tag)
+        .build()?
+        .update()?;
 
     match status {
         self_update::Status::UpToDate(v) => {
@@ -38,8 +33,8 @@ pub fn perform_update(target_version: Option<String>) -> Result<bool, Box<dyn st
 }
 
 /// Check if an update is available without applying it
-/// Returns Ok(Some(version)) if update available, Ok(None) if up to date
-pub fn check_for_updates() -> Result<Option<String>, Box<dyn std::error::Error>> {
+/// Returns Ok(Some((version, tag))) if update available, Ok(None) if up to date
+pub fn check_for_updates() -> Result<Option<(String, String)>, Box<dyn std::error::Error>> {
     let current_version = env!("CARGO_PKG_VERSION");
     let target = get_target_triple(); // Capture outside thread
 
@@ -63,7 +58,8 @@ pub fn check_for_updates() -> Result<Option<String>, Box<dyn std::error::Error>>
         Ok(result) => {
             let updates = result?;
             if self_update::version::bump_is_greater(current_version, &updates.version)? {
-                Ok(Some(updates.version))
+                let tag = format!("v{}", updates.version);
+                Ok(Some((updates.version, tag)))
             } else {
                 Ok(None)
             }

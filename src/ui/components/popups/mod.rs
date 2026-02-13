@@ -67,6 +67,11 @@ pub enum PopupState {
     },
     UpdateAvailable {
         version: String,
+        tag: String,
+    },
+    Updating,
+    UpdateError {
+        error: String,
     },
     UpToDate,
 }
@@ -145,7 +150,10 @@ pub fn render_popups(ctx: &egui::Context, app: &mut CrapApp) {
         }
 
         // Update popups
-        PopupState::UpdateAvailable { .. } | PopupState::UpToDate => {
+        PopupState::UpdateAvailable { .. }
+        | PopupState::UpToDate
+        | PopupState::Updating
+        | PopupState::UpdateError { .. } => {
             updates::render_update_popups(ctx, app, &state);
         }
     }
