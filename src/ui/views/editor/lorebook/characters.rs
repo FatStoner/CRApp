@@ -83,6 +83,11 @@ pub fn render_lorebook_characters(app: &mut CrapApp, ui: &mut egui::Ui, book: &L
                 };
             }
             crate::ui::browser::BrowserAction::OpenCharacter(id) => {
+                // CRITICAL: Restore lorebook ownership before navigation
+                // The lorebook editor took ownership via .take(), so app.selected_lorebook is None.
+                // We need to restore it before load_character() calls push_history(),
+                // otherwise the history won't capture the lorebook ID.
+                app.selected_lorebook = Some(book.clone());
                 app.load_character(id);
             }
             crate::ui::browser::BrowserAction::OpenCollection(_) => {}
