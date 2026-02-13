@@ -123,7 +123,7 @@ pub fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
         ui.separator();
 
         // Tabs
-        ui.horizontal(|ui| {
+        ui.horizontal_wrapped(|ui| {
             ui.selectable_value(
                 &mut app.active_char_tab,
                 CharacterTab::MainData,

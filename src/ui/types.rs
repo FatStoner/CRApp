@@ -20,6 +20,13 @@ pub enum CharacterTab {
 }
 
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
+pub enum SettingsTab {
+    General,
+    Tokens,
+    About,
+}
+
+#[derive(PartialEq, Eq, Clone, Copy, Debug)]
 pub enum LorebookTab {
     Entries,
     Characters,

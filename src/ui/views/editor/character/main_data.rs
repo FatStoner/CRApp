@@ -72,12 +72,7 @@ pub fn render_main_data_tab(
                                 egui::Color32::GREEN,
                             ));
                         }
-                        if ui
-                            .toggle_value(&mut app.count_title_in_total, "count in total")
-                            .changed()
-                        {
-                            app.token_cache.clear();
-                        }
+                        // Token count settings moved to separate tab
                         let mut ignore = character.spell_check_overrides.contains("title");
                         if ui.checkbox(&mut ignore, "Ignore Spell Check").changed() {
                             if ignore {
@@ -636,17 +631,38 @@ pub fn render_main_data_tab(
             ui.add_space(8.0);
 
             // Token Summary
-            let t_first = count_tokens(&character.first_message);
-            let t_pers = count_tokens(&character.personality);
-            let t_scen = count_tokens(&character.scenario);
-            let t_ex = count_tokens(&character.example_dialogue);
+            let t_name = if app.count_name_in_total {
+                count_tokens(&character.name)
+            } else {
+                0
+            };
+            let t_first = if app.count_first_message_in_total {
+                count_tokens(&character.first_message)
+            } else {
+                0
+            };
+            let t_pers = if app.count_personality_in_total {
+                count_tokens(&character.personality)
+            } else {
+                0
+            };
+            let t_scen = if app.count_scenario_in_total {
+                count_tokens(&character.scenario)
+            } else {
+                0
+            };
+            let t_ex = if app.count_example_in_total {
+                count_tokens(&character.example_dialogue)
+            } else {
+                0
+            };
             let t_title = if app.count_title_in_total {
                 count_tokens(&character.char_title)
             } else {
                 0
             };
 
-            let total_tokens = t_first + t_pers + t_scen + t_ex + t_title;
+            let total_tokens = t_name + t_first + t_pers + t_scen + t_ex + t_title;
             let perm_tokens = t_pers + t_scen;
 
             ui.label(
@@ -658,17 +674,38 @@ pub fn render_main_data_tab(
                 .color(egui::Color32::WHITE),
             );
 
-            let c_first = character.first_message.chars().count();
-            let c_pers = character.personality.chars().count();
-            let c_scen = character.scenario.chars().count();
-            let c_ex = character.example_dialogue.chars().count();
+            let c_name = if app.count_name_in_total {
+                character.name.chars().count()
+            } else {
+                0
+            };
+            let c_first = if app.count_first_message_in_total {
+                character.first_message.chars().count()
+            } else {
+                0
+            };
+            let c_pers = if app.count_personality_in_total {
+                character.personality.chars().count()
+            } else {
+                0
+            };
+            let c_scen = if app.count_scenario_in_total {
+                character.scenario.chars().count()
+            } else {
+                0
+            };
+            let c_ex = if app.count_example_in_total {
+                character.example_dialogue.chars().count()
+            } else {
+                0
+            };
             let c_title = if app.count_title_in_total {
                 character.char_title.chars().count()
             } else {
                 0
             };
 
-            let total_chars = c_first + c_pers + c_scen + c_ex + c_title;
+            let total_chars = c_name + c_first + c_pers + c_scen + c_ex + c_title;
             let perm_chars = c_pers + c_scen;
 
             ui.label(

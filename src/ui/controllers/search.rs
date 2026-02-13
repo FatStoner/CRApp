@@ -341,30 +341,52 @@ impl CrapApp {
         self.token_calc_in_progress.insert(character.id);
         let tx = self.tx.clone();
         let char_clone = character.clone();
+
+        // Capture all flags
+        let include_name = self.count_name_in_total;
         let include_title = self.count_title_in_total;
+        let include_first = self.count_first_message_in_total;
+        let include_pers = self.count_personality_in_total;
+        let include_scen = self.count_scenario_in_total;
+        let include_ex = self.count_example_in_total;
 
         tokio::spawn(async move {
             let mut total_tokens = 0;
             let mut total_chars = 0;
 
-            // Note: Editor excludes Name from token count, so we do too.
-            // fields: personality, scenario, example_dialogue, first_message, AND title (optional)
+            if include_pers {
+                let t = crate::models::count_tokens(&char_clone.personality);
+                total_tokens += t;
+                total_chars += char_clone.personality.len();
+            }
 
-            let t_pers = crate::models::count_tokens(&char_clone.personality);
-            let t_scen = crate::models::count_tokens(&char_clone.scenario);
-            let t_ex = crate::models::count_tokens(&char_clone.example_dialogue);
-            let t_first = crate::models::count_tokens(&char_clone.first_message);
+            if include_scen {
+                let t = crate::models::count_tokens(&char_clone.scenario);
+                total_tokens += t;
+                total_chars += char_clone.scenario.len();
+            }
 
-            total_tokens += t_pers + t_scen + t_ex + t_first;
+            if include_ex {
+                let t = crate::models::count_tokens(&char_clone.example_dialogue);
+                total_tokens += t;
+                total_chars += char_clone.example_dialogue.len();
+            }
 
-            total_chars += char_clone.personality.len();
-            total_chars += char_clone.scenario.len();
-            total_chars += char_clone.example_dialogue.len();
-            total_chars += char_clone.first_message.len();
+            if include_first {
+                let t = crate::models::count_tokens(&char_clone.first_message);
+                total_tokens += t;
+                total_chars += char_clone.first_message.len();
+            }
+
+            if include_name {
+                let t = crate::models::count_tokens(&char_clone.name);
+                total_tokens += t;
+                total_chars += char_clone.name.len();
+            }
 
             if include_title {
-                let t_title = crate::models::count_tokens(&char_clone.char_title);
-                total_tokens += t_title;
+                let t = crate::models::count_tokens(&char_clone.char_title);
+                total_tokens += t;
                 total_chars += char_clone.char_title.len();
             }
 

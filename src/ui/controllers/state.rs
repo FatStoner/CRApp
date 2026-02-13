@@ -38,6 +38,7 @@ pub struct CrapApp {
     pub selected_template: Option<Template>,
     pub selected_entry: Option<crate::models::LorebookEntry>,
     pub active_char_tab: CharacterTab,
+    pub active_settings_tab: SettingsTab,
     pub active_lorebook_tab: LorebookTab,
     pub central_view: CentralView,
     pub theme: ThemeMode,
@@ -84,7 +85,12 @@ pub struct CrapApp {
     pub pending_action: Option<AppAction>,
 
     // Preferences
+    pub count_name_in_total: bool,
     pub count_title_in_total: bool,
+    pub count_first_message_in_total: bool,
+    pub count_personality_in_total: bool,
+    pub count_scenario_in_total: bool,
+    pub count_example_in_total: bool,
 
     // Navigation History
     pub navigation_history: Vec<NavigationState>,
@@ -137,6 +143,7 @@ impl CrapApp {
             selected_entry: None,
 
             active_char_tab: CharacterTab::MainData,
+            active_settings_tab: SettingsTab::General,
             active_lorebook_tab: LorebookTab::Entries,
             central_view: CentralView::Browser,
             sort_mode: SortMode::Alphabetical,
@@ -175,7 +182,12 @@ impl CrapApp {
             theme: ThemeMode::System,
             ui_scale: 1.0,
 
-            count_title_in_total: false,
+            count_name_in_total: false,
+            count_title_in_total: true,
+            count_first_message_in_total: true, // Default to true as it's a major section
+            count_personality_in_total: true,
+            count_scenario_in_total: true,
+            count_example_in_total: true,
 
             navigation_history: Vec::new(),
             scale_last_updated: None,
