@@ -23,6 +23,8 @@ pub enum TreeAction {
     ShowStatisticsCollection(i64),
     ShowStatisticsAll,
     ShowStatisticsFavorites,
+    ExportAll,
+    ExportFavorites,
 }
 
 pub fn render_tree(

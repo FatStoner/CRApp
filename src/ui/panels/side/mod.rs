@@ -143,6 +143,10 @@ pub fn render_side_panel(app: &mut CrapApp, ctx: &egui::Context) {
                                     actions.push(TreeAction::ShowStatisticsAll);
                                     ui.close_menu();
                                 }
+                                if ui.button("📤 Export All").clicked() {
+                                    actions.push(TreeAction::ExportAll);
+                                    ui.close_menu();
+                                }
                             });
 
                             let response = ui
@@ -166,6 +170,11 @@ pub fn render_side_panel(app: &mut CrapApp, ctx: &egui::Context) {
                                     actions.push(TreeAction::ShowStatisticsFavorites);
                                     ui.close_menu();
                                 }
+                                if ui.button("📤 Export Favorites").clicked() {
+                                    actions.push(TreeAction::ExportFavorites);
+                                    ui.close_menu();
+                                }
+
                             });
 
                             ui.separator();
@@ -592,6 +601,16 @@ pub fn render_side_panel(app: &mut CrapApp, ctx: &egui::Context) {
                             }).cloned().collect();
                             
                             app.calculate_statistics(chars);
+                        }
+                        TreeAction::ExportAll => {
+                            app.popup_state = crate::ui::PopupState::ExportCollectionOptions {
+                                target: crate::ui::ExportTarget::All,
+                            };
+                        }
+                        TreeAction::ExportFavorites => {
+                            app.popup_state = crate::ui::PopupState::ExportCollectionOptions {
+                                target: crate::ui::ExportTarget::Favorites,
+                            };
                         }
                     }
                 }
