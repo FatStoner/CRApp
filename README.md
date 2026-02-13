@@ -2,7 +2,7 @@
 
 **CRApp** is a high-performance, local-first Desktop Character Manager built with **Rust**, **SQLite**, and **egui**, designed for power users who need distinct organization and deep integration for their character cards and lorebooks.
 
-![Status](https://img.shields.io/badge/Status-Early_Beta-orange)
+![Status](https://img.shields.io/badge/Status-Beta-orange)
 ![License](https://img.shields.io/badge/License-MIT-blue)
 
 ## Overview
