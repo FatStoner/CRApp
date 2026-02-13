@@ -117,7 +117,7 @@ pub fn render_import_export_popups(ctx: &egui::Context, app: &mut CrapApp, state
                     }
 
                     ui.separator();
-                    if ui.button("🛠 Advanced Export...").on_hover_text("Export as Grid Image vs Detailed List.").clicked() {
+                    if ui.button("🛠 Export to one file...").on_hover_text("Export as Grid Image vs Detailed List.").clicked() {
                         app.popup_state = super::PopupState::ExportCollectionAdvanced {
                             target,
                             settings: super::AdvancedExportSettings::default(),
@@ -141,7 +141,7 @@ pub fn render_import_export_popups(ctx: &egui::Context, app: &mut CrapApp, state
             let mut close = false;
             let mut do_export = false;
 
-            egui::Window::new("Advanced Export")
+            egui::Window::new("Export to one file")
                 .collapsible(false)
                 .resizable(false)
                 .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
