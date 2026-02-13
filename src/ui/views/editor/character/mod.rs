@@ -170,27 +170,29 @@ pub fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
         let mut tag_add_request: Option<(i64, String, bool)> = None;
         let mut tag_remove_request: Option<(i64, i64, bool)> = None;
 
-        egui::ScrollArea::vertical().show(ui, |ui| match app.active_char_tab {
-            CharacterTab::MainData => {
-                render_main_data_tab(
-                    app,
-                    ui,
-                    &mut character,
-                    &mut status_update,
-                    &mut tag_add_request,
-                    &mut tag_remove_request,
-                );
-            }
-            CharacterTab::Notes => {
-                render_notes_tab(app, ui, &mut character);
-            }
-            CharacterTab::Lorebooks => {
-                render_lorebooks_tab(app, ui, &mut character, &mut toggle_requests);
-            }
-            CharacterTab::Gallery => {
-                render_gallery_tab(app, ui, &mut character, &mut status_update);
-            }
-        });
+        egui::ScrollArea::vertical()
+            .auto_shrink([false, false])
+            .show(ui, |ui| match app.active_char_tab {
+                CharacterTab::MainData => {
+                    render_main_data_tab(
+                        app,
+                        ui,
+                        &mut character,
+                        &mut status_update,
+                        &mut tag_add_request,
+                        &mut tag_remove_request,
+                    );
+                }
+                CharacterTab::Notes => {
+                    render_notes_tab(app, ui, &mut character);
+                }
+                CharacterTab::Lorebooks => {
+                    render_lorebooks_tab(app, ui, &mut character, &mut toggle_requests);
+                }
+                CharacterTab::Gallery => {
+                    render_gallery_tab(app, ui, &mut character, &mut status_update);
+                }
+            });
 
         if let Some((msg, color)) = status_update {
             app.set_status(msg, color);

@@ -65,14 +65,6 @@ pub fn render_main_data_tab(
                 .show_header(ui, |ui| {
                     ui.label("Title / Description");
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if ui.small_button("Copy").clicked() {
-                            ui.output_mut(|o| o.copied_text = character.char_title.clone());
-                            *status_update = Some((
-                                "Copied Title to clipboard".to_string(),
-                                egui::Color32::GREEN,
-                            ));
-                        }
-                        // Token count settings moved to separate tab
                         let mut ignore = character.spell_check_overrides.contains("title");
                         if ui.checkbox(&mut ignore, "Ignore Spell Check").changed() {
                             if ignore {
@@ -80,6 +72,13 @@ pub fn render_main_data_tab(
                             } else {
                                 character.spell_check_overrides.remove("title");
                             }
+                        }
+                        if ui.small_button("Copy").clicked() {
+                            ui.output_mut(|o| o.copied_text = character.char_title.clone());
+                            *status_update = Some((
+                                "Copied Title to clipboard".to_string(),
+                                egui::Color32::GREEN,
+                            ));
                         }
                         ui.label(
                             egui::RichText::new(format!(
@@ -488,23 +487,137 @@ pub fn render_main_data_tab(
             ui.label("Avatar");
 
             // Show image preview if available
-            if let Some(path_str) = &character.avatar_path {
-                let uri = crate::ui::utils::get_image_uri(path_str);
+            if let Some(path_str) = character.avatar_path.clone() {
+                let uri = crate::ui::utils::get_image_uri(&path_str);
 
                 // Calculate preview size based on available width in this column
                 let preview_width = ui.available_width() - 8.0;
-                ui.add(
+                let response = ui.add(
                     egui::Image::new(uri)
                         .rounding(egui::Rounding::same(4.0))
                         .fit_to_original_size(0.5) // Adjust scaling logic if needed or use max_width
-                        .max_width(preview_width),
+                        .max_width(preview_width)
+                        .sense(egui::Sense::click()),
                 );
 
-                ui.label(path_str);
+                response.context_menu(|ui| {
+                    if ui.button("Copy to Clipboard").clicked() {
+                        match std::fs::read(&path_str) {
+                            Ok(bytes) => match image::load_from_memory(&bytes) {
+                                Ok(dynamic_img) => {
+                                    let rgba = dynamic_img.to_rgba8();
+                                    let img_data = arboard::ImageData {
+                                        width: rgba.width() as usize,
+                                        height: rgba.height() as usize,
+                                        bytes: std::borrow::Cow::from(rgba.into_raw()),
+                                    };
+
+                                    match arboard::Clipboard::new() {
+                                        Ok(mut clipboard) => {
+                                            if let Err(e) = clipboard.set_image(img_data) {
+                                                *status_update = Some((
+                                                    format!("Failed to copy to clipboard: {}", e),
+                                                    egui::Color32::RED,
+                                                ));
+                                            } else {
+                                                *status_update = Some((
+                                                    "Avatar copied to clipboard!".to_string(),
+                                                    egui::Color32::GREEN,
+                                                ));
+                                            }
+                                        }
+                                        Err(e) => {
+                                            *status_update = Some((
+                                                format!("Clipboard access failed: {}", e),
+                                                egui::Color32::RED,
+                                            ));
+                                        }
+                                    }
+                                }
+                                Err(e) => {
+                                    *status_update = Some((
+                                        format!("Failed to load image: {}", e),
+                                        egui::Color32::RED,
+                                    ));
+                                }
+                            },
+                            Err(e) => {
+                                *status_update = Some((
+                                    format!("Failed to read avatar file: {}", e),
+                                    egui::Color32::RED,
+                                ));
+                            }
+                        }
+                        ui.close_menu();
+                    }
+
+                    if ui.button("Open Folder").clicked() {
+                        #[cfg(target_os = "windows")]
+                        {
+                            let _ = std::process::Command::new("explorer")
+                                .arg("/select,")
+                                .arg(path_str.replace("/", "\\"))
+                                .spawn();
+                        }
+
+                        #[cfg(target_os = "linux")]
+                        {
+                            if let Ok(abs_path) = std::fs::canonicalize(&path_str) {
+                                let file_uri = format!("file://{}", abs_path.to_string_lossy());
+                                // Try D-Bus for selection first (standard modern Linux)
+                                let status = std::process::Command::new("dbus-send")
+                                    .args(&[
+                                        "--session",
+                                        "--dest=org.freedesktop.FileManager1",
+                                        "--type=method_call",
+                                        "/org/freedesktop/FileManager1",
+                                        "org.freedesktop.FileManager1.ShowItems",
+                                        &format!("array:string:{}", file_uri),
+                                        "string:\"\"",
+                                    ])
+                                    .status();
+
+                                if status.is_err() || !status.unwrap().success() {
+                                    // Fallback to just opening the parent directory
+                                    if let Some(parent) = abs_path.parent() {
+                                        let _ = std::process::Command::new("xdg-open")
+                                            .arg(parent)
+                                            .spawn();
+                                    }
+                                }
+                            }
+                        }
+
+                        #[cfg(target_os = "macos")]
+                        {
+                            let _ = std::process::Command::new("open")
+                                .arg("-R")
+                                .arg(&path_str)
+                                .spawn();
+                        }
+                        ui.close_menu();
+                    }
+
+                    if ui.button("Change Avatar").clicked() {
+                        if let Some(path) = rfd::FileDialog::new()
+                            .add_filter("image", &["png", "jpg", "jpeg", "webp"])
+                            .pick_file()
+                        {
+                            if let Some(avatar_path) =
+                                app.update_avatar_from_file(path, character.id)
+                            {
+                                character.avatar_path = Some(avatar_path);
+                            }
+                        }
+                        ui.close_menu();
+                    }
+                });
+
+                ui.label(&path_str);
 
                 ui.horizontal(|ui| {
                     if ui.button("Copy to Clipboard").clicked() {
-                        match std::fs::read(path_str) {
+                        match std::fs::read(&path_str) {
                             Ok(bytes) => match image::load_from_memory(&bytes) {
                                 Ok(dynamic_img) => {
                                     let rgba = dynamic_img.to_rgba8();
@@ -563,7 +676,7 @@ pub fn render_main_data_tab(
 
                         #[cfg(target_os = "linux")]
                         {
-                            if let Ok(abs_path) = std::fs::canonicalize(path_str) {
+                            if let Ok(abs_path) = std::fs::canonicalize(&path_str) {
                                 let file_uri = format!("file://{}", abs_path.to_string_lossy());
                                 // Try D-Bus for selection first (standard modern Linux)
                                 let status = std::process::Command::new("dbus-send")
@@ -593,7 +706,7 @@ pub fn render_main_data_tab(
                         {
                             let _ = std::process::Command::new("open")
                                 .arg("-R")
-                                .arg(path_str)
+                                .arg(&path_str)
                                 .spawn();
                         }
                     }

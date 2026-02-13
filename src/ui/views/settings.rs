@@ -151,7 +151,7 @@ pub fn render_options_window(app: &mut CrapApp, ctx: &egui::Context) {
                     SettingsTab::Tokens => {
                         ui.heading("Token Counting");
                         ui.add_space(8.0);
-                        ui.label("Select sections to include in the sidebar token count:");
+                        ui.label("Select sections to include in the total token count:");
 
                         ui.add_space(8.0);
                         ui.horizontal_wrapped(|ui| {
