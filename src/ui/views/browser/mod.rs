@@ -19,6 +19,7 @@ pub enum BrowserAction {
     OpenCharacter(i64),
     OpenCollection(i64),
     ExportCollection(crate::ui::ExportTarget),
+    ShowStatistics(i64),
 }
 
 pub fn render_collection_move_menu(
@@ -740,6 +741,48 @@ pub fn render_browser_view(app: &mut CrapApp, ui: &mut egui::Ui) {
             }
             BrowserAction::ExportCollection(target) => {
                 app.popup_state = crate::ui::PopupState::ExportCollectionOptions { target };
+            }
+            BrowserAction::ShowStatistics(id) => {
+                app.show_statistics_window = true;
+                let name = app
+                    .collections
+                    .iter()
+                    .find(|c| c.id == id)
+                    .map(|c| c.name.clone())
+                    .unwrap_or("Folder".to_string());
+
+                app.statistics_state = Some(crate::ui::types::StatisticsState {
+                    source_name: name,
+                    is_calculating: true,
+                    data: None,
+                });
+
+                // Collect IDs
+                let mut authorized_ids = vec![id];
+                let mut stack = vec![id];
+                while let Some(parent) = stack.pop() {
+                    for c in &app.collections {
+                        if c.parent_id == Some(parent) {
+                            authorized_ids.push(c.id);
+                            stack.push(c.id);
+                        }
+                    }
+                }
+
+                let chars: Vec<crate::models::Character> = app
+                    .characters
+                    .iter()
+                    .filter(|c| {
+                        if let Some(cid) = c.collection_id {
+                            authorized_ids.contains(&cid)
+                        } else {
+                            false
+                        }
+                    })
+                    .cloned()
+                    .collect();
+
+                app.calculate_statistics(chars);
             }
         }
     }

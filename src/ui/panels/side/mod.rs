@@ -130,19 +130,28 @@ pub fn render_side_panel(app: &mut CrapApp, ctx: &egui::Context) {
                         AppMode::Characters => {
                             // Root Characters & Collections
                             // We start with parent_id: None
-                            if ui
-                                .selectable_label(app.viewing_all_characters, "📁 All Characters")
-                                .clicked()
+                            let response = ui
+                                .selectable_label(app.viewing_all_characters, "📁 All Characters");
+                            
+                            if response.clicked()
                             {
                                 actions.push(TreeAction::SwitchToAll);
                             }
+                            
+                            response.context_menu(|ui| {
+                                if ui.button("📊 Statistics").clicked() {
+                                    actions.push(TreeAction::ShowStatisticsAll);
+                                    ui.close_menu();
+                                }
+                            });
 
-                            if ui
+                            let response = ui
                                 .selectable_label(
                                     app.viewing_favorites,
                                     format!("\u{2764} Favorites"),
-                                )
-                                .clicked()
+                                );
+
+                            if response.clicked()
                             {
                                 if app.viewing_favorites {
                                     // Toggle off -> go to Uncategorized (DeselectCollection logic effectively)
@@ -151,6 +160,13 @@ pub fn render_side_panel(app: &mut CrapApp, ctx: &egui::Context) {
                                     actions.push(TreeAction::SwitchToFavorites);
                                 }
                             }
+
+                            response.context_menu(|ui| {
+                                if ui.button("📊 Statistics").clicked() {
+                                    actions.push(TreeAction::ShowStatisticsFavorites);
+                                    ui.close_menu();
+                                }
+                            });
 
                             ui.separator();
 
@@ -523,6 +539,59 @@ pub fn render_side_panel(app: &mut CrapApp, ctx: &egui::Context) {
                                 state.set_open(true);
                                 state.store(ctx);
                             }
+                        }
+                        TreeAction::ShowStatisticsAll => {
+                            app.show_statistics_window = true;
+                            app.statistics_state = Some(crate::ui::types::StatisticsState {
+                                source_name: "All Characters".to_string(),
+                                is_calculating: true,
+                                data: None,
+                            });
+                            // Calculate
+                            let chars = app.characters.clone();
+                            app.calculate_statistics(chars);
+                        }
+                        TreeAction::ShowStatisticsFavorites => {
+                            app.show_statistics_window = true;
+                            app.statistics_state = Some(crate::ui::types::StatisticsState {
+                                source_name: "Favorites".to_string(),
+                                is_calculating: true,
+                                data: None,
+                            });
+                            // Calculate
+                            let chars: Vec<crate::models::Character> = app.characters.iter().filter(|c| c.is_favorite).cloned().collect();
+                            app.calculate_statistics(chars);
+                        }
+                        TreeAction::ShowStatisticsCollection(id) => {
+                             app.show_statistics_window = true;
+                             let name = app.collections.iter().find(|c| c.id == id).map(|c| c.name.clone()).unwrap_or("Folder".to_string());
+                             
+                            app.statistics_state = Some(crate::ui::types::StatisticsState {
+                                source_name: name,
+                                is_calculating: true,
+                                data: None,
+                            });
+                            // Calculate (Recursive)
+                            // Helper to find all descendant IDs
+                            fn get_all_descendant_ids(all_colls: &[crate::models::Collection], parent_id: i64) -> Vec<i64> {
+                                let mut ids = vec![parent_id];
+                                let children: Vec<i64> = all_colls.iter().filter(|c| c.parent_id == Some(parent_id)).map(|c| c.id).collect();
+                                for child in children {
+                                    ids.extend(get_all_descendant_ids(all_colls, child));
+                                }
+                                ids
+                            }
+                            
+                            let allowed_ids = get_all_descendant_ids(&app.collections, id);
+                            let chars: Vec<crate::models::Character> = app.characters.iter().filter(|c| {
+                                if let Some(cid) = c.collection_id {
+                                    allowed_ids.contains(&cid)
+                                } else {
+                                    false
+                                }
+                            }).cloned().collect();
+                            
+                            app.calculate_statistics(chars);
                         }
                     }
                 }

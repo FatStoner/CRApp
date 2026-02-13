@@ -113,6 +113,10 @@ pub fn render_subfolder_card(
             ));
             ui.close_menu();
         }
+        if ui.button("📊 Statistics").clicked() {
+            actions.push(BrowserAction::ShowStatistics(folder.id));
+            ui.close_menu();
+        }
     });
 }
 
@@ -191,6 +195,10 @@ pub fn render_subfolder_list_item(
                         actions.push(BrowserAction::ExportCollection(
                             crate::ui::ExportTarget::Collection(folder.id),
                         ));
+                        ui.close_menu();
+                    }
+                    if ui.button("📊 Statistics").clicked() {
+                        actions.push(BrowserAction::ShowStatistics(folder.id));
                         ui.close_menu();
                     }
                 });

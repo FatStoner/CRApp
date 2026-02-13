@@ -42,6 +42,20 @@ pub fn handle_ui_events(app: &mut CrapApp, ctx: &egui::Context) {
                     app.loading_error = Some(e);
                 }
             },
+            UiEvent::GalleryImageAdded(path) => {
+                if let Some(ctx) = &mut app.gallery_context {
+                    if !ctx.contains(&path) {
+                        ctx.push(path);
+                    }
+                }
+            }
+            UiEvent::StatisticsCalculated(data) => {
+                if let Some(state) = &mut app.statistics_state {
+                    state.data = Some(data);
+                    state.is_calculating = false;
+                }
+                ctx.request_repaint();
+            }
             UiEvent::ThemeLoaded(res) => {
                 if let Ok(mode) = res {
                     app.theme = mode;
@@ -525,12 +539,6 @@ pub fn handle_ui_events(app: &mut CrapApp, ctx: &egui::Context) {
 
             UiEvent::StatusMessage(msg, color) => {
                 app.set_status(msg, color);
-            }
-            UiEvent::GalleryImageAdded(path) => {
-                let uri = crate::ui::utils::get_image_uri(&path);
-                ctx.forget_image(&uri);
-                ctx.request_repaint();
-                app.set_status("Image added to gallery".to_string(), egui::Color32::GREEN);
             }
         }
     }

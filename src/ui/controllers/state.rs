@@ -80,6 +80,9 @@ pub struct CrapApp {
     pub import_text: String,
     pub parsed_data: Option<ParsedCharacterData>,
 
+    pub show_statistics_window: bool,
+    pub statistics_state: Option<StatisticsState>,
+
     pub viewing_all_characters: bool,
     pub viewing_favorites: bool,
     pub pending_action: Option<AppAction>,
@@ -175,6 +178,9 @@ impl CrapApp {
             show_options_window: false,
             import_text: String::new(),
             parsed_data: None,
+
+            show_statistics_window: false,
+            statistics_state: None,
 
             viewing_all_characters: false,
             viewing_favorites: false,

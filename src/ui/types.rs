@@ -147,4 +147,38 @@ pub enum UiEvent {
     SpellCheckSettingLoaded(bool),
     BackgroundScaleLoaded(f32),
     GalleryImageAdded(String),
+    StatisticsCalculated(StatisticsData),
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct StatisticsData {
+    pub character_count: usize,
+    pub total_tokens_avg: f32,
+    pub total_chars_avg: f32,
+
+    // Breakdown averages
+    pub name_tokens_avg: f32,
+    pub name_chars_avg: f32,
+
+    pub title_tokens_avg: f32,
+    pub title_chars_avg: f32,
+
+    pub personality_tokens_avg: f32,
+    pub personality_chars_avg: f32,
+
+    pub scenario_tokens_avg: f32,
+    pub scenario_chars_avg: f32,
+
+    pub first_message_tokens_avg: f32,
+    pub first_message_chars_avg: f32,
+
+    pub example_dialogue_tokens_avg: f32,
+    pub example_dialogue_chars_avg: f32,
+}
+
+#[derive(Clone, Debug)]
+pub struct StatisticsState {
+    pub source_name: String,
+    pub is_calculating: bool,
+    pub data: Option<StatisticsData>,
 }

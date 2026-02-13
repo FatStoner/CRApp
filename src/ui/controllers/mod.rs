@@ -9,6 +9,7 @@ pub mod navigation;
 pub mod search;
 pub mod settings;
 pub mod state;
+pub mod statistics;
 pub mod tags;
 pub mod utils;
 

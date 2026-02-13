@@ -106,6 +106,7 @@ impl eframe::App for CrapApp {
 
         // Global Popups
         components::popups::render_popups(ctx, self);
+        views::statistics::render_statistics_window(self, ctx);
 
         // LIGHTBOX OVERLAY
         components::lightbox::render_lightbox(self, ctx);

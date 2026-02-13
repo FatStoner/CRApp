@@ -20,6 +20,9 @@ pub enum TreeAction {
     FoldAllFolders,
     UnfoldAllFolders,
     ExportCollection(i64),
+    ShowStatisticsCollection(i64),
+    ShowStatisticsAll,
+    ShowStatisticsFavorites,
 }
 
 pub fn render_tree(
@@ -164,6 +167,10 @@ pub fn render_tree(
                 }
                 if ui.button("📤 Export Collection").clicked() {
                     actions.push(TreeAction::ExportCollection(col.id));
+                    ui.close_menu();
+                }
+                if ui.button("📊 Statistics").clicked() {
+                    actions.push(TreeAction::ShowStatisticsCollection(col.id));
                     ui.close_menu();
                 }
                 if ui.button("➕ New Character").clicked() {
