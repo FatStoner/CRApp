@@ -29,3 +29,6 @@ imageproc = "0.23.0"
 rusttype = "0.9"
 html-escape = "0.2"
 egui_cosmic_text = "0.2"
+
+# Force enable features for the version of image used by egui_extras
+image_v25 = { package = "image", version = "0.25", features = ["jpeg", "png"] }
