@@ -1,6 +1,8 @@
 use crate::models::{count_tokens, Lorebook};
+use crate::ui::types::EditorFontFamily;
 use crate::ui::CrapApp;
 use eframe::egui;
+use egui_cosmic_text::cosmic_text::Family;
 
 pub fn render_lorebook_metadata(
     app: &mut CrapApp,
@@ -10,6 +12,12 @@ pub fn render_lorebook_metadata(
     tag_add_request: &mut Option<(i64, String)>,
     tag_remove_request: &mut Option<(i64, i64)>,
 ) {
+    let font_family = match app.editor_font {
+        EditorFontFamily::SansSerif => Family::SansSerif,
+        EditorFontFamily::Serif => Family::Serif,
+        EditorFontFamily::Monospace => Family::Monospace,
+    };
+
     egui::ScrollArea::vertical()
         .max_height(ui.available_height() * 0.45)
         .id_source("lorebook_metadata_scroll")
@@ -28,9 +36,11 @@ pub fn render_lorebook_metadata(
                         crate::ui::components::CodeEditor::new(
                             &mut book.title,
                             "lorebook_title_editor",
+                            font_family,
                         )
                         .single_line()
                         .highlight(app.editor_search_query.clone())
+                        .spell_check(None)
                         .show(
                             ui,
                             &mut app.cosmic_font_system,
@@ -62,9 +72,15 @@ pub fn render_lorebook_metadata(
                         crate::ui::components::CodeEditor::new(
                             &mut book.content,
                             "lorebook_content_editor",
+                            font_family,
                         )
                         .desired_lines(15)
                         .highlight(app.editor_search_query.clone())
+                        .spell_check(if app.enable_spell_check {
+                            app.spell_checker.clone()
+                        } else {
+                            None
+                        })
                         .show(
                             ui,
                             &mut app.cosmic_font_system,

@@ -1,6 +1,8 @@
 use crate::models::{count_tokens, Character};
+use crate::ui::types::EditorFontFamily;
 use crate::ui::CrapApp;
 use eframe::egui;
+use egui_cosmic_text::cosmic_text::Family;
 
 pub fn render_main_data_tab(
     app: &mut CrapApp,
@@ -10,6 +12,12 @@ pub fn render_main_data_tab(
     tag_add_request: &mut Option<(i64, String, bool)>,
     tag_remove_request: &mut Option<(i64, i64, bool)>,
 ) {
+    let font_family = match app.editor_font {
+        EditorFontFamily::SansSerif => Family::SansSerif,
+        EditorFontFamily::Serif => Family::Serif,
+        EditorFontFamily::Monospace => Family::Monospace,
+    };
+
     ui.horizontal(|ui| {
         let available_width = ui.available_width();
         let left_width = available_width * 0.66;
@@ -21,13 +29,14 @@ pub fn render_main_data_tab(
             |ui| {
                 ui.label("Name (File Name)");
                 // File Name (character.name) with search highlight
-                // File Name (character.name)
                 crate::ui::components::CodeEditor::new(
                     &mut character.name,
                     "character_file_name_editor",
+                    font_family,
                 )
                 .single_line()
                 .highlight(app.editor_search_query.clone())
+                .spell_check(None)
                 .show(
                     ui,
                     &mut app.cosmic_font_system,
@@ -42,9 +51,11 @@ pub fn render_main_data_tab(
                 crate::ui::components::CodeEditor::new(
                     &mut character.char_name,
                     "character_real_name_editor",
+                    font_family,
                 )
                 .single_line()
                 .highlight(app.editor_search_query.clone())
+                .spell_check(None)
                 .show(
                     ui,
                     &mut app.cosmic_font_system,
@@ -93,9 +104,19 @@ pub fn render_main_data_tab(
                     crate::ui::components::CodeEditor::new(
                         &mut character.char_title,
                         "char_title_editor",
+                        font_family,
                     )
                     .desired_lines(1)
                     .highlight(app.editor_search_query.clone())
+                    .spell_check(
+                        if app.enable_spell_check
+                            && !character.spell_check_overrides.contains("title")
+                        {
+                            app.spell_checker.clone()
+                        } else {
+                            None
+                        },
+                    )
                     .show(
                         ui,
                         &mut app.cosmic_font_system,
@@ -150,9 +171,19 @@ pub fn render_main_data_tab(
                     crate::ui::components::CodeEditor::new(
                         &mut character.first_message,
                         "first_message_editor",
+                        font_family,
                     )
                     .desired_lines(10)
                     .highlight(app.editor_search_query.clone())
+                    .spell_check(
+                        if app.enable_spell_check
+                            && !character.spell_check_overrides.contains("first_message")
+                        {
+                            app.spell_checker.clone()
+                        } else {
+                            None
+                        },
+                    )
                     .show(
                         ui,
                         &mut app.cosmic_font_system,
@@ -206,9 +237,19 @@ pub fn render_main_data_tab(
                     crate::ui::components::CodeEditor::new(
                         &mut character.personality,
                         "personality_editor",
+                        font_family,
                     )
                     .desired_lines(10)
                     .highlight(app.editor_search_query.clone())
+                    .spell_check(
+                        if app.enable_spell_check
+                            && !character.spell_check_overrides.contains("personality")
+                        {
+                            app.spell_checker.clone()
+                        } else {
+                            None
+                        },
+                    )
                     .show(
                         ui,
                         &mut app.cosmic_font_system,
@@ -261,9 +302,19 @@ pub fn render_main_data_tab(
                     crate::ui::components::CodeEditor::new(
                         &mut character.scenario,
                         "scenario_editor",
+                        font_family,
                     )
                     .desired_lines(8)
                     .highlight(app.editor_search_query.clone())
+                    .spell_check(
+                        if app.enable_spell_check
+                            && !character.spell_check_overrides.contains("scenario")
+                        {
+                            app.spell_checker.clone()
+                        } else {
+                            None
+                        },
+                    )
                     .show(
                         ui,
                         &mut app.cosmic_font_system,
@@ -316,9 +367,19 @@ pub fn render_main_data_tab(
                     crate::ui::components::CodeEditor::new(
                         &mut character.example_dialogue,
                         "example_dialogue_editor",
+                        font_family,
                     )
                     .desired_lines(8)
                     .highlight(app.editor_search_query.clone())
+                    .spell_check(
+                        if app.enable_spell_check
+                            && !character.spell_check_overrides.contains("example")
+                        {
+                            app.spell_checker.clone()
+                        } else {
+                            None
+                        },
+                    )
                     .show(
                         ui,
                         &mut app.cosmic_font_system,
