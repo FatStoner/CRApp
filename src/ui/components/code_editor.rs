@@ -211,7 +211,7 @@ impl<'a> CodeEditor<'a> {
         let font_size = ui
             .style()
             .text_styles
-            .get(&egui::TextStyle::Body)
+            .get(&egui::TextStyle::Monospace)
             .map(|id| id.size)
             .unwrap_or(14.0);
         let line_height_val = font_size * 1.4;
