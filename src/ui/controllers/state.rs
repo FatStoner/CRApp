@@ -121,6 +121,16 @@ pub struct CrapApp {
     pub last_active_lorebook_id: Option<i64>,
     pub check_updates_at_start: bool,
     pub is_checking_for_updates: bool,
+
+    // Cosmic Text Integration
+    pub cosmic_font_system: egui_cosmic_text::cosmic_text::FontSystem,
+    pub cosmic_swash_cache: egui_cosmic_text::cosmic_text::SwashCache,
+    pub cosmic_atlas: egui_cosmic_text::atlas::TextureAtlas,
+    pub cosmic_editors: std::collections::HashMap<
+        String,
+        egui_cosmic_text::widget::CosmicEdit<egui_cosmic_text::widget::FillWidth>,
+    >,
+    pub cosmic_clipboard: arboard::Clipboard,
 }
 
 impl CrapApp {
@@ -216,6 +226,15 @@ impl CrapApp {
             last_active_lorebook_id: None,
             check_updates_at_start: true,
             is_checking_for_updates: false,
+
+            cosmic_font_system: egui_cosmic_text::cosmic_text::FontSystem::new(),
+            cosmic_swash_cache: egui_cosmic_text::cosmic_text::SwashCache::new(),
+            cosmic_atlas: egui_cosmic_text::atlas::TextureAtlas::new(
+                cc.egui_ctx.clone(),
+                egui::Color32::WHITE,
+            ),
+            cosmic_editors: std::collections::HashMap::new(),
+            cosmic_clipboard: arboard::Clipboard::new().expect("Failed to initialize clipboard"),
         };
 
         // Initialize Settings

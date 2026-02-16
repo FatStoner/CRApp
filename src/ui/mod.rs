@@ -15,7 +15,6 @@ pub mod views;
 pub use components::popups::PopupState;
 pub use components::spell_check;
 pub use components::spell_layout;
-pub use components::text_highlight;
 pub use components::widgets;
 pub use controllers::CrapApp;
 
@@ -129,5 +128,7 @@ impl eframe::App for CrapApp {
                     });
                 });
         }
+
+        self.cosmic_atlas.trim();
     }
 }

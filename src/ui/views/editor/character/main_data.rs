@@ -21,40 +21,38 @@ pub fn render_main_data_tab(
             |ui| {
                 ui.label("Name (File Name)");
                 // File Name (character.name) with search highlight
-                {
-                    let mut layouter = crate::ui::spell_layout::create_spell_check_layouter(
-                        None,
-                        app.editor_search_query.clone(),
-                    );
-                    let response = ui.add(
-                        egui::TextEdit::singleline(&mut character.name).layouter(&mut *layouter),
-                    );
-                    crate::ui::widgets::track_text_selection(ui, &response);
-                    response.context_menu(|ui| {
-                        crate::ui::widgets::text_context_menu(ui, &mut character.name, response.id);
-                    });
-                }
+                // File Name (character.name)
+                crate::ui::components::CodeEditor::new(
+                    &mut character.name,
+                    "character_file_name_editor",
+                )
+                .single_line()
+                .highlight(app.editor_search_query.clone())
+                .show(
+                    ui,
+                    &mut app.cosmic_font_system,
+                    &mut app.cosmic_swash_cache,
+                    &mut app.cosmic_atlas,
+                    &mut app.cosmic_editors,
+                    &mut app.cosmic_clipboard,
+                );
 
                 ui.label("Character Name");
-                // Character Name (character.char_name) with search highlight
-                {
-                    let mut layouter = crate::ui::spell_layout::create_spell_check_layouter(
-                        None,
-                        app.editor_search_query.clone(),
-                    );
-                    let response = ui.add(
-                        egui::TextEdit::singleline(&mut character.char_name)
-                            .layouter(&mut *layouter),
-                    );
-                    crate::ui::widgets::track_text_selection(ui, &response);
-                    response.context_menu(|ui| {
-                        crate::ui::widgets::text_context_menu(
-                            ui,
-                            &mut character.char_name,
-                            response.id,
-                        );
-                    });
-                }
+                // Character Name (character.char_name)
+                crate::ui::components::CodeEditor::new(
+                    &mut character.char_name,
+                    "character_real_name_editor",
+                )
+                .single_line()
+                .highlight(app.editor_search_query.clone())
+                .show(
+                    ui,
+                    &mut app.cosmic_font_system,
+                    &mut app.cosmic_swash_cache,
+                    &mut app.cosmic_atlas,
+                    &mut app.cosmic_editors,
+                    &mut app.cosmic_clipboard,
+                );
 
                 let id = ui.make_persistent_id("title_header");
                 egui::collapsing_header::CollapsingState::load_with_default_open(
@@ -92,32 +90,20 @@ pub fn render_main_data_tab(
                     });
                 })
                 .body(|ui| {
-                    // Title (character.char_title) with search highlight AND auto-resize
-                    // Changed to multiline with min_rows(1) for auto-resize behavior
-                    let title_edit = egui::TextEdit::multiline(&mut character.char_title)
-                        .desired_width(f32::INFINITY)
-                        .desired_rows(1);
-                    {
-                        let mut layouter = crate::ui::spell_layout::create_spell_check_layouter(
-                            if app.enable_spell_check
-                                && !character.spell_check_overrides.contains("title")
-                            {
-                                app.spell_checker.clone()
-                            } else {
-                                None
-                            },
-                            app.editor_search_query.clone(),
-                        );
-                        let response = ui.add(title_edit.layouter(&mut *layouter));
-                        crate::ui::widgets::track_text_selection(ui, &response);
-                        response.context_menu(|ui| {
-                            crate::ui::widgets::text_context_menu(
-                                ui,
-                                &mut character.char_title,
-                                response.id,
-                            );
-                        });
-                    }
+                    crate::ui::components::CodeEditor::new(
+                        &mut character.char_title,
+                        "char_title_editor",
+                    )
+                    .desired_lines(1)
+                    .highlight(app.editor_search_query.clone())
+                    .show(
+                        ui,
+                        &mut app.cosmic_font_system,
+                        &mut app.cosmic_swash_cache,
+                        &mut app.cosmic_atlas,
+                        &mut app.cosmic_editors,
+                        &mut app.cosmic_clipboard,
+                    );
                 });
 
                 ui.add_space(8.0);
@@ -161,29 +147,20 @@ pub fn render_main_data_tab(
                     });
                 })
                 .body(|ui| {
-                    let text_edit = egui::TextEdit::multiline(&mut character.first_message)
-                        .desired_width(f32::INFINITY);
-                    {
-                        let mut layouter = crate::ui::spell_layout::create_spell_check_layouter(
-                            if app.enable_spell_check
-                                && !character.spell_check_overrides.contains("first_message")
-                            {
-                                app.spell_checker.clone()
-                            } else {
-                                None
-                            },
-                            app.editor_search_query.clone(),
-                        );
-                        let response = ui.add(text_edit.layouter(&mut *layouter));
-                        crate::ui::widgets::track_text_selection(ui, &response);
-                        response.context_menu(|ui| {
-                            crate::ui::widgets::text_context_menu(
-                                ui,
-                                &mut character.first_message,
-                                response.id,
-                            );
-                        });
-                    }
+                    crate::ui::components::CodeEditor::new(
+                        &mut character.first_message,
+                        "first_message_editor",
+                    )
+                    .desired_lines(10)
+                    .highlight(app.editor_search_query.clone())
+                    .show(
+                        ui,
+                        &mut app.cosmic_font_system,
+                        &mut app.cosmic_swash_cache,
+                        &mut app.cosmic_atlas,
+                        &mut app.cosmic_editors,
+                        &mut app.cosmic_clipboard,
+                    );
                 });
 
                 ui.add_space(8.0);
@@ -226,29 +203,20 @@ pub fn render_main_data_tab(
                     });
                 })
                 .body(|ui| {
-                    let text_edit = egui::TextEdit::multiline(&mut character.personality)
-                        .desired_width(f32::INFINITY);
-                    {
-                        let mut layouter = crate::ui::spell_layout::create_spell_check_layouter(
-                            if app.enable_spell_check
-                                && !character.spell_check_overrides.contains("personality")
-                            {
-                                app.spell_checker.clone()
-                            } else {
-                                None
-                            },
-                            app.editor_search_query.clone(),
-                        );
-                        let response = ui.add(text_edit.layouter(&mut *layouter));
-                        crate::ui::widgets::track_text_selection(ui, &response);
-                        response.context_menu(|ui| {
-                            crate::ui::widgets::text_context_menu(
-                                ui,
-                                &mut character.personality,
-                                response.id,
-                            );
-                        });
-                    }
+                    crate::ui::components::CodeEditor::new(
+                        &mut character.personality,
+                        "personality_editor",
+                    )
+                    .desired_lines(10)
+                    .highlight(app.editor_search_query.clone())
+                    .show(
+                        ui,
+                        &mut app.cosmic_font_system,
+                        &mut app.cosmic_swash_cache,
+                        &mut app.cosmic_atlas,
+                        &mut app.cosmic_editors,
+                        &mut app.cosmic_clipboard,
+                    );
                 });
 
                 ui.add_space(8.0);
@@ -290,29 +258,20 @@ pub fn render_main_data_tab(
                     });
                 })
                 .body(|ui| {
-                    let text_edit = egui::TextEdit::multiline(&mut character.scenario)
-                        .desired_width(f32::INFINITY);
-                    {
-                        let mut layouter = crate::ui::spell_layout::create_spell_check_layouter(
-                            if app.enable_spell_check
-                                && !character.spell_check_overrides.contains("scenario")
-                            {
-                                app.spell_checker.clone()
-                            } else {
-                                None
-                            },
-                            app.editor_search_query.clone(),
-                        );
-                        let response = ui.add(text_edit.layouter(&mut *layouter));
-                        crate::ui::widgets::track_text_selection(ui, &response);
-                        response.context_menu(|ui| {
-                            crate::ui::widgets::text_context_menu(
-                                ui,
-                                &mut character.scenario,
-                                response.id,
-                            );
-                        });
-                    }
+                    crate::ui::components::CodeEditor::new(
+                        &mut character.scenario,
+                        "scenario_editor",
+                    )
+                    .desired_lines(8)
+                    .highlight(app.editor_search_query.clone())
+                    .show(
+                        ui,
+                        &mut app.cosmic_font_system,
+                        &mut app.cosmic_swash_cache,
+                        &mut app.cosmic_atlas,
+                        &mut app.cosmic_editors,
+                        &mut app.cosmic_clipboard,
+                    );
                 });
 
                 ui.add_space(8.0);
@@ -354,29 +313,20 @@ pub fn render_main_data_tab(
                     });
                 })
                 .body(|ui| {
-                    let text_edit = egui::TextEdit::multiline(&mut character.example_dialogue)
-                        .desired_width(f32::INFINITY);
-                    {
-                        let mut layouter = crate::ui::spell_layout::create_spell_check_layouter(
-                            if app.enable_spell_check
-                                && !character.spell_check_overrides.contains("example")
-                            {
-                                app.spell_checker.clone()
-                            } else {
-                                None
-                            },
-                            app.editor_search_query.clone(),
-                        );
-                        let response = ui.add(text_edit.layouter(&mut *layouter));
-                        crate::ui::widgets::track_text_selection(ui, &response);
-                        response.context_menu(|ui| {
-                            crate::ui::widgets::text_context_menu(
-                                ui,
-                                &mut character.example_dialogue,
-                                response.id,
-                            );
-                        });
-                    }
+                    crate::ui::components::CodeEditor::new(
+                        &mut character.example_dialogue,
+                        "example_dialogue_editor",
+                    )
+                    .desired_lines(8)
+                    .highlight(app.editor_search_query.clone())
+                    .show(
+                        ui,
+                        &mut app.cosmic_font_system,
+                        &mut app.cosmic_swash_cache,
+                        &mut app.cosmic_atlas,
+                        &mut app.cosmic_editors,
+                        &mut app.cosmic_clipboard,
+                    );
                 });
 
                 egui::CollapsingHeader::new("Tags & Metadata")

@@ -239,7 +239,7 @@ fn render_lorebook_import(
             ui.label(egui::RichText::new("To import: Go to lorebook page, right click empty space -> Inspect Element.\nFind the first <html ...> line, right click -> Copy -> Copy outerHTML.").size(11.0).color(egui::Color32::GRAY));
 
             egui::ScrollArea::vertical()
-                .id_salt("import_source_scroll")
+                .id_source("import_source_scroll")
                 .max_height(200.0)
                 .show(ui, |ui| {
                     ui.add(
@@ -261,7 +261,7 @@ fn render_lorebook_import(
             if let Some(data) = &parsed_data {
                 ui.heading("Preview");
                 egui::ScrollArea::vertical()
-                    .id_salt("import_preview_scroll")
+                    .id_source("import_preview_scroll")
                     .max_height(150.0)
                     .show(ui, |ui| {
                         egui::Grid::new("import_preview_grid").num_columns(2).show(

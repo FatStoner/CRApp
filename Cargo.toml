@@ -5,7 +5,7 @@ edition = "2021"
 repository = "https://github.com/JustJam-Dev/CRApp"
 
 [dependencies]
-eframe = "0.29"
+eframe = "0.28"
 tokio = { version = "1", features = ["full"] }
 sqlx = { version = "0.8", features = ["runtime-tokio", "sqlite", "macros", "chrono", "migrate"] }
 serde = { version = "1", features = ["derive"] }
@@ -13,7 +13,7 @@ serde_json = "1.0"
 chrono = { version = "0.4", features = ["serde"] }
 image = "0.24"
 tiktoken-rs = "0.5"
-egui_extras = { version = "0.29", features = ["image", "all_loaders"] }
+egui_extras = { version = "0.28", features = ["image", "all_loaders"] }
 rfd = "0.17.1"
 base64 = "0.21"
 png = "0.17"
@@ -28,3 +28,4 @@ self_update = { version = "0.41", features = ["archive-zip", "compression-zip-de
 imageproc = "0.23.0"
 rusttype = "0.9"
 html-escape = "0.2"
+egui_cosmic_text = "0.2"

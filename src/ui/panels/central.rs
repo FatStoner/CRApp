@@ -65,7 +65,7 @@ pub fn render_central_panel(app: &mut CrapApp, ctx: &egui::Context) {
                         ui.separator();
                         
                         egui::ScrollArea::vertical()
-                            .id_salt("review_parsed_data_scroll") // unique id
+                            .id_source("review_parsed_data_scroll") // unique id
                             .auto_shrink([false, false]) // Don't shrink to content, fill window
                             .show(ui, |ui| {
                                 let data = app.parsed_data.as_mut().unwrap(); // FIX: Define data inside the closure!

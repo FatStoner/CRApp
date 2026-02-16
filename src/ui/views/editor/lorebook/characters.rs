@@ -29,7 +29,7 @@ pub fn render_lorebook_characters(app: &mut CrapApp, ui: &mut egui::Ui, book: &L
         ui.label("Go to a Character -> Lorebooks tab to link them.");
     } else {
         egui::ScrollArea::vertical()
-            .id_salt("lore_chars_scroll")
+            .id_source("lore_chars_scroll")
             .show(ui, |ui| {
                 ui.horizontal_wrapped(|ui| {
                     for char in &linked_chars {

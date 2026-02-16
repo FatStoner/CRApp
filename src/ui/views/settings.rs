@@ -66,7 +66,7 @@ pub fn render_options_window(app: &mut CrapApp, ctx: &egui::Context) {
                             let current_scale = (app.ui_scale * 100.0).round() as i32;
                             let mut selected = current_scale;
 
-                            egui::ComboBox::from_id_salt("scale_combo_options")
+                            egui::ComboBox::from_id_source("scale_combo_options")
                                 .selected_text(format!("{}%", current_scale))
                                 .show_ui(ui, |ui| {
                                     for p in (50..=200).step_by(10) {

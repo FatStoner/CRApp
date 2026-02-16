@@ -69,7 +69,7 @@ pub fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                 })
                 .unwrap_or_else(|| "Uncategorized".to_string());
 
-            egui::ComboBox::from_id_salt("collection_combo")
+            egui::ComboBox::from_id_source("collection_combo")
                 .selected_text(current_col_name)
                 .show_ui(ui, |ui| {
                     ui.selectable_value(&mut character.collection_id, None, "Uncategorized");
@@ -98,7 +98,7 @@ pub fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
             ui.label("🔍 Search:");
             let response = ui.add(
                 egui::TextEdit::singleline(&mut app.editor_search_query)
-                    .id_salt("editor_search_field")
+                    .id_source("editor_search_field")
                     .hint_text("Type 3+ chars to highlight...")
                     .desired_width(200.0),
             );

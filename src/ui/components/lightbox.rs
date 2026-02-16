@@ -131,7 +131,7 @@ pub fn render_lightbox(app: &mut CrapApp, ctx: &egui::Context) {
                 ui.painter()
                     .rect_filled(control_rect, 20.0, egui::Color32::from_black_alpha(200));
 
-                ui.allocate_new_ui(egui::UiBuilder::new().max_rect(control_rect), |ui| {
+                ui.allocate_ui_at_rect(control_rect, |ui| {
                     ui.horizontal_centered(|ui| {
                         if ui.button("➖").clicked() {
                             app.gallery_zoom = (app.gallery_zoom - 0.1).max(0.1);

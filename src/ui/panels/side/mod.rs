@@ -285,11 +285,8 @@ pub fn render_side_panel(app: &mut CrapApp, ctx: &egui::Context) {
                                         ui.painter().rect_filled(highlight_rect, 4.0, bg_color);
                                     }
 
-                                    ui.allocate_new_ui(
-                                        egui::UiBuilder::new().max_rect(rect).layout(
-                                            egui::Layout::left_to_right(egui::Align::Center),
-                                        ),
-                                        |ui| {
+                                    ui.allocate_ui_at_rect(rect, |ui| {
+                                        ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
                                             ui.add_space(6.0);
                                             // Thumbnail
                                             let thumb_size = 40.0;
@@ -314,8 +311,8 @@ pub fn render_side_panel(app: &mut CrapApp, ctx: &egui::Context) {
                                                     .selectable(false)
                                                     .sense(egui::Sense::hover()),
                                             );
-                                        },
-                                    );
+                                        });
+                                    });
 
                                     response.context_menu(|ui| {
                                         if ui.button("Delete").clicked() {
@@ -365,11 +362,8 @@ pub fn render_side_panel(app: &mut CrapApp, ctx: &egui::Context) {
                                         ui.painter().rect_filled(highlight_rect, 4.0, bg_color);
                                     }
 
-                                    ui.allocate_new_ui(
-                                        egui::UiBuilder::new().max_rect(rect).layout(
-                                            egui::Layout::left_to_right(egui::Align::Center),
-                                        ),
-                                        |ui| {
+                                    ui.allocate_ui_at_rect(rect, |ui| {
+                                        ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
                                             ui.add_space(6.0);
                                             // Icon
                                             let thumb_size = 40.0;
@@ -400,8 +394,8 @@ pub fn render_side_panel(app: &mut CrapApp, ctx: &egui::Context) {
                                                     .color(egui::Color32::LIGHT_BLUE);
                                             }
                                             ui.add(egui::Label::new(label_text).selectable(false));
-                                        },
-                                    );
+                                        });
+                                    });
 
                                     response.context_menu(|ui| {
                                         if ui.button("Delete").clicked() {

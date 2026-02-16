@@ -113,7 +113,7 @@ pub fn render_deep_search(app: &mut CrapApp, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
             ui.label("Folder:");
 
-            egui::ComboBox::from_id_salt("deep_search_folder_filter")
+            egui::ComboBox::from_id_source("deep_search_folder_filter")
                 .selected_text(if let Some(coll_id) = app.deep_search_filter_collection {
                     app.collections
                         .iter()

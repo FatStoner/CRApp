@@ -12,7 +12,7 @@ pub fn render_lorebook_metadata(
 ) {
     egui::ScrollArea::vertical()
         .max_height(ui.available_height() * 0.45)
-        .id_salt("lorebook_metadata_scroll")
+        .id_source("lorebook_metadata_scroll")
         .show(ui, |ui| {
             let total_width = ui.available_width();
             let right_width = (total_width * 0.35).max(160.0).min(300.0);
@@ -25,21 +25,20 @@ pub fn render_lorebook_metadata(
                     egui::Layout::top_down(egui::Align::Min),
                     |ui| {
                         ui.label("Title");
-                        if app.editor_search_query.len() >= 3 {
-                            let mut layouter = crate::ui::text_highlight::create_highlight_layouter(
-                                app.editor_search_query.clone(),
-                            );
-                            ui.add(
-                                egui::TextEdit::singleline(&mut book.title)
-                                    .desired_width(f32::INFINITY)
-                                    .layouter(&mut layouter),
-                            );
-                        } else {
-                            ui.add(
-                                egui::TextEdit::singleline(&mut book.title)
-                                    .desired_width(f32::INFINITY),
-                            );
-                        }
+                        crate::ui::components::CodeEditor::new(
+                            &mut book.title,
+                            "lorebook_title_editor",
+                        )
+                        .single_line()
+                        .highlight(app.editor_search_query.clone())
+                        .show(
+                            ui,
+                            &mut app.cosmic_font_system,
+                            &mut app.cosmic_swash_cache,
+                            &mut app.cosmic_atlas,
+                            &mut app.cosmic_editors,
+                            &mut app.cosmic_clipboard,
+                        );
                         ui.add_space(8.0);
 
                         ui.horizontal(|ui| {
@@ -59,21 +58,21 @@ pub fn render_lorebook_metadata(
                                 },
                             );
                         });
-                        if app.editor_search_query.len() >= 3 {
-                            let mut layouter = crate::ui::text_highlight::create_highlight_layouter(
-                                app.editor_search_query.clone(),
-                            );
-                            ui.add(
-                                egui::TextEdit::multiline(&mut book.content)
-                                    .desired_width(f32::INFINITY)
-                                    .layouter(&mut layouter),
-                            );
-                        } else {
-                            ui.add(
-                                egui::TextEdit::multiline(&mut book.content)
-                                    .desired_width(f32::INFINITY),
-                            );
-                        }
+
+                        crate::ui::components::CodeEditor::new(
+                            &mut book.content,
+                            "lorebook_content_editor",
+                        )
+                        .desired_lines(15)
+                        .highlight(app.editor_search_query.clone())
+                        .show(
+                            ui,
+                            &mut app.cosmic_font_system,
+                            &mut app.cosmic_swash_cache,
+                            &mut app.cosmic_atlas,
+                            &mut app.cosmic_editors,
+                            &mut app.cosmic_clipboard,
+                        );
                         ui.add_space(8.0);
 
                         // Tags Section

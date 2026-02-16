@@ -236,7 +236,7 @@ pub fn render_browser_view(app: &mut CrapApp, ui: &mut egui::Ui) {
             ui.add_space(8.0);
             ui.add_space(8.0);
 
-            egui::ComboBox::from_id_salt("view_mode_selector")
+            egui::ComboBox::from_id_source("view_mode_selector")
                 .selected_text(match app.browser_view_mode {
                     BrowserViewMode::Grid => "View: Grid",
                     BrowserViewMode::List => "View: List",
