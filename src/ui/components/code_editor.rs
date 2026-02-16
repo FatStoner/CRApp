@@ -1,7 +1,7 @@
 use eframe::egui;
 use egui_cosmic_text::{
     atlas::TextureAtlas,
-    cosmic_text::{Attrs, Color, Cursor, Edit, Family, FontSystem, Selection, Shaping, SwashCache},
+    cosmic_text::{Action, Attrs, Color, Cursor, Edit, Family, FontSystem, Motion, Selection, Shaping, SwashCache},
     widget::{CosmicEdit, EditorActions, FillWidth, HoverStrategy, Interactivity, LayoutMode, LineHeight},
 };
 use std::collections::HashMap;
@@ -235,9 +235,11 @@ impl<'a> CodeEditor<'a> {
         // 3. State Tracking (Golden Sync Logic) + Highlight Check
         let last_model_text_id = ui.make_persistent_id(format!("{}_last_model_text", self.id));
         let last_search_query_id = ui.make_persistent_id(format!("{}_last_search_query", self.id));
+        let cursor_req_id = ui.make_persistent_id(format!("{}_cursor_req", self.id));
         
         let last_model_text: Option<String> = ui.data(|d| d.get_temp(last_model_text_id));
         let last_search_query: Option<String> = ui.data(|d| d.get_temp(last_search_query_id));
+        let cursor_req: Option<bool> = ui.data(|d| d.get_temp(cursor_req_id));
 
         // Use string comparison for query to avoid TypeId issues with Option<String> persistence
         let current_query_str = self.search_query.as_deref().unwrap_or("");
@@ -245,6 +247,20 @@ impl<'a> CodeEditor<'a> {
 
         let query_changed = last_query_str != current_query_str;
         let text_changed = last_model_text.as_ref() != Some(self.text);
+
+        // Handle deferred cursor request
+        if cursor_req.unwrap_or(false) {
+             let mut editor = cosmic_edit.into_editor();
+             editor.action(font_system, Action::Motion(Motion::BufferEnd));
+             
+             cosmic_edit = CosmicEdit::from_editor(
+                editor,
+                Interactivity::Enabled,
+                HoverStrategy::Widget,
+                FillWidth::default(),
+            );
+            ui.data_mut(|d| d.remove_temp::<bool>(cursor_req_id));
+        }
 
         // detect external change or query change
         if text_changed || query_changed {
@@ -287,7 +303,7 @@ impl<'a> CodeEditor<'a> {
                     let min_height = self.desired_lines as f32 * line_height_val;
                     ui.set_min_height(min_height);
 
-                    let resp = cosmic_edit.ui(
+                    let mut resp = cosmic_edit.ui(
                         ui,
                         font_system,
                         swash_cache,
@@ -298,6 +314,17 @@ impl<'a> CodeEditor<'a> {
                             id: self.id.clone(),
                         },
                     );
+
+                    // Click-to-focus on empty space
+                    let available = ui.available_rect_before_wrap();
+                    if available.height() > 0.0 {
+                        let filler_resp = ui.allocate_rect(available, egui::Sense::click());
+                        if filler_resp.clicked() {
+                            resp.request_focus();
+                            ui.data_mut(|d| d.insert_temp(cursor_req_id, true));
+                            ui.ctx().request_repaint();
+                        }
+                    }
 
                     // Robust Keyboard Overrides
                     if resp.has_focus() {
@@ -371,3 +398,4 @@ impl<'a> CodeEditor<'a> {
         response
     }
 }
+
