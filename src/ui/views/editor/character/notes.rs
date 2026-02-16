@@ -1,26 +1,42 @@
 use crate::models::Character;
+use crate::ui::types::EditorFontFamily;
 use crate::ui::CrapApp;
 use eframe::egui;
+use egui_cosmic_text::cosmic_text::Family;
 
 pub fn render_notes_tab(app: &mut CrapApp, ui: &mut egui::Ui, character: &mut Character) {
+    let font_family = match app.editor_font {
+        EditorFontFamily::SansSerif => Family::SansSerif,
+        EditorFontFamily::Serif => Family::Serif,
+        EditorFontFamily::Monospace => Family::Monospace,
+    };
+
     ui.label("Notes");
-    let width = ui.ctx().screen_rect().width() * 2.0 / 3.0;
-    let text_edit = egui::TextEdit::multiline(&mut character.author_notes).desired_width(width);
-    {
-        let mut layouter = crate::ui::spell_layout::create_spell_check_layouter(
-            if app.enable_spell_check && !character.spell_check_overrides.contains("notes") {
-                app.spell_checker.clone()
-            } else {
-                None
-            },
-            app.editor_search_query.clone(),
-        );
-        let response = ui.add(text_edit.layouter(&mut *layouter));
-        crate::ui::widgets::track_text_selection(ui, &response);
-        response.context_menu(|ui| {
-            crate::ui::widgets::text_context_menu(ui, &mut character.author_notes, response.id);
-        });
-    }
+    let _width = ui.ctx().screen_rect().width() * 2.0 / 3.0;
+
+    // Author's Notes with CodeEditor
+    crate::ui::components::CodeEditor::new(
+        &mut character.author_notes,
+        "author_notes_editor",
+        font_family,
+    )
+    .desired_lines(15)
+    .highlight(app.editor_search_query.clone())
+    .spell_check(
+        if app.enable_spell_check && !character.spell_check_overrides.contains("notes") {
+            app.spell_checker.clone()
+        } else {
+            None
+        },
+    )
+    .show(
+        ui,
+        &mut app.cosmic_font_system,
+        &mut app.cosmic_swash_cache,
+        &mut app.cosmic_atlas,
+        &mut app.cosmic_editors,
+        &mut app.cosmic_clipboard,
+    );
 
     ui.add_space(16.0);
     ui.separator();

@@ -14,7 +14,7 @@ pub mod views;
 // Re-exports for backward compatibility and convenience
 pub use components::popups::PopupState;
 pub use components::spell_check;
-pub use components::spell_layout;
+// pub use components::spell_layout;
 pub use components::widgets;
 pub use controllers::CrapApp;
 

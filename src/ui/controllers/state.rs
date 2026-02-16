@@ -111,6 +111,7 @@ pub struct CrapApp {
     pub show_background: bool,
     pub background_scale: f32,
     pub enable_spell_check: bool,
+    pub editor_font: EditorFontFamily,
 
     // Gallery Zoom
     pub gallery_zoom: f32,
@@ -218,6 +219,7 @@ impl CrapApp {
             show_background: true,
             background_scale: 0.9,
             enable_spell_check: true,
+            editor_font: EditorFontFamily::SansSerif,
 
             gallery_zoom: 1.0,
             gallery_pan: egui::vec2(0.0, 0.0),
@@ -378,6 +380,21 @@ impl CrapApp {
                     let _ = tx.send(UiEvent::CheckUpdatesAtStartLoaded(true)).await;
                 }
                 Err(e) => eprintln!("Failed to load check updates setting: {}", e),
+            }
+        });
+
+        // Initial Editor Font Load
+        let tx = self.tx.clone();
+        let db = self.db.clone();
+        tokio::spawn(async move {
+            match db.get_setting("editor_font").await {
+                Ok(Some(val)) => {
+                    if let Ok(font) = val.parse::<EditorFontFamily>() {
+                        let _ = tx.send(UiEvent::EditorFontLoaded(font)).await;
+                    }
+                }
+                Ok(None) => {}
+                Err(e) => eprintln!("Failed to load editor font setting: {}", e),
             }
         });
 

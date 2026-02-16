@@ -6,6 +6,7 @@
 .db.old
 crap_data.db.old
 *.exe
+data/gallery
 data/avatars/
 data/covers/
 data/collection_images
@@ -13,6 +14,7 @@ Docs/
 *.crapp
 *.json
 *.png
+*.jpg
 .agent/
 deploy.sh
 exports/

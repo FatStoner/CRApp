@@ -1,5 +1,5 @@
 use crate::models::ThemeMode;
-use crate::ui::types::SettingsTab;
+use crate::ui::types::{EditorFontFamily, SettingsTab};
 use crate::ui::CrapApp;
 use eframe::egui;
 
@@ -56,6 +56,47 @@ pub fn render_options_window(app: &mut CrapApp, ctx: &egui::Context) {
                             if ui.checkbox(&mut enabled, "Enable Spell Check").changed() {
                                 app.set_spell_check(enabled);
                             }
+                        });
+
+                        ui.add_space(8.0);
+
+                        // Font Selector
+                        ui.horizontal(|ui| {
+                            ui.label("Field Font:");
+                            egui::ComboBox::from_id_source("font_combo_options")
+                                .selected_text(app.editor_font.to_string())
+                                .show_ui(ui, |ui| {
+                                    if ui
+                                        .selectable_value(
+                                            &mut app.editor_font,
+                                            EditorFontFamily::SansSerif,
+                                            "SansSerif",
+                                        )
+                                        .clicked()
+                                    {
+                                        app.set_editor_font(EditorFontFamily::SansSerif);
+                                    }
+                                    if ui
+                                        .selectable_value(
+                                            &mut app.editor_font,
+                                            EditorFontFamily::Serif,
+                                            "Serif",
+                                        )
+                                        .clicked()
+                                    {
+                                        app.set_editor_font(EditorFontFamily::Serif);
+                                    }
+                                    if ui
+                                        .selectable_value(
+                                            &mut app.editor_font,
+                                            EditorFontFamily::Monospace,
+                                            "Monospace",
+                                        )
+                                        .clicked()
+                                    {
+                                        app.set_editor_font(EditorFontFamily::Monospace);
+                                    }
+                                });
                         });
 
                         ui.add_space(8.0);

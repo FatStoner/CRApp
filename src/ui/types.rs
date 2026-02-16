@@ -102,6 +102,36 @@ pub struct NavigationState {
     pub active_lorebook_tab: LorebookTab,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum EditorFontFamily {
+    SansSerif,
+    Serif,
+    Monospace,
+}
+
+impl ToString for EditorFontFamily {
+    fn to_string(&self) -> String {
+        match self {
+            EditorFontFamily::SansSerif => "SansSerif".to_string(),
+            EditorFontFamily::Serif => "Serif".to_string(),
+            EditorFontFamily::Monospace => "Monospace".to_string(),
+        }
+    }
+}
+
+impl std::str::FromStr for EditorFontFamily {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "SansSerif" => Ok(EditorFontFamily::SansSerif),
+            "Serif" => Ok(EditorFontFamily::Serif),
+            "Monospace" => Ok(EditorFontFamily::Monospace),
+            _ => Err(()),
+        }
+    }
+}
+
 pub enum UiEvent {
     UiRepaint, // Generic repaint signal
     DeepSearchCompleted(Result<Vec<DeepSearchResult>, String>),
@@ -147,6 +177,7 @@ pub enum UiEvent {
     BackgroundLoaded(bool),
     SpellCheckSettingLoaded(bool),
     BackgroundScaleLoaded(f32),
+    EditorFontLoaded(EditorFontFamily),
     GalleryImageAdded(String),
     StatisticsCalculated(StatisticsData),
     UpdateAvailable(String, String), // (version, tag)

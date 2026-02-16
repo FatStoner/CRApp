@@ -1,5 +1,6 @@
 use super::state::CrapApp;
 use crate::models::ThemeMode;
+use crate::ui::types::EditorFontFamily;
 use eframe::egui;
 
 impl CrapApp {
@@ -91,6 +92,15 @@ impl CrapApp {
         let val = enabled.to_string();
         tokio::spawn(async move {
             let _ = db.set_setting("check_updates_at_start", &val).await;
+        });
+    }
+
+    pub fn set_editor_font(&mut self, font: EditorFontFamily) {
+        self.editor_font = font;
+        let db = self.db.clone();
+        let val = font.to_string();
+        tokio::spawn(async move {
+            let _ = db.set_setting("editor_font", &val).await;
         });
     }
 }

@@ -1,7 +1,9 @@
 use crate::models::{count_tokens, Lorebook, LorebookEntry};
+use crate::ui::types::EditorFontFamily;
 use crate::ui::CrapApp;
 use arboard::Clipboard;
 use eframe::egui;
+use egui_cosmic_text::cosmic_text::Family;
 
 pub fn render_lorebook_entries(
     app: &mut CrapApp,
@@ -11,6 +13,12 @@ pub fn render_lorebook_entries(
     entry_add_req: &mut bool,
     status_update: &mut Option<(String, egui::Color32)>,
 ) {
+    let font_family = match app.editor_font {
+        EditorFontFamily::SansSerif => Family::SansSerif,
+        EditorFontFamily::Serif => Family::Serif,
+        EditorFontFamily::Monospace => Family::Monospace,
+    };
+
     // --- Master-Detail Entries View ---
     ui.allocate_ui(ui.available_size(), |ui| {
         ui.columns(2, |columns| {
@@ -24,9 +32,15 @@ pub fn render_lorebook_entries(
                         crate::ui::components::CodeEditor::new(
                             &mut entry.name,
                             format!("lore_entry_name_{}", entry.id),
+                            font_family,
                         )
                         .single_line()
                         .highlight(app.editor_search_query.clone())
+                        .spell_check(if app.enable_spell_check {
+                            app.spell_checker.clone()
+                        } else {
+                            None
+                        })
                         .show(
                             ui,
                             &mut app.cosmic_font_system,
@@ -40,9 +54,15 @@ pub fn render_lorebook_entries(
                         crate::ui::components::CodeEditor::new(
                             &mut entry.keywords,
                             format!("lore_entry_keywords_{}", entry.id),
+                            font_family,
                         )
                         .single_line()
                         .highlight(app.editor_search_query.clone())
+                        .spell_check(if app.enable_spell_check {
+                            app.spell_checker.clone()
+                        } else {
+                            None
+                        })
                         .show(
                             ui,
                             &mut app.cosmic_font_system,
@@ -80,9 +100,15 @@ pub fn render_lorebook_entries(
                                 crate::ui::components::CodeEditor::new(
                                     &mut entry.content,
                                     format!("lore_entry_content_{}", entry.id), // Using entry.id for unique ID
+                                    font_family,
                                 )
                                 .desired_lines(15)
                                 .highlight(app.editor_search_query.clone())
+                                .spell_check(if app.enable_spell_check {
+                                    app.spell_checker.clone()
+                                } else {
+                                    None
+                                })
                                 .show(
                                     ui,
                                     &mut app.cosmic_font_system,

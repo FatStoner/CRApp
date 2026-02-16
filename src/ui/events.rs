@@ -87,6 +87,9 @@ pub fn handle_ui_events(app: &mut CrapApp, ctx: &egui::Context) {
             UiEvent::SpellCheckSettingLoaded(enabled) => {
                 app.enable_spell_check = enabled;
             }
+            UiEvent::EditorFontLoaded(font) => {
+                app.editor_font = font;
+            }
             UiEvent::LoreLinksBulkLoaded(map) => {
                 app.char_lore_map = map;
             }
