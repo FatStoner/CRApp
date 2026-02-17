@@ -15,6 +15,7 @@ pub struct CodeEditor<'a> {
     text: &'a mut String,
     id: String,
     desired_lines: usize,
+    max_lines: Option<usize>,
     is_single_line: bool,
     search_query: Option<String>,
     font_family: Family<'a>,
@@ -102,6 +103,7 @@ impl<'a> CodeEditor<'a> {
             text,
             id: id.into(),
             desired_lines: 10,
+            max_lines: None,
             is_single_line: false,
             search_query: None,
             font_family,
@@ -113,6 +115,11 @@ impl<'a> CodeEditor<'a> {
 
     pub fn desired_lines(mut self, lines: usize) -> Self {
         self.desired_lines = lines;
+        self
+    }
+
+    pub fn max_lines(mut self, lines: usize) -> Self {
+        self.max_lines = Some(lines);
         self
     }
 
@@ -375,6 +382,9 @@ impl<'a> CodeEditor<'a> {
                         ui.set_min_height(min_height);
                         if self.is_single_line {
                             ui.set_max_height(min_height);
+                        } else if let Some(max_l) = self.max_lines {
+                            let max_height = max_l as f32 * line_height_val;
+                            ui.set_max_height(max_height);
                         }
 
                         if self.is_single_line {
@@ -536,9 +546,26 @@ impl<'a> CodeEditor<'a> {
                         }
 
                         // Click-to-focus on empty space
-                        let available = ui.available_rect_before_wrap();
-                        if available.height() > 0.0 {
-                            let filler_resp = ui.allocate_rect(available, egui::Sense::click());
+                        // Click-to-focus on empty space
+                        // Determine how much space is left to reach min_height (desired_lines)
+                        // We use min_height because desired_lines dictates the minimum visual size.
+                        // available_rect_before_wrap() might be large if max_height is set, so we constrain it manually.
+
+                        let current_used_height = ui.min_rect().height();
+                        // Note: current_used_height inside this Ui might just be cosmic_edit height + padding.
+
+                        let target_min_height = if self.is_single_line {
+                            0.0 // No filler for single line needed usually, but logic holds
+                        } else {
+                            self.desired_lines as f32 * line_height_val
+                        };
+
+                        let remaining_to_min = (target_min_height - current_used_height).max(0.0);
+
+                        if remaining_to_min > 0.0 {
+                            let (id, rect) = ui
+                                .allocate_space(egui::vec2(ui.available_width(), remaining_to_min));
+                            let filler_resp = ui.interact(rect, id, egui::Sense::click());
                             if filler_resp.clicked() {
                                 resp.request_focus();
                                 ui.data_mut(|d| d.insert_temp(cursor_req_id, true));

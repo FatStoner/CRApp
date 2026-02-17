@@ -99,6 +99,17 @@ impl Database {
                 }
             });
 
+        // 4. Ensure 'quick_notes' in 'characters'
+        let _ =
+            sqlx::query("ALTER TABLE characters ADD COLUMN quick_notes TEXT NOT NULL DEFAULT ''")
+                .execute(&pool)
+                .await
+                .map_err(|e| {
+                    if !e.to_string().contains("duplicate column name") {
+                        eprintln!("Warning: Failed to add quick_notes column: {}", e);
+                    }
+                });
+
         Ok(Database { pool })
     }
 

@@ -854,6 +854,29 @@ pub fn render_main_data_tab(
                 .strong()
                 .color(egui::Color32::WHITE),
             );
+
+            ui.add_space(16.0);
+            ui.separator();
+            ui.label("Quick Notes");
+            crate::ui::components::CodeEditor::new(
+                &mut character.quick_notes,
+                "quick_notes_editor",
+                font_family,
+            )
+            .desired_lines(2)
+            .max_lines(30)
+            .font_size_offset(if app.editor_large_font { 2.0 } else { 0.0 })
+            .bright_mode(app.editor_bright_mode)
+            .highlight(app.editor_search_query.clone())
+            .spell_check(None)
+            .show(
+                ui,
+                &mut app.cosmic_font_system,
+                &mut app.cosmic_swash_cache,
+                &mut app.cosmic_atlas,
+                &mut app.cosmic_editors,
+                &mut app.cosmic_clipboard,
+            );
         });
     });
 }

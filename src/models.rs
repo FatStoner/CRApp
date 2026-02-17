@@ -78,6 +78,8 @@ pub struct Character {
     pub updated_at: DateTime<Utc>,
     pub collection_id: Option<i64>,
     #[sqlx(default)]
+    pub quick_notes: String,
+    #[sqlx(default)]
     pub is_favorite: bool,
     pub spell_check_overrides_json: Option<String>,
     #[sqlx(skip)]
@@ -106,6 +108,7 @@ impl Default for Character {
             created_at: Utc::now(),
             updated_at: Utc::now(),
             collection_id: None,
+            quick_notes: "".to_string(),
             is_favorite: false,
             spell_check_overrides_json: None,
             spell_check_overrides: std::collections::HashSet::new(),
@@ -128,6 +131,7 @@ impl Character {
             && self.author_notes == other.author_notes
             && self.avatar_path == other.avatar_path
             && self.collection_id == other.collection_id
+            && self.quick_notes == other.quick_notes
             && self.is_favorite == other.is_favorite
             && self.spell_check_overrides == other.spell_check_overrides
             && self
