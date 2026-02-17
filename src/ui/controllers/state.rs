@@ -134,7 +134,7 @@ pub struct CrapApp {
         egui_cosmic_text::widget::CosmicEdit<egui_cosmic_text::widget::FillWidth>,
     >,
     pub cosmic_clipboard: arboard::Clipboard,
-    pub gallery_cache: HashMap<i64, std::sync::Arc<Vec<String>>>,
+    pub gallery_cache: HashMap<i64, std::sync::Arc<Vec<GalleryImage>>>,
     pub gallery_loading: HashSet<i64>,
 }
 

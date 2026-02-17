@@ -242,16 +242,27 @@ The `CodeEditor` (wrapper around `cosmic-text`) is optimized for large files (10
 
 ---
 
+### 5. **Asynchronous Asset Management**
+
+The Character Gallery uses a multi-stage loading pipeline to maintain 60fps responsiveness during scrolling:
+
+- **Background Scanning**: Directory enumeration and file filtering are offloaded to background threads.
+- **On-Demand Thumbnailing**: High-resolution images are automatically downscaled (300px max) on the first load and cached in `data/.thumbnails`.
+- **Pre-calculated URIs**: `file://` URIs are generated in background threads, eliminating per-frame string allocations and path resolutions.
+- **Reference-Counted Caching**: Gallery data is stored in `Arc<Vec<GalleryImage>>`, allowing zero-copy sharing between UI and background tasks.
+
+---
+
 ## Benefits of Current Architecture
 
 ✅ **Maintainability** - Small, focused files are easier to understand and modify
 ✅ **Testability** - Clear separation allows unit testing of controllers
 ✅ **Scalability** - Easy to add new views, controllers, or components
 ✅ **Readability** - Logical organization makes codebase navigation intuitive
-✅ **Performance** - No impact on runtime, only compile-time organization
+✅ **Performance** - Heavy assets and large files are handled via culling, hashing, and background threading.
 
 ---
 
 *Last Updated: 2026-02-17*
-*Total UI LOC: 13,000+*
-*Modules: 40+ files across 12 directories*
+*Total UI LOC: 13,500+*
+*Modules: 45+ files across 12 directories*

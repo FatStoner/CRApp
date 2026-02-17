@@ -180,14 +180,16 @@ impl CrapApp {
             Err(e) => Err(format!("Clipboard access failed: {}", e)),
         }
     }
-    /// Load gallery images asynchronously
+    /// Load gallery images asynchronously with thumbnail generation
     pub fn load_gallery_images_async(&self, character_id: i64) {
         let tx = self.tx.clone();
         tokio::spawn(async move {
             let gallery_dir = format!("data/gallery/{}", character_id);
+            let thumb_dir = format!("data/.thumbnails/{}", character_id);
             let _ = std::fs::create_dir_all(&gallery_dir);
+            let _ = std::fs::create_dir_all(&thumb_dir);
 
-            let mut files = Vec::new();
+            let mut images = Vec::new();
             if let Ok(entries) = std::fs::read_dir(&gallery_dir) {
                 for entry in entries.flatten() {
                     if let Ok(file_type) = entry.file_type() {
@@ -199,16 +201,54 @@ impl CrapApp {
                                 .map(|s| s.to_lowercase())
                             {
                                 if ["png", "jpg", "jpeg", "webp"].contains(&ext.as_str()) {
-                                    files.push(path.to_string_lossy().to_string());
+                                    let filename = path.file_name().unwrap().to_string_lossy();
+                                    let thumb_path = std::path::Path::new(&thumb_dir)
+                                        .join(format!("{}.png", filename));
+
+                                    let original_path_str = path.to_string_lossy().to_string();
+
+                                    // Thumbnail logic
+                                    let mut needs_thumb = true;
+                                    if thumb_path.exists() {
+                                        if let (Ok(orig_meta), Ok(thumb_meta)) = (
+                                            std::fs::metadata(&path),
+                                            std::fs::metadata(&thumb_path),
+                                        ) {
+                                            if let (Ok(orig_time), Ok(thumb_time)) =
+                                                (orig_meta.modified(), thumb_meta.modified())
+                                            {
+                                                if thumb_time > orig_time {
+                                                    needs_thumb = false;
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    if needs_thumb {
+                                        if let Ok(img) = image::open(&path) {
+                                            // Resize to 300px max while preserving aspect ratio
+                                            let thumb = img.thumbnail(300, 300);
+                                            let _ = thumb.save(&thumb_path);
+                                        }
+                                    }
+
+                                    let thumb_uri = crate::ui::utils::get_image_uri(
+                                        &thumb_path.to_string_lossy(),
+                                    );
+
+                                    images.push(crate::ui::types::GalleryImage {
+                                        path: original_path_str,
+                                        thumbnail_uri: thumb_uri,
+                                    });
                                 }
                             }
                         }
                     }
                 }
             }
-            files.sort();
+            images.sort_by(|a, b| a.path.cmp(&b.path));
             let _ = tx
-                .send(UiEvent::GalleryImagesLoaded(character_id, files))
+                .send(UiEvent::GalleryImagesLoaded(character_id, images))
                 .await;
             let _ = tx.send(UiEvent::UiRepaint).await;
         });

@@ -13,7 +13,7 @@ pub mod lorebooks;
 pub mod tags;
 pub mod templates;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Database {
     pub pool: Pool<Sqlite>,
 }

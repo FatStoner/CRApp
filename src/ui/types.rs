@@ -132,6 +132,13 @@ impl std::str::FromStr for EditorFontFamily {
     }
 }
 
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct GalleryImage {
+    pub path: String,
+    pub thumbnail_uri: String,
+}
+
+#[derive(Clone, Debug)]
 pub enum UiEvent {
     UiRepaint, // Generic repaint signal
     DeepSearchCompleted(Result<Vec<DeepSearchResult>, String>),
@@ -181,7 +188,7 @@ pub enum UiEvent {
     EditorLargeFontLoaded(bool),
     EditorBrightModeLoaded(bool),
     GalleryImageAdded(String),
-    GalleryImagesLoaded(i64, Vec<String>),
+    GalleryImagesLoaded(i64, Vec<GalleryImage>),
     StatisticsCalculated(StatisticsData),
     UpdateAvailable(String, String), // (version, tag)
     UpdateCheckFinished(Result<Option<(String, String)>, String>, bool), // (Result<(version, tag)>, is_manual_check)

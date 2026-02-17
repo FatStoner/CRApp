@@ -50,22 +50,13 @@ pub fn handle_ui_events(app: &mut CrapApp, ctx: &egui::Context) {
                     }
                 }
 
-                // Update Gallery Cache
-                // We don't know the character ID easily here without parsing the path or passing it.
-                // However, the path contains the character ID: data/gallery/{id}/{filename}
-                // Let's try to extract it.
+                // Trigger reload to ensure thumbnail is generated
                 let path_obj = std::path::Path::new(&path);
                 if let Some(parent) = path_obj.parent() {
                     if let Some(file_name) = parent.file_name() {
                         if let Some(id_str) = file_name.to_str() {
                             if let Ok(id) = id_str.parse::<i64>() {
-                                if let Some(arc_vec) = app.gallery_cache.get_mut(&id) {
-                                    let vec = std::sync::Arc::make_mut(arc_vec);
-                                    if !vec.contains(&path) {
-                                        vec.push(path);
-                                        vec.sort();
-                                    }
-                                }
+                                app.load_gallery_images_async(id);
                             }
                         }
                     }

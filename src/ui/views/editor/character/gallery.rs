@@ -54,9 +54,10 @@ pub fn render_gallery_tab(
             app.load_gallery_images_async(character.id);
 
             // Create a temp list of paths to forget images, using what we had
-            for path_str in files.iter() {
-                let uri = crate::ui::utils::get_image_uri(path_str);
-                ui.ctx().forget_image(&uri);
+            for img in files.iter() {
+                ui.ctx().forget_image(&img.thumbnail_uri);
+                let full_uri = crate::ui::utils::get_image_uri(&img.path);
+                ui.ctx().forget_image(&full_uri);
             }
             ui.ctx().request_repaint();
         }
@@ -80,16 +81,13 @@ pub fn render_gallery_tab(
 
     egui::ScrollArea::vertical().show(ui, |ui| {
         ui.horizontal_wrapped(|ui| {
-            for path_str in files.iter() {
-                // Use get_image_uri to handle caching and protocol
-                let uri = crate::ui::utils::get_image_uri(path_str);
-
+            for img in files.iter() {
                 let size = 150.0;
                 let (rect, response) =
                     ui.allocate_exact_size(egui::vec2(size, size), egui::Sense::click());
 
                 if ui.is_rect_visible(rect) {
-                    crate::ui::widgets::paint_gallery_image(ui, rect, &uri, 4.0);
+                    crate::ui::widgets::paint_gallery_image(ui, rect, &img.thumbnail_uri, 4.0);
                 }
 
                 // Hover
@@ -102,12 +100,13 @@ pub fn render_gallery_tab(
                 }
 
                 if response.clicked() {
-                    app.fullscreen_image = Some(uri.clone());
+                    let full_uri = crate::ui::utils::get_image_uri(&img.path);
+                    app.fullscreen_image = Some(full_uri);
                     // Update gallery context for lightbox navigation
                     app.gallery_context = Some(
                         files
                             .iter()
-                            .map(|p| crate::ui::utils::get_image_uri(p))
+                            .map(|i| crate::ui::utils::get_image_uri(&i.path))
                             .collect(),
                     );
                     app.gallery_zoom = 1.0;
@@ -117,7 +116,7 @@ pub fn render_gallery_tab(
                 response.context_menu(|ui| {
                     if ui.button("🗑 Delete").clicked() {
                         app.popup_state = crate::ui::PopupState::DeleteGalleryImageConfirmation {
-                            path: path_str.clone(),
+                            path: img.path.clone(),
                         };
                         ui.close_menu();
                     }
