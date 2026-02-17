@@ -181,6 +181,7 @@ pub enum UiEvent {
     EditorLargeFontLoaded(bool),
     EditorBrightModeLoaded(bool),
     GalleryImageAdded(String),
+    GalleryImagesLoaded(i64, Vec<String>),
     StatisticsCalculated(StatisticsData),
     UpdateAvailable(String, String), // (version, tag)
     UpdateCheckFinished(Result<Option<(String, String)>, String>, bool), // (Result<(version, tag)>, is_manual_check)

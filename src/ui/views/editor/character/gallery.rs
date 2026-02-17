@@ -16,29 +16,19 @@ pub fn render_gallery_tab(
     );
     ui.add_space(8.0);
 
-    let gallery_dir = format!("data/gallery/{}", character.id);
-    let _ = std::fs::create_dir_all(&gallery_dir);
-
-    let mut files = Vec::new();
-    if let Ok(entries) = std::fs::read_dir(&gallery_dir) {
-        for entry in entries.flatten() {
-            if let Ok(file_type) = entry.file_type() {
-                if file_type.is_file() {
-                    let path = entry.path();
-                    if let Some(ext) = path
-                        .extension()
-                        .and_then(|e| e.to_str())
-                        .map(|s| s.to_lowercase())
-                    {
-                        if ["png", "jpg", "jpeg", "webp"].contains(&ext.as_str()) {
-                            files.push(path);
-                        }
-                    }
-                }
-            }
+    // Async Loading Logic
+    let files = if let Some(cached_files) = app.gallery_cache.get(&character.id) {
+        cached_files.clone()
+    } else {
+        // Trigger load if not already loading
+        if !app.gallery_loading.contains(&character.id) {
+            app.gallery_loading.insert(character.id);
+            app.load_gallery_images_async(character.id);
         }
-    }
-    files.sort();
+        std::sync::Arc::new(Vec::new())
+    };
+
+    let is_loading = app.gallery_loading.contains(&character.id);
 
     // Add Image Button
     ui.horizontal(|ui| {
@@ -58,9 +48,14 @@ pub fn render_gallery_tab(
             }
         }
         if ui.button("🔄 Refresh").clicked() {
-            for path in &files {
-                let path_str = path.to_string_lossy().to_string();
-                let uri = crate::ui::utils::get_image_uri(&path_str);
+            // Clear cache and reload
+            app.gallery_cache.remove(&character.id);
+            app.gallery_loading.insert(character.id);
+            app.load_gallery_images_async(character.id);
+
+            // Create a temp list of paths to forget images, using what we had
+            for path_str in files.iter() {
+                let uri = crate::ui::utils::get_image_uri(path_str);
                 ui.ctx().forget_image(&uri);
             }
             ui.ctx().request_repaint();
@@ -68,20 +63,26 @@ pub fn render_gallery_tab(
         if ui.button("📂 Open Folder").clicked() {
             #[cfg(target_os = "linux")]
             {
+                let gallery_dir = format!("data/gallery/{}", character.id);
+                let _ = std::fs::create_dir_all(&gallery_dir);
                 if let Ok(abs_path) = std::fs::canonicalize(&gallery_dir) {
                     let _ = std::process::Command::new("xdg-open").arg(abs_path).spawn();
                 }
             }
+        }
+
+        if is_loading {
+            ui.spinner();
+            ui.label("Loading...");
         }
     });
     ui.add_space(8.0);
 
     egui::ScrollArea::vertical().show(ui, |ui| {
         ui.horizontal_wrapped(|ui| {
-            for path in &files {
-                let path_str = path.to_string_lossy().to_string();
+            for path_str in files.iter() {
                 // Use get_image_uri to handle caching and protocol
-                let uri = crate::ui::utils::get_image_uri(&path_str);
+                let uri = crate::ui::utils::get_image_uri(path_str);
 
                 let size = 150.0;
                 let (rect, response) =
@@ -102,10 +103,11 @@ pub fn render_gallery_tab(
 
                 if response.clicked() {
                     app.fullscreen_image = Some(uri.clone());
+                    // Update gallery context for lightbox navigation
                     app.gallery_context = Some(
                         files
                             .iter()
-                            .map(|p| crate::ui::utils::get_image_uri(&p.to_string_lossy()))
+                            .map(|p| crate::ui::utils::get_image_uri(p))
                             .collect(),
                     );
                     app.gallery_zoom = 1.0;
@@ -115,7 +117,7 @@ pub fn render_gallery_tab(
                 response.context_menu(|ui| {
                     if ui.button("🗑 Delete").clicked() {
                         app.popup_state = crate::ui::PopupState::DeleteGalleryImageConfirmation {
-                            path: path.to_string_lossy().to_string(),
+                            path: path_str.clone(),
                         };
                         ui.close_menu();
                     }

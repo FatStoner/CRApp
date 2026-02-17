@@ -134,6 +134,8 @@ pub struct CrapApp {
         egui_cosmic_text::widget::CosmicEdit<egui_cosmic_text::widget::FillWidth>,
     >,
     pub cosmic_clipboard: arboard::Clipboard,
+    pub gallery_cache: HashMap<i64, std::sync::Arc<Vec<String>>>,
+    pub gallery_loading: HashSet<i64>,
 }
 
 impl CrapApp {
@@ -241,6 +243,8 @@ impl CrapApp {
             ),
             cosmic_editors: std::collections::HashMap::new(),
             cosmic_clipboard: arboard::Clipboard::new().expect("Failed to initialize clipboard"),
+            gallery_cache: HashMap::new(),
+            gallery_loading: HashSet::new(),
         };
 
         // Initialize Settings

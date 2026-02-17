@@ -180,4 +180,37 @@ impl CrapApp {
             Err(e) => Err(format!("Clipboard access failed: {}", e)),
         }
     }
+    /// Load gallery images asynchronously
+    pub fn load_gallery_images_async(&self, character_id: i64) {
+        let tx = self.tx.clone();
+        tokio::spawn(async move {
+            let gallery_dir = format!("data/gallery/{}", character_id);
+            let _ = std::fs::create_dir_all(&gallery_dir);
+
+            let mut files = Vec::new();
+            if let Ok(entries) = std::fs::read_dir(&gallery_dir) {
+                for entry in entries.flatten() {
+                    if let Ok(file_type) = entry.file_type() {
+                        if file_type.is_file() {
+                            let path = entry.path();
+                            if let Some(ext) = path
+                                .extension()
+                                .and_then(|e| e.to_str())
+                                .map(|s| s.to_lowercase())
+                            {
+                                if ["png", "jpg", "jpeg", "webp"].contains(&ext.as_str()) {
+                                    files.push(path.to_string_lossy().to_string());
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            files.sort();
+            let _ = tx
+                .send(UiEvent::GalleryImagesLoaded(character_id, files))
+                .await;
+            let _ = tx.send(UiEvent::UiRepaint).await;
+        });
+    }
 }

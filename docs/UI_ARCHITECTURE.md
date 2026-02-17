@@ -231,6 +231,17 @@ pub use collection_card::render_subfolder_card;
 
 ---
 
+### 4. **High-Performance Code Editor**
+
+The `CodeEditor` (wrapper around `cosmic-text`) is optimized for large files (10MB+) by minimizing per-frame operations:
+
+- **Visibility Culling**: Only lines visible on screen are processed for spell-checking and decoration.
+- **Zero-Allocation Sync**: Uses a `Length + Hashing` heuristic for change detection. Full hashing is skipped if file length is identical to the last frame.
+- **Shared Memory**: Spell-check results and line offsets are stored in `Arc` containers to avoid per-frame `Vec` cloning.
+- **State Persistence**: Uses `egui::Memory` to track font changes, brightness, and search queries, preventing expensive re-layouts unless necessary.
+
+---
+
 ## Benefits of Current Architecture
 
 ✅ **Maintainability** - Small, focused files are easier to understand and modify

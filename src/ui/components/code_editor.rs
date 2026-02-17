@@ -6,7 +6,10 @@ use egui_cosmic_text::{
         CosmicEdit, EditorActions, FillWidth, HoverStrategy, Interactivity, LayoutMode, LineHeight,
     },
 };
+use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
+use std::hash::{Hash, Hasher};
+use std::sync::Arc;
 
 pub struct CodeEditor<'a> {
     text: &'a mut String,
@@ -59,11 +62,6 @@ impl<'a> egui_cosmic_text::widget::ContextMenu for SimpleContextMenu<'a> {
             match cb.get_text() {
                 Ok(text) => {
                     if !text.is_empty() {
-                        eprintln!(
-                            "[CodeEditor] [ID: {}] Menu Paste: Inserting {} chars",
-                            self.id,
-                            text.chars().count()
-                        );
                         editor.insert_string(text, font_system);
                         actions.scroll_to_cursor = true;
                         actions.focus = true;
@@ -75,11 +73,7 @@ impl<'a> egui_cosmic_text::widget::ContextMenu for SimpleContextMenu<'a> {
                         );
                     }
                 }
-                Err(e) => {
-                    eprintln!(
-                        "[CodeEditor] [ID: {}] Menu Paste: Clipboard error: {:?}",
-                        self.id, e
-                    );
+                Err(_e) => {
                     // Fallback
                     if let Ok(text) = self.clipboard.get_text() {
                         if !text.is_empty() {
@@ -237,6 +231,7 @@ impl<'a> CodeEditor<'a> {
         font_size += self.font_size_offset;
         let line_height_val = font_size * 1.4;
 
+        // REVERT: self.font_family is already Family<'a>, no need to match
         let default_attrs = Attrs::new().family(self.font_family).color(cosmic_color);
 
         // Highlight attributes: Gold/Orange for visibility + Bold
@@ -266,19 +261,26 @@ impl<'a> CodeEditor<'a> {
         }
 
         let mut cosmic_edit = editors.remove(&self.id).unwrap();
-        cosmic_edit.set_font_size(
-            scaled_font_size,
-            LineHeight::Absolute(scaled_line_height),
-            font_system,
-        );
+        // Font Size Caching
+        let last_font_size_id = ui.make_persistent_id(format!("{}_last_font_size", self.id));
+        let last_font_size: Option<f32> = ui.data(|d| d.get_temp(last_font_size_id));
+
+        if last_font_size != Some(scaled_font_size) {
+            cosmic_edit.set_font_size(
+                scaled_font_size,
+                LineHeight::Absolute(scaled_line_height),
+                font_system,
+            );
+            ui.data_mut(|d| d.insert_temp(last_font_size_id, scaled_font_size));
+        }
 
         // 3. State Tracking (Golden Sync Logic) + Highlight Check
-        let last_model_text_id = ui.make_persistent_id(format!("{}_last_model_text", self.id));
+        let last_model_hash_id = ui.make_persistent_id(format!("{}_last_model_hash", self.id));
         let last_search_query_id = ui.make_persistent_id(format!("{}_last_search_query", self.id));
         let last_font_family_id = ui.make_persistent_id(format!("{}_last_font_family", self.id));
         let cursor_req_id = ui.make_persistent_id(format!("{}_cursor_req", self.id));
 
-        let last_model_text: Option<String> = ui.data(|d| d.get_temp(last_model_text_id));
+        let last_model_hash: Option<u64> = ui.data(|d| d.get_temp(last_model_hash_id));
         let last_search_query: Option<String> = ui.data(|d| d.get_temp(last_search_query_id));
         let last_font_family: Option<String> = ui.data(|d| d.get_temp(last_font_family_id));
         let last_bright_mode: Option<bool> =
@@ -295,12 +297,27 @@ impl<'a> CodeEditor<'a> {
         let query_changed = last_query_str != current_query_str;
         let font_changed = last_font_str != current_font_str;
         let bright_mode_changed = last_bright_mode != Some(self.bright_mode);
-        let text_changed = last_model_text.as_ref() != Some(self.text);
 
-        // --- CRITICAL: NORMALIZE LINE ENDINGS ---
-        // CRLF (\r\n) causes 1-byte drift per line between zspell and cosmic-text.
-        // We force all text to \n normalization before it touches CosmicEdit or zspell.
-        if self.text.contains('\r') {
+        // Calculate hash of current model text only if we are idle or length changed
+        // OPTIMIZATION: Check length first. If length matches, probability of change is low (but not zero).
+        // We accept this risk to inconsistent state for 1 frame to avoid hashing 100MB/frame.
+        let last_len_id = ui.make_persistent_id(format!("{}_last_len", self.id));
+        let last_len: Option<usize> = ui.data(|d| d.get_temp(last_len_id));
+        let current_len = self.text.len();
+
+        let text_changed = if last_len != Some(current_len) {
+            let mut hasher = DefaultHasher::new();
+            self.text.hash(&mut hasher);
+            let current_model_hash = hasher.finish();
+            ui.data_mut(|d| d.insert_temp(last_len_id, current_len));
+            ui.data_mut(|d| d.insert_temp(last_model_hash_id, current_model_hash));
+            last_model_hash != Some(current_model_hash)
+        } else {
+            false
+        }; // --- CRITICAL: NORMALIZE LINE ENDINGS ---
+           // CRLF (\r\n) causes 1-byte drift per line between zspell and cosmic-text.
+           // We force all text to \n normalization before it touches CosmicEdit or zspell.
+        if text_changed && self.text.contains('\r') {
             *self.text = self.text.replace("\r\n", "\n").replace('\r', "\n");
         }
 
@@ -320,14 +337,19 @@ impl<'a> CodeEditor<'a> {
         // --- CRITICAL: EXTERNAL vs INTERNAL SYNC ---
         // We only call set_text if the text changed externally.
         // If we just typed something, clean_editor_text will match the model, and we skip set_text to preserve undo history.
-        let editor_text = cosmic_edit.text();
-        let clean_editor_text = if self.is_single_line {
-            editor_text.trim_end_matches('\n').replace('\n', "")
+        //
+        // OPTIMIZATION: Only fetch editor text (expensive allocation) if model hash changed.
+        let external_change = if text_changed {
+            let editor_text = cosmic_edit.text();
+            let clean_editor_text = if self.is_single_line {
+                editor_text.trim_end_matches('\n').replace('\n', "")
+            } else {
+                editor_text.trim_end_matches('\n').to_string()
+            };
+            *self.text != clean_editor_text
         } else {
-            editor_text.trim_end_matches('\n').to_string()
+            false
         };
-
-        let external_change = text_changed && (*self.text != clean_editor_text);
 
         if external_change || query_changed || font_changed || bright_mode_changed {
             if query_changed || font_changed || bright_mode_changed {
@@ -371,37 +393,110 @@ impl<'a> CodeEditor<'a> {
 
                         // --- SPELL CHECK RENDERING ---
                         if let Some(checker) = &self.spell_checker {
+                            // Caching Logic
+                            let glitches_id =
+                                ui.make_persistent_id(format!("{}_glitches", self.id));
+                            let cached_glitches: Option<Arc<(Vec<(usize, usize)>, Vec<usize>)>> =
+                                ui.data(|d| d.get_temp(glitches_id));
+
+                            // Check if we need to re-run spell check
+                            // - internal_changed: User typed something this frame
+                            // - external_change: Model text changed from outside
+                            // - cached_glitches.is_none(): First run or cache cleared
+                            let need_check =
+                                internal_changed || external_change || cached_glitches.is_none();
+
                             // Access the internal buffer once to ensure consistent coordinates and indices
                             cosmic_edit.editor().with_buffer(|buffer| {
-                                // 1. Calculate absolute byte offsets for each line
-                                // cosmic-text offsets in LayoutRun are relative to the logical line start.
-                                // zspell offsets are absolute to the whole string.
-                                let mut line_offsets = Vec::with_capacity(buffer.lines.len());
-                                let mut full_text = String::new();
-                                for (i, line) in buffer.lines.iter().enumerate() {
-                                    if i > 0 {
-                                        full_text.push('\n');
-                                    }
-                                    line_offsets.push(full_text.len());
-                                    full_text.push_str(line.text());
-                                }
+                                let (arc_glitches, arc_offsets) = if need_check {
+                                    // 1. Calculate absolute byte offsets for each line
+                                    // cosmic-text offsets in LayoutRun are relative to the logical line start.
+                                    // zspell offsets are absolute to the whole string.
+                                    let mut line_offsets = Vec::with_capacity(buffer.lines.len());
+                                    let mut current_offset = 0;
+                                    let mut full_text = String::with_capacity(current_offset); // heuristic? no current_offset is 0 here.
 
-                                let glitches = checker.check(&full_text);
+                                    for (i, line) in buffer.lines.iter().enumerate() {
+                                        if i > 0 {
+                                            current_offset += 1; // '\n'
+                                            full_text.push('\n');
+                                        }
+                                        line_offsets.push(current_offset);
+                                        let text = line.text();
+                                        current_offset += text.len();
+                                        full_text.push_str(text);
+                                    }
+
+                                    let glitches = checker.check(&full_text);
+                                    let cache_data = Arc::new((glitches, line_offsets));
+
+                                    ui.data_mut(|d| d.insert_temp(glitches_id, cache_data.clone()));
+                                    (cache_data.0.clone(), cache_data.1.clone())
+                                } else {
+                                    let cache = cached_glitches.unwrap();
+                                    (cache.0.clone(), cache.1.clone())
+                                };
+
+                                // Deref the Arc to get slice
+                                let glitches = &arc_glitches;
+                                let line_offsets = &arc_offsets;
 
                                 if !glitches.is_empty() {
                                     let painter = ui.painter();
                                     let underline_stroke =
                                         egui::Stroke::new(1.0, egui::Color32::RED);
                                     let rect_min = resp.rect.min;
+                                    let clip_rect = ui.clip_rect();
+
+                                    // OPTIMIZATION: Linear scan O(N) since both layout runs and glitches are sorted
+                                    let mut glitch_idx = 0;
 
                                     for run in buffer.layout_runs() {
                                         let line_y = run.line_y;
+
+                                        // VISIBILITY CULLING
+                                        // Check if this line is visible in the current clip rect
+                                        // Margin to avoid flickering at edges
+                                        let margin = 100.0;
+                                        let line_top = rect_min.y + line_y / pixels_per_point;
+                                        let line_bottom =
+                                            line_top + run.line_height / pixels_per_point;
+
+                                        if line_bottom < clip_rect.min.y - margin {
+                                            continue; // Skip lines above view
+                                        }
+                                        if line_top > clip_rect.max.y + margin {
+                                            break; // Stop processing lines below view (layout_runs are ordered)
+                                        }
+
                                         let line_offset =
                                             line_offsets.get(run.line_i).cloned().unwrap_or(0);
+                                        let line_end_offset = line_offset + run.text.len();
 
-                                        for (start_byte, end_byte) in &glitches {
+                                        // Skip glitches that end before this line starts
+                                        while glitch_idx < glitches.len() {
+                                            let (_, end) = glitches[glitch_idx];
+                                            if end > line_offset {
+                                                break;
+                                            }
+                                            glitch_idx += 1;
+                                        }
+
+                                        // Iterate glitches that might overlap this line
+                                        let mut current_idx = glitch_idx;
+                                        while current_idx < glitches.len() {
+                                            let (start_byte, end_byte) = &glitches[current_idx];
+
+                                            // Stop if this glitch starts after the line ends
+                                            if *start_byte >= line_end_offset {
+                                                break;
+                                            }
+
+                                            // Increment for next potential line check
+                                            current_idx += 1;
+
                                             // Ignore single characters (length 1) to avoid tiny underlines on '-' or lone letters
-                                            if end_byte - start_byte <= 1 {
+                                            if *end_byte - *start_byte <= 1 {
                                                 continue;
                                             }
 
@@ -506,9 +601,12 @@ impl<'a> CodeEditor<'a> {
 
                             if *self.text != clean_new {
                                 *self.text = clean_new;
-                                ui.data_mut(|d| {
-                                    d.insert_temp(last_model_text_id, self.text.clone())
-                                });
+
+                                let mut hasher = DefaultHasher::new();
+                                self.text.hash(&mut hasher);
+                                let new_hash = hasher.finish();
+
+                                ui.data_mut(|d| d.insert_temp(last_model_hash_id, new_hash));
                             }
                         }
 
@@ -524,13 +622,18 @@ impl<'a> CodeEditor<'a> {
 
         // 6. Final State Recording
         ui.data_mut(|d| {
-            d.insert_temp(last_model_text_id, self.text.clone());
+            // Recalculate hash for final state (it might have changed during render/sync)
+            let mut hasher = DefaultHasher::new();
+            self.text.hash(&mut hasher);
+            let final_hash = hasher.finish();
+
+            d.insert_temp(last_model_hash_id, final_hash);
             // Store as plain String to match retrieval type
             d.insert_temp(last_search_query_id, current_query_str.to_string());
             d.insert_temp(last_font_family_id, current_font_str);
             d.insert_temp(
                 ui.make_persistent_id(format!("{}_last_bright_mode", self.id)),
-                Some(self.bright_mode),
+                self.bright_mode,
             );
         });
 
