@@ -373,6 +373,14 @@ impl<'a> CodeEditor<'a> {
                     .show(ui, |ui| {
                         let min_height = self.desired_lines as f32 * line_height_val;
                         ui.set_min_height(min_height);
+                        if self.is_single_line {
+                            ui.set_max_height(min_height);
+                        }
+
+                        if self.is_single_line {
+                            ui.set_max_height(min_height);
+                        }
+                        ui.set_width(ui.available_width());
 
                         let mut force_sync_back = false;
                         let resp = cosmic_edit.ui(

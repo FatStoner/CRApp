@@ -68,6 +68,7 @@ Handles the detailed editing interfaces.
     -   **Legacy Compat**: Supports importing V1 and V2 PNG cards.
 -   **Lorebook Editor**:
     -   **Import**: "IMPORT" button allowing users to paste HTML source from SpicyChat (both Edit and Profile views) to automatically allow population of Title, Description, and Entries.
+    -   **Export**: "EXPORT" button supporting **SillyTavern** and **Chub.ai** compatible JSON formats (Standard V2).
     -   **Metadata**: Title, Description (Content), Tags, and Cover management.
     -   **Tabbed Section**:
         -   **Entries Tab**: Master-Detail view for managing individual entries. Feature a swapped layout (Editor on Left, List on Right) and dynamic count badge.

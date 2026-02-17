@@ -24,10 +24,26 @@ pub struct SillyTavernEntry {
     pub probability: usize,
     pub disable: bool,
     pub depth: usize,
-} // Defaults will be handled in conversion
+    // Extensions and other fields observed in reference
+    pub selectiveLogic: Option<usize>,
+    pub addMemo: Option<bool>,
+    pub displayIndex: Option<usize>,
+    // "keys" is present in reference alongside "key"
+    pub keys: Vec<String>,
+    // "name" is present in reference
+    pub name: String,
+    // "id" is present in reference (seems duplicate of uid but u64?)
+    pub id: usize,
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SillyTavernLorebook {
+    pub name: Option<String>,
+    pub description: Option<String>,
+    pub scan_depth: Option<usize>,
+    pub token_budget: Option<usize>,
+    pub recursive_scanning: Option<bool>,
+    pub extensions: Option<HashMap<String, serde_json::Value>>,
     pub entries: HashMap<String, SillyTavernEntry>,
 }
 
@@ -55,6 +71,12 @@ impl Default for SillyTavernEntry {
             probability: 100,
             disable: false,
             depth: 4,
+            selectiveLogic: Some(0),
+            addMemo: Some(true),
+            displayIndex: Some(1),
+            keys: vec![],
+            name: "".to_string(),
+            id: 0,
         }
     }
 }
@@ -72,8 +94,11 @@ pub fn convert_to_sillytavern(lorebook: &crate::models::Lorebook) -> SillyTavern
 
         let st_entry = SillyTavernEntry {
             uid: idx,
-            key: keywords,
+            id: idx, // reference has both
+            key: keywords.clone(),
+            keys: keywords, // reference has both
             comment: entry.name.clone(),
+            name: entry.name.clone(),
             content: entry.content.clone(),
             ..Default::default()
         };
@@ -81,5 +106,13 @@ pub fn convert_to_sillytavern(lorebook: &crate::models::Lorebook) -> SillyTavern
         entries.insert(idx.to_string(), st_entry);
     }
 
-    SillyTavernLorebook { entries }
+    SillyTavernLorebook {
+        name: Some(lorebook.title.clone()),
+        description: Some(lorebook.description.clone()),
+        scan_depth: Some(4),
+        token_budget: Some(2048),
+        recursive_scanning: Some(false),
+        extensions: Some(HashMap::new()),
+        entries,
+    }
 }
