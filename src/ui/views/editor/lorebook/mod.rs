@@ -94,11 +94,21 @@ pub fn render_lorebook_editor(app: &mut CrapApp, ui: &mut egui::Ui) {
 
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 // EXPORT
-                if ui.button("EXPORT").clicked() {
-                    if let Some(result) = app.export_lorebook(&book) {
-                        status_update = Some(result);
+                // EXPORT
+                ui.menu_button("EXPORT", |ui| {
+                    if ui.button("CRApp Format (.crappbook)").clicked() {
+                        if let Some(result) = app.export_lorebook(&book) {
+                            status_update = Some(result);
+                        }
+                        ui.close_menu();
                     }
-                }
+                    if ui.button("SillyTavern Format (.json)").clicked() {
+                        if let Some(result) = app.export_lorebook_sillytavern(&book) {
+                            status_update = Some(result);
+                        }
+                        ui.close_menu();
+                    }
+                });
 
                 // IMPORT
                 if ui.button("IMPORT").clicked() {

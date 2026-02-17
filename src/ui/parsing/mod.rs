@@ -5,6 +5,7 @@ pub mod detection;
 pub mod generic;
 pub mod girlfriendgpt;
 pub mod janitor;
+pub mod sillytavern;
 pub mod spicychat;
 pub mod types;
 pub mod utils;

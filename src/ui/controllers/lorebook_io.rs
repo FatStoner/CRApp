@@ -50,6 +50,48 @@ impl CrapApp {
         None
     }
 
+    /// Export lorebook to SillyTavern JSON format
+    pub fn export_lorebook_sillytavern(
+        &self,
+        lorebook: &Lorebook,
+    ) -> Option<(String, egui::Color32)> {
+        let export_data = crate::ui::parsing::sillytavern::convert_to_sillytavern(lorebook);
+
+        // SillyTavern expects a map of entries, often just the entries object itself as the root for "World Info" imports
+        // or sometimes wrapped. Based on research, "World Info" is the entries object or a wrapper.
+        // But usually sticking to the structure: { "entries": { ... } } is safe.
+        // Wait, the research said: "JSON format is object-based, containing multiple entries... often incremented sequentially".
+        // It also mentioned "entries" key mapping to object.
+        // Let's stick to the struct I defined: SillyTavernLorebook which has `entries` field.
+
+        if let Ok(json) = serde_json::to_string_pretty(&export_data) {
+            let safe_title: String = lorebook
+                .title
+                .chars()
+                .filter(|c| c.is_alphanumeric() || *c == ' ' || *c == '-' || *c == '_')
+                .collect();
+            let filename = format!("{}_st.json", safe_title.replace(" ", "_"));
+
+            if let Some(path) = rfd::FileDialog::new()
+                .set_file_name(&filename)
+                .add_filter("SillyTavern World Info", &["json"])
+                .save_file()
+            {
+                if let Err(e) = std::fs::write(&path, json) {
+                    return Some((format!("Export failed: {}", e), egui::Color32::RED));
+                } else {
+                    return Some((
+                        "SillyTavern Export successful!".to_string(),
+                        egui::Color32::GREEN,
+                    ));
+                }
+            }
+        } else {
+            return Some(("Serialization failed!".to_string(), egui::Color32::RED));
+        }
+        None
+    }
+
     /// Update lorebook cover image from file (copies file to data/covers/)
     pub fn update_lorebook_cover(
         &self,
