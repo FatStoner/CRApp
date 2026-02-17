@@ -112,6 +112,8 @@ pub struct CrapApp {
     pub background_scale: f32,
     pub enable_spell_check: bool,
     pub editor_font: EditorFontFamily,
+    pub editor_large_font: bool,
+    pub editor_bright_mode: bool,
 
     // Gallery Zoom
     pub gallery_zoom: f32,
@@ -220,6 +222,8 @@ impl CrapApp {
             background_scale: 0.9,
             enable_spell_check: true,
             editor_font: EditorFontFamily::SansSerif,
+            editor_large_font: false,
+            editor_bright_mode: true,
 
             gallery_zoom: 1.0,
             gallery_pan: egui::vec2(0.0, 0.0),
@@ -395,6 +399,36 @@ impl CrapApp {
                 }
                 Ok(None) => {}
                 Err(e) => eprintln!("Failed to load editor font setting: {}", e),
+            }
+        });
+
+        // Initial Large Font Load
+        let tx = self.tx.clone();
+        let db = self.db.clone();
+        tokio::spawn(async move {
+            match db.get_setting("editor_large_font").await {
+                Ok(Some(val)) => {
+                    let enabled = val == "true";
+                    let _ = tx.send(UiEvent::EditorLargeFontLoaded(enabled)).await;
+                }
+                Ok(None) => {}
+                Err(e) => eprintln!("Failed to load large font setting: {}", e),
+            }
+        });
+
+        // Initial Bright Mode Load
+        let tx = self.tx.clone();
+        let db = self.db.clone();
+        tokio::spawn(async move {
+            match db.get_setting("editor_bright_mode").await {
+                Ok(Some(val)) => {
+                    let enabled = val != "false"; // Default true
+                    let _ = tx.send(UiEvent::EditorBrightModeLoaded(enabled)).await;
+                }
+                Ok(None) => {
+                    let _ = tx.send(UiEvent::EditorBrightModeLoaded(true)).await;
+                }
+                Err(e) => eprintln!("Failed to load bright mode setting: {}", e),
             }
         });
 

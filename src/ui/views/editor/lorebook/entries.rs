@@ -35,6 +35,8 @@ pub fn render_lorebook_entries(
                             font_family,
                         )
                         .single_line()
+                        .font_size_offset(if app.editor_large_font { 2.0 } else { 0.0 })
+                        .bright_mode(app.editor_bright_mode)
                         .highlight(app.editor_search_query.clone())
                         .spell_check(if app.enable_spell_check {
                             app.spell_checker.clone()
@@ -57,6 +59,8 @@ pub fn render_lorebook_entries(
                             font_family,
                         )
                         .single_line()
+                        .font_size_offset(if app.editor_large_font { 2.0 } else { 0.0 })
+                        .bright_mode(app.editor_bright_mode)
                         .highlight(app.editor_search_query.clone())
                         .spell_check(if app.enable_spell_check {
                             app.spell_checker.clone()
@@ -103,6 +107,8 @@ pub fn render_lorebook_entries(
                                     font_family,
                                 )
                                 .desired_lines(15)
+                                .font_size_offset(if app.editor_large_font { 2.0 } else { 0.0 })
+                                .bright_mode(app.editor_bright_mode)
                                 .highlight(app.editor_search_query.clone())
                                 .spell_check(if app.enable_spell_check {
                                     app.spell_checker.clone()

@@ -101,6 +101,24 @@ pub fn render_options_window(app: &mut CrapApp, ctx: &egui::Context) {
 
                         ui.add_space(8.0);
 
+                        ui.horizontal(|ui| {
+                            let mut large_font = app.editor_large_font;
+                            if ui.checkbox(&mut large_font, "Large Font").changed() {
+                                app.set_editor_large_font(large_font);
+                            }
+                        });
+
+                        ui.add_space(8.0);
+
+                        ui.horizontal(|ui| {
+                            let mut bright = app.editor_bright_mode;
+                            if ui.checkbox(&mut bright, "Bright Text").changed() {
+                                app.set_editor_bright_mode(bright);
+                            }
+                        });
+
+                        ui.add_space(8.0);
+
                         // Scale
                         ui.horizontal(|ui| {
                             ui.label("Scale:");

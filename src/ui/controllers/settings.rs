@@ -103,4 +103,22 @@ impl CrapApp {
             let _ = db.set_setting("editor_font", &val).await;
         });
     }
+
+    pub fn set_editor_large_font(&mut self, enabled: bool) {
+        self.editor_large_font = enabled;
+        let db = self.db.clone();
+        let val = enabled.to_string();
+        tokio::spawn(async move {
+            let _ = db.set_setting("editor_large_font", &val).await;
+        });
+    }
+
+    pub fn set_editor_bright_mode(&mut self, enabled: bool) {
+        self.editor_bright_mode = enabled;
+        let db = self.db.clone();
+        let val = enabled.to_string();
+        tokio::spawn(async move {
+            let _ = db.set_setting("editor_bright_mode", &val).await;
+        });
+    }
 }

@@ -33,6 +33,9 @@ A dedicated modal window for application-wide settings.
     -   **Theme**: Toggle Light/Dark/System theme.
     -   **UI Scale**: Adjust global UI scaling.
     -   **Background**: Toggle custom background image and file picker integration.
+-   **Editor Appearance**:
+    -   **Large Font**: Increases font size in all `CodeEditor` instances.
+    -   **Bright Text**: Toggles between high-visibility and standard text colors.
 
 ### 2. Browser View (`ui/browser.rs`)
 Handles the "Gallery" or "Browser" view where characters are listed.
@@ -55,6 +58,7 @@ Handles the detailed editing interfaces.
     -   **Fields**: Name, Title, Personality, Scenario, Examples, etc.
         -   **Context Menu**: Custom Cut/Copy/Paste actions with selection persistence.
     -   **Avatars**: Image preview, clipboard pasting, file browsing.
+    -   **Configurable Appearance**: Respects user-defined font size and brightness settings from the Options window for all text fields.
     -   **Tags**: Management of App and External tags.
     -   **Lorebooks**: Selection of linked lorebooks with "Go to Lorebook" navigation button.
     -   **Navigation**: "Back" and "Up" buttons with **Unsaved Changes Protection**.

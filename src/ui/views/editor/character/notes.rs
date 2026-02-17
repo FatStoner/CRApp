@@ -21,6 +21,8 @@ pub fn render_notes_tab(app: &mut CrapApp, ui: &mut egui::Ui, character: &mut Ch
         font_family,
     )
     .desired_lines(15)
+    .font_size_offset(if app.editor_large_font { 2.0 } else { 0.0 })
+    .bright_mode(app.editor_bright_mode)
     .highlight(app.editor_search_query.clone())
     .spell_check(
         if app.enable_spell_check && !character.spell_check_overrides.contains("notes") {

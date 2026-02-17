@@ -16,6 +16,8 @@ pub struct CodeEditor<'a> {
     search_query: Option<String>,
     font_family: Family<'a>,
     spell_checker: Option<std::sync::Arc<crate::ui::spell_check::SpellChecker>>,
+    font_size_offset: f32,
+    bright_mode: bool,
 }
 
 /// Custom context menu that strictly handles Cut, Copy, and Paste.
@@ -110,6 +112,8 @@ impl<'a> CodeEditor<'a> {
             search_query: None,
             font_family,
             spell_checker: None,
+            font_size_offset: 0.0,
+            bright_mode: true,
         }
     }
 
@@ -137,6 +141,16 @@ impl<'a> CodeEditor<'a> {
         checker: Option<std::sync::Arc<crate::ui::spell_check::SpellChecker>>,
     ) -> Self {
         self.spell_checker = checker;
+        self
+    }
+
+    pub fn font_size_offset(mut self, offset: f32) -> Self {
+        self.font_size_offset = offset;
+        self
+    }
+
+    pub fn bright_mode(mut self, enabled: bool) -> Self {
+        self.bright_mode = enabled;
         self
     }
 
@@ -200,7 +214,12 @@ impl<'a> CodeEditor<'a> {
 
         // 1. Aesthetics
         let visuals = ui.visuals();
-        let egui_text_color = visuals.text_color();
+        let egui_text_color = if self.bright_mode {
+            visuals.strong_text_color()
+        } else {
+            visuals.text_color()
+        };
+
         let cosmic_color = Color::rgba(
             egui_text_color.r(),
             egui_text_color.g(),
@@ -208,12 +227,14 @@ impl<'a> CodeEditor<'a> {
             egui_text_color.a(),
         );
 
-        let font_size = ui
+        let mut font_size = ui
             .style()
             .text_styles
             .get(&egui::TextStyle::Monospace)
             .map(|id| id.size)
             .unwrap_or(14.0);
+
+        font_size += self.font_size_offset;
         let line_height_val = font_size * 1.4;
 
         let default_attrs = Attrs::new().family(self.font_family).color(cosmic_color);
@@ -260,6 +281,8 @@ impl<'a> CodeEditor<'a> {
         let last_model_text: Option<String> = ui.data(|d| d.get_temp(last_model_text_id));
         let last_search_query: Option<String> = ui.data(|d| d.get_temp(last_search_query_id));
         let last_font_family: Option<String> = ui.data(|d| d.get_temp(last_font_family_id));
+        let last_bright_mode: Option<bool> =
+            ui.data(|d| d.get_temp(ui.make_persistent_id(format!("{}_last_bright_mode", self.id))));
         let cursor_req: Option<bool> = ui.data(|d| d.get_temp(cursor_req_id));
 
         // Use string comparison for query/font to avoid TypeId issues with Option<String> persistence
@@ -271,6 +294,7 @@ impl<'a> CodeEditor<'a> {
 
         let query_changed = last_query_str != current_query_str;
         let font_changed = last_font_str != current_font_str;
+        let bright_mode_changed = last_bright_mode != Some(self.bright_mode);
         let text_changed = last_model_text.as_ref() != Some(self.text);
 
         // --- CRITICAL: NORMALIZE LINE ENDINGS ---
@@ -305,8 +329,8 @@ impl<'a> CodeEditor<'a> {
 
         let external_change = text_changed && (*self.text != clean_editor_text);
 
-        if external_change || query_changed || font_changed {
-            if query_changed || font_changed {
+        if external_change || query_changed || font_changed || bright_mode_changed {
+            if query_changed || font_changed || bright_mode_changed {
                 ui.ctx().request_repaint();
             }
             let spans = self.build_spans(self.text.as_str(), default_attrs, highlight_attrs);
@@ -443,19 +467,29 @@ impl<'a> CodeEditor<'a> {
                                 }
 
                                 // Explicit Undo/Redo handling
-                                if i.consume_key(egui::Modifiers::COMMAND, egui::Key::Z) {
-                                    cosmic_edit.undo();
+                                // FIX: Use key_pressed instead of consume_key to prevent rapid-fire undo on hold.
+                                // We check 'key_pressed' which triggers once per press (mostly), then consume it.
+                                if i.key_pressed(egui::Key::Z) && i.modifiers.command {
+                                    if i.modifiers.shift {
+                                        cosmic_edit.redo();
+                                    } else {
+                                        cosmic_edit.undo();
+                                    }
                                     force_sync_back_cell.set(true);
+                                    i.consume_key(egui::Modifiers::COMMAND, egui::Key::Z);
+                                    if i.modifiers.shift {
+                                        i.consume_key(
+                                            egui::Modifiers::COMMAND | egui::Modifiers::SHIFT,
+                                            egui::Key::Z,
+                                        );
+                                    }
                                 }
-                                if i.consume_key(egui::Modifiers::COMMAND, egui::Key::Y) {
+
+                                // Redo alternative (Ctrl+Y)
+                                if i.key_pressed(egui::Key::Y) && i.modifiers.command {
                                     cosmic_edit.redo();
                                     force_sync_back_cell.set(true);
-                                } else if i.consume_key(
-                                    egui::Modifiers::COMMAND | egui::Modifiers::SHIFT,
-                                    egui::Key::Z,
-                                ) {
-                                    cosmic_edit.redo();
-                                    force_sync_back_cell.set(true);
+                                    i.consume_key(egui::Modifiers::COMMAND, egui::Key::Y);
                                 }
                             });
                         }
@@ -494,6 +528,10 @@ impl<'a> CodeEditor<'a> {
             // Store as plain String to match retrieval type
             d.insert_temp(last_search_query_id, current_query_str.to_string());
             d.insert_temp(last_font_family_id, current_font_str);
+            d.insert_temp(
+                ui.make_persistent_id(format!("{}_last_bright_mode", self.id)),
+                Some(self.bright_mode),
+            );
         });
 
         editors.insert(self.id, cosmic_edit);

@@ -90,6 +90,12 @@ pub fn handle_ui_events(app: &mut CrapApp, ctx: &egui::Context) {
             UiEvent::EditorFontLoaded(font) => {
                 app.editor_font = font;
             }
+            UiEvent::EditorLargeFontLoaded(enabled) => {
+                app.editor_large_font = enabled;
+            }
+            UiEvent::EditorBrightModeLoaded(enabled) => {
+                app.editor_bright_mode = enabled;
+            }
             UiEvent::LoreLinksBulkLoaded(map) => {
                 app.char_lore_map = map;
             }

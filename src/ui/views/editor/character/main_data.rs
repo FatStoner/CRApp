@@ -35,6 +35,8 @@ pub fn render_main_data_tab(
                     font_family,
                 )
                 .single_line()
+                .font_size_offset(if app.editor_large_font { 2.0 } else { 0.0 })
+                .bright_mode(app.editor_bright_mode)
                 .highlight(app.editor_search_query.clone())
                 .spell_check(None)
                 .show(
@@ -54,6 +56,8 @@ pub fn render_main_data_tab(
                     font_family,
                 )
                 .single_line()
+                .font_size_offset(if app.editor_large_font { 2.0 } else { 0.0 })
+                .bright_mode(app.editor_bright_mode)
                 .highlight(app.editor_search_query.clone())
                 .spell_check(None)
                 .show(
@@ -107,6 +111,8 @@ pub fn render_main_data_tab(
                         font_family,
                     )
                     .desired_lines(1)
+                    .font_size_offset(if app.editor_large_font { 2.0 } else { 0.0 })
+                    .bright_mode(app.editor_bright_mode)
                     .highlight(app.editor_search_query.clone())
                     .spell_check(
                         if app.enable_spell_check
@@ -174,6 +180,8 @@ pub fn render_main_data_tab(
                         font_family,
                     )
                     .desired_lines(10)
+                    .font_size_offset(if app.editor_large_font { 2.0 } else { 0.0 })
+                    .bright_mode(app.editor_bright_mode)
                     .highlight(app.editor_search_query.clone())
                     .spell_check(
                         if app.enable_spell_check
@@ -240,6 +248,8 @@ pub fn render_main_data_tab(
                         font_family,
                     )
                     .desired_lines(10)
+                    .font_size_offset(if app.editor_large_font { 2.0 } else { 0.0 })
+                    .bright_mode(app.editor_bright_mode)
                     .highlight(app.editor_search_query.clone())
                     .spell_check(
                         if app.enable_spell_check
@@ -305,6 +315,8 @@ pub fn render_main_data_tab(
                         font_family,
                     )
                     .desired_lines(8)
+                    .font_size_offset(if app.editor_large_font { 2.0 } else { 0.0 })
+                    .bright_mode(app.editor_bright_mode)
                     .highlight(app.editor_search_query.clone())
                     .spell_check(
                         if app.enable_spell_check
@@ -370,6 +382,8 @@ pub fn render_main_data_tab(
                         font_family,
                     )
                     .desired_lines(8)
+                    .font_size_offset(if app.editor_large_font { 2.0 } else { 0.0 })
+                    .bright_mode(app.editor_bright_mode)
                     .highlight(app.editor_search_query.clone())
                     .spell_check(
                         if app.enable_spell_check

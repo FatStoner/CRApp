@@ -178,6 +178,8 @@ pub enum UiEvent {
     SpellCheckSettingLoaded(bool),
     BackgroundScaleLoaded(f32),
     EditorFontLoaded(EditorFontFamily),
+    EditorLargeFontLoaded(bool),
+    EditorBrightModeLoaded(bool),
     GalleryImageAdded(String),
     StatisticsCalculated(StatisticsData),
     UpdateAvailable(String, String), // (version, tag)
