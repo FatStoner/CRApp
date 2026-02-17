@@ -16,7 +16,7 @@ C.R.App leverages the power of a local SQLite database to handle thousands of ch
 -   **🔍 Deep Search**: Search through character names, descriptions, and tags instantly.
 -   **📖 Lorebooks & World Info**: Create and link extensive lorebooks to your characters.
 -   **📂 Nested Collections**: Organize your library with a robust, hierarchical folder system.
--   **🔄 Import/Export**: Full support for TavernAI V2 cards (PNG) and JSON. Quick clipboard importing from **SpicyChat**, **JanitorAI**, **AfterHour.app**, **GirlfriendGPT**, and **CraveU**. **Lorebook export** compatible with **SillyTavern** and **Chub.ai**.
+-   **🔄 Import/Export**: Full support for TavernAI V2 cards (PNG) and JSON. Quick clipboard importing from **SpicyChat**, **JanitorAI**, **Chub.ai**, **AfterHour.app**, **GirlfriendGPT**, and **CraveU**. **Lorebook export** compatible with **SillyTavern** and **Chub.ai**.
 -   **🧹 Auto-Cleanup**: Automatically removes unused images to keep your storage efficient.
 -   **✨ Auto-Updates**: Stay up to date automatically with the built-in update system.
 

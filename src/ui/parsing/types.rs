@@ -39,6 +39,8 @@ pub enum ImportFormat {
     JanitorEdit,
     JanitorProfile,
     AfterHour,
+    ChubEdit,
+    ChubProfile,
 
     Unknown,
 }

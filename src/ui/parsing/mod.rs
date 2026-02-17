@@ -21,3 +21,4 @@ pub use utils::{parse_clipboard, parse_crappbook_json};
 // Wrapper for spicychat to keep public API if used elsewhere, or just re-export
 pub use charactercard::{parse_png_card, parse_v2_card};
 pub use spicychat::parse_spicychat_lorebook;
+pub mod chub_ai;

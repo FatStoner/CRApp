@@ -24,12 +24,7 @@ pub fn render_central_panel(app: &mut CrapApp, ctx: &egui::Context) {
                 .show(ctx, |ui| {
                     if app.parsed_data.is_none() {
                         // Phase 1: Input
-                        ui.label("Supported Platforms:");
-                        ui.label("• JanitorAI (Profile & Edit)");
-                        ui.label("• CraveU AI (Edit)");
-                        ui.label("• AfterHour.app (Edit)");
-                        ui.label("• GirlfriendGPT (Edit)");
-                        ui.label("• SpicyChat (Profile & Edit)");
+                        ui.label("Supported Platforms: JanitorAI, Chub.ai, CraveU AI, AfterHour.app, GirlfriendGPT, SpicyChat");
                         ui.label(egui::RichText::new("1. Go to the character profile OR edit page on the service\n2. Select All (Ctrl+A)\n3. Copy (Ctrl+C)\n4. Paste here (Ctrl+V)").size(11.0).color(egui::Color32::GRAY));
                         ui.add_space(4.0);
                         

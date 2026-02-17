@@ -59,5 +59,19 @@ pub fn detect_format(lines: &[&str]) -> ImportFormat {
         return ImportFormat::Profile;
     }
 
+    // Chub.ai Check
+    if lines
+        .iter()
+        .any(|l| l.contains("Edit Character (View Character)"))
+    {
+        return ImportFormat::ChubEdit;
+    }
+
+    if lines.iter().any(|l| {
+        l.contains("Creator's notes go here") || l.contains("Definitions - May contain spoilers")
+    }) {
+        return ImportFormat::ChubProfile;
+    }
+
     ImportFormat::Unknown
 }

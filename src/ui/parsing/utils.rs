@@ -24,6 +24,8 @@ pub fn parse_clipboard(text: &str) -> ParsedCharacterData {
         ImportFormat::GirlfriendGpt => girlfriendgpt::parse_ggpt_view(&lines),
         ImportFormat::JanitorEdit => janitor::parse_janitor_edit(&lines),
         ImportFormat::JanitorProfile => janitor::parse_janitor_profile(&lines),
+        ImportFormat::ChubEdit => super::chub_ai::parse_chub_edit(&lines),
+        ImportFormat::ChubProfile => super::chub_ai::parse_chub_profile(&lines),
         ImportFormat::Profile => generic::parse_profile_view(&lines),
         // For LorebookHtml, we need a separate entry point or return type.
         // Since parse_clipboard returns ParsedCharacterData, we might need a separate function for Lorebooks.
