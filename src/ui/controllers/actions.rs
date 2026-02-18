@@ -298,6 +298,7 @@ impl CrapApp {
             self.load_lorebook_tags(id);
             self.mode = AppMode::Lorebooks;
             self.central_view = CentralView::Editor;
+            self.blur_overrides.clear(); // Clear overrides on navigation
             self.last_active_lorebook_id = Some(id);
         }
     }

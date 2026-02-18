@@ -40,6 +40,7 @@ impl CrapApp {
             self.selected_collection_id = state.selected_collection_id;
             self.active_char_tab = state.active_char_tab;
             self.active_lorebook_tab = state.active_lorebook_tab;
+            self.blur_overrides.clear(); // Clear overrides on navigation
 
             // Restore Selection
             if let Some(char_id) = state.selected_character_id {
@@ -109,6 +110,7 @@ impl CrapApp {
             self.mode = AppMode::Characters;
             self.central_view = CentralView::Browser;
             self.selected_character = None;
+            self.blur_overrides.clear(); // Clear overrides on navigation
             self.reload_collections();
         }
     }
@@ -125,6 +127,7 @@ impl CrapApp {
             self.mode = AppMode::Characters;
             self.central_view = CentralView::Browser;
             self.selected_character = None;
+            self.blur_overrides.clear(); // Clear overrides on navigation
             self.reload_characters();
         }
     }
@@ -138,6 +141,7 @@ impl CrapApp {
             self.mode = AppMode::Templates;
             self.selected_character = None;
             self.selected_lorebook = None;
+            self.blur_overrides.clear(); // Clear overrides on navigation
         }
     }
 
@@ -158,6 +162,7 @@ impl CrapApp {
             };
         } else {
             self.load_lorebook(id);
+            self.blur_overrides.clear(); // Clear overrides on navigation
         }
     }
 
@@ -178,6 +183,7 @@ impl CrapApp {
             self.mode = AppMode::Templates;
             self.selected_character = None;
             self.selected_lorebook = None;
+            self.blur_overrides.clear(); // Clear overrides on navigation
         }
     }
 
@@ -191,6 +197,7 @@ impl CrapApp {
                 self.mode = AppMode::Characters;
                 self.central_view = CentralView::Browser;
                 self.selected_character = None;
+                self.blur_overrides.clear(); // Clear overrides on navigation
                 self.reload_collections();
             }
             AppAction::SwitchLorebook(id) => self.load_lorebook(id),
@@ -200,6 +207,7 @@ impl CrapApp {
                 self.mode = AppMode::Characters;
                 self.central_view = CentralView::Browser;
                 self.selected_character = None;
+                self.blur_overrides.clear(); // Clear overrides on navigation
                 self.reload_characters();
             }
             AppAction::Exit => {
@@ -227,6 +235,7 @@ impl CrapApp {
                 self.mode = AppMode::Templates;
                 self.selected_character = None;
                 self.selected_lorebook = None;
+                self.blur_overrides.clear(); // Clear overrides on navigation
             }
         }
     }
