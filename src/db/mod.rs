@@ -110,6 +110,27 @@ impl Database {
                     }
                 });
 
+        // 5. Ensure 'is_nsfw' in 'characters'
+        let _ = sqlx::query("ALTER TABLE characters ADD COLUMN is_nsfw BOOLEAN NOT NULL DEFAULT 0")
+            .execute(&pool)
+            .await
+            .map_err(|e| {
+                if !e.to_string().contains("duplicate column name") {
+                    eprintln!("Warning: Failed to add is_nsfw column: {}", e);
+                }
+            });
+
+        // 6. Ensure 'blur_avatar' in 'characters'
+        let _ =
+            sqlx::query("ALTER TABLE characters ADD COLUMN blur_avatar BOOLEAN NOT NULL DEFAULT 0")
+                .execute(&pool)
+                .await
+                .map_err(|e| {
+                    if !e.to_string().contains("duplicate column name") {
+                        eprintln!("Warning: Failed to add blur_avatar column: {}", e);
+                    }
+                });
+
         Ok(Database { pool })
     }
 

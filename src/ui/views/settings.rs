@@ -118,6 +118,28 @@ pub fn render_options_window(app: &mut CrapApp, ctx: &egui::Context) {
                         });
 
                         ui.add_space(8.0);
+                        ui.separator();
+                        ui.add_space(8.0);
+                        ui.heading("Content Blur");
+
+                        ui.horizontal(|ui| {
+                            let mut blur_all = app.blur_all_images;
+                            if ui.checkbox(&mut blur_all, "Blur All Images").changed() {
+                                app.set_blur_all_images(blur_all);
+                            }
+                        });
+
+                        ui.horizontal(|ui| {
+                            let mut blur_nsfw = app.blur_all_nsfw;
+                            if ui
+                                .checkbox(&mut blur_nsfw, "Blur All NSFW Characters")
+                                .changed()
+                            {
+                                app.set_blur_all_nsfw(blur_nsfw);
+                            }
+                        });
+
+                        ui.add_space(8.0);
 
                         // Scale
                         ui.horizontal(|ui| {

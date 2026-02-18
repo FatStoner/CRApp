@@ -512,18 +512,46 @@ pub fn render_main_data_tab(
             ui.label("Avatar");
 
             // Show image preview if available
+            // Show image preview if available
             if let Some(path_str) = character.avatar_path.clone() {
                 let uri = crate::ui::utils::get_image_uri(&path_str);
 
                 // Calculate preview size based on available width in this column
                 let preview_width = ui.available_width() - 8.0;
+
+                // Determine if we should blur
+                // Calculate effective blur state
+                let base_blur = app.blur_all_images
+                    || (app.blur_all_nsfw && character.is_nsfw)
+                    || character.blur_avatar;
+                let should_blur = if let Some(&override_val) = app.blur_overrides.get(&character.id)
+                {
+                    override_val
+                } else {
+                    base_blur
+                };
+
                 let response = ui.add(
-                    egui::Image::new(uri)
+                    egui::Image::new(&uri)
                         .rounding(egui::Rounding::same(4.0))
-                        .fit_to_original_size(0.5) // Adjust scaling logic if needed or use max_width
                         .max_width(preview_width)
                         .sense(egui::Sense::click()),
                 );
+
+                if should_blur {
+                    ui.painter().rect_filled(
+                        response.rect,
+                        4.0,
+                        egui::Color32::from_black_alpha(255),
+                    );
+                    ui.painter().text(
+                        response.rect.center(),
+                        egui::Align2::CENTER_CENTER,
+                        if character.is_nsfw { "NSFW" } else { "BLURRED" },
+                        egui::FontId::proportional(32.0),
+                        egui::Color32::WHITE,
+                    );
+                }
 
                 response.context_menu(|ui| {
                     if ui.button("Copy to Clipboard").clicked() {
@@ -635,6 +663,20 @@ pub fn render_main_data_tab(
                             }
                         }
                         ui.close_menu();
+                    }
+
+                    ui.separator();
+
+                    if should_blur {
+                        if ui.button("Unblur Image").clicked() {
+                            app.toggle_character_blur(character.id);
+                            ui.close_menu();
+                        }
+                    } else {
+                        if ui.button("Blur Image").clicked() {
+                            app.toggle_character_blur(character.id);
+                            ui.close_menu();
+                        }
                     }
                 });
 
@@ -765,6 +807,17 @@ pub fn render_main_data_tab(
                     }
                 }
             });
+
+            ui.add_space(4.0);
+            if ui
+                .checkbox(&mut character.blur_avatar, "Blur Avatar")
+                .changed()
+            {
+                app.blur_overrides.remove(&character.id);
+            }
+            if ui.checkbox(&mut character.is_nsfw, "NSFW").changed() {
+                app.blur_overrides.remove(&character.id);
+            }
 
             ui.add_space(8.0);
 

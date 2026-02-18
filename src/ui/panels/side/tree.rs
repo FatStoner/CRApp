@@ -40,6 +40,9 @@ pub fn render_tree(
     search_query: &str,
     char_lore_map: &std::collections::HashMap<i64, Vec<i64>>,
     lorebooks: &[Lorebook],
+    blur_all_images: bool,
+    blur_all_nsfw: bool,
+    blur_overrides: &std::collections::HashMap<i64, bool>,
 ) {
     let query_lower = search_query.to_lowercase();
     let is_search_active = !search_query.is_empty();
@@ -201,6 +204,9 @@ pub fn render_tree(
                 search_query,
                 char_lore_map,
                 lorebooks,
+                blur_all_images,
+                blur_all_nsfw,
+                blur_overrides,
             );
         });
 
@@ -309,8 +315,19 @@ pub fn render_tree(
 
         if let Some(path_str) = &char.avatar_path {
             let uri = crate::ui::utils::get_image_uri(path_str);
+            let base_blur = blur_all_images || (blur_all_nsfw && char.is_nsfw) || char.blur_avatar;
+            let should_blur = if let Some(&override_val) = blur_overrides.get(&char.id) {
+                override_val
+            } else {
+                base_blur
+            };
 
             crate::ui::widgets::paint_avatar_crop(ui, thumb_rect, &uri, 4.0);
+
+            if should_blur {
+                ui.painter()
+                    .rect_filled(thumb_rect, 4.0, egui::Color32::from_black_alpha(255));
+            }
         } else {
             ui.painter()
                 .rect_filled(thumb_rect, 4.0, egui::Color32::from_gray(70));
@@ -392,6 +409,16 @@ pub fn render_tree(
                                 actions.push(TreeAction::MoveCharacter(char_id, Some(col.id)));
                                 ui.close_menu();
                             }
+                            // The following code snippet was provided in the instruction but is syntactically incorrect
+                            // and refers to undefined variables/functions in this context.
+                            // It has been commented out to maintain a syntactically correct file.
+                            // if let Some(actions) = render_item_fn(ui, item, is_selected, blur_all_images, blur_all_nsfw, blur_overrides) {
+                            //     // Handle actions (e.g. selection)
+                            //     if !actions.is_empty() {
+                            //         return actions; // Return actions immediately to top level
+                            //         // Or collect them? For selection we usually just want to know "selected"
+                            //     }
+                            // }
                             render_collection_options(
                                 ui,
                                 collections,

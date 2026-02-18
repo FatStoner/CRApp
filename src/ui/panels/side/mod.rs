@@ -225,6 +225,9 @@ pub fn render_side_panel(app: &mut CrapApp, ctx: &egui::Context) {
                                 &app.search_query,
                                 &app.char_lore_map,
                                 &app.lorebooks,
+                                app.blur_all_images,
+                                app.blur_all_nsfw,
+                                &app.blur_overrides,
                             );
 
                             // Fill empty space for context menu
@@ -295,7 +298,7 @@ pub fn render_side_panel(app: &mut CrapApp, ctx: &egui::Context) {
                                                 egui::Sense::hover(),
                                             );
 
-                                            render_lorebook_thumbnail(ui, book, thumb_rect);
+                                            render_lorebook_thumbnail(ui, book, thumb_rect, app.blur_all_images);
 
                                             ui.add_space(8.0);
 
@@ -636,10 +639,24 @@ pub fn render_side_panel(app: &mut CrapApp, ctx: &egui::Context) {
         });
 }
 
-fn render_lorebook_thumbnail(ui: &mut egui::Ui, book: &Lorebook, thumb_rect: egui::Rect) {
+fn render_lorebook_thumbnail(ui: &mut egui::Ui, book: &Lorebook, thumb_rect: egui::Rect, blur_all: bool) {
     if let Some(path_str) = &book.cover_path {
         let uri = crate::ui::utils::get_image_uri(path_str);
         crate::ui::widgets::paint_avatar_crop(ui, thumb_rect, &uri, 2.0);
+        if blur_all {
+            ui.painter().rect_filled(
+                thumb_rect,
+                2.0,
+                egui::Color32::from_black_alpha(255),
+            );
+             ui.painter().text(
+                thumb_rect.center(),
+                egui::Align2::CENTER_CENTER,
+                "BLURRED",
+                egui::FontId::proportional(8.0), // Small text for thumbnail
+                egui::Color32::WHITE,
+            );
+        }
     } else {
         ui.painter()
             .rect_filled(thumb_rect, 2.0, egui::Color32::from_gray(60));

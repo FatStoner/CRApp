@@ -283,6 +283,9 @@ impl CrapApp {
             self.mode = AppMode::Characters;
             self.central_view = CentralView::Editor;
             self.last_active_character_id = Some(id);
+
+            // Reset temporary blur overrides when switching characters
+            self.blur_overrides.clear();
         }
     }
 
@@ -485,6 +488,23 @@ impl CrapApp {
             // Actually it spawns a task and eventually reloads chars.
             // That's fine for now.
             self.save_character(char_clone);
+        }
+    }
+
+    pub fn toggle_character_blur(&mut self, char_id: i64) {
+        if let Some(c) = self.characters.iter().find(|c| c.id == char_id) {
+            let base_blur =
+                self.blur_all_images || (self.blur_all_nsfw && c.is_nsfw) || c.blur_avatar;
+
+            // Check current effective state
+            let current_state = if let Some(&override_val) = self.blur_overrides.get(&char_id) {
+                override_val
+            } else {
+                base_blur
+            };
+
+            // Toggle it
+            self.blur_overrides.insert(char_id, !current_state);
         }
     }
 

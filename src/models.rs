@@ -81,6 +81,10 @@ pub struct Character {
     pub quick_notes: String,
     #[sqlx(default)]
     pub is_favorite: bool,
+    #[sqlx(default)]
+    pub is_nsfw: bool,
+    #[sqlx(default)]
+    pub blur_avatar: bool,
     pub spell_check_overrides_json: Option<String>,
     #[sqlx(skip)]
     pub spell_check_overrides: std::collections::HashSet<String>,
@@ -110,6 +114,8 @@ impl Default for Character {
             collection_id: None,
             quick_notes: "".to_string(),
             is_favorite: false,
+            is_nsfw: false,
+            blur_avatar: false,
             spell_check_overrides_json: None,
             spell_check_overrides: std::collections::HashSet::new(),
             app_tags: Vec::new(),
@@ -133,6 +139,8 @@ impl Character {
             && self.collection_id == other.collection_id
             && self.quick_notes == other.quick_notes
             && self.is_favorite == other.is_favorite
+            && self.is_nsfw == other.is_nsfw
+            && self.blur_avatar == other.blur_avatar
             && self.spell_check_overrides == other.spell_check_overrides
             && self
                 .urls

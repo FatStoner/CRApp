@@ -113,7 +113,11 @@ pub struct CrapApp {
     pub enable_spell_check: bool,
     pub editor_font: EditorFontFamily,
     pub editor_large_font: bool,
+
     pub editor_bright_mode: bool,
+    pub blur_all_images: bool,
+    pub blur_all_nsfw: bool,
+    pub blur_overrides: std::collections::HashMap<i64, bool>,
 
     // Gallery Zoom
     pub gallery_zoom: f32,
@@ -225,7 +229,11 @@ impl CrapApp {
             enable_spell_check: true,
             editor_font: EditorFontFamily::SansSerif,
             editor_large_font: false,
+
             editor_bright_mode: true,
+            blur_all_images: false,
+            blur_all_nsfw: false,
+            blur_overrides: std::collections::HashMap::new(),
 
             gallery_zoom: 1.0,
             gallery_pan: egui::vec2(0.0, 0.0),
@@ -433,6 +441,38 @@ impl CrapApp {
                     let _ = tx.send(UiEvent::EditorBrightModeLoaded(true)).await;
                 }
                 Err(e) => eprintln!("Failed to load bright mode setting: {}", e),
+            }
+        });
+
+        // Initial Blur All Images Load
+        let tx = self.tx.clone();
+        let db = self.db.clone();
+        tokio::spawn(async move {
+            match db.get_setting("blur_all_images").await {
+                Ok(Some(val)) => {
+                    let enabled = val == "true";
+                    let _ = tx.send(UiEvent::BlurAllImagesLoaded(enabled)).await;
+                }
+                Ok(None) => {
+                    let _ = tx.send(UiEvent::BlurAllImagesLoaded(false)).await;
+                }
+                Err(e) => eprintln!("Failed to load blur all images setting: {}", e),
+            }
+        });
+
+        // Initial Blur All NSFW Load
+        let tx = self.tx.clone();
+        let db = self.db.clone();
+        tokio::spawn(async move {
+            match db.get_setting("blur_all_nsfw").await {
+                Ok(Some(val)) => {
+                    let enabled = val == "true";
+                    let _ = tx.send(UiEvent::BlurAllNsfwLoaded(enabled)).await;
+                }
+                Ok(None) => {
+                    let _ = tx.send(UiEvent::BlurAllNsfwLoaded(false)).await;
+                }
+                Err(e) => eprintln!("Failed to load blur all nsfw setting: {}", e),
             }
         });
 

@@ -22,8 +22,8 @@ pub async fn upsert(pool: &SqlitePool, character: &mut Character) -> Result<(), 
     if character.id == 0 {
         // INSERT
         let id = sqlx::query(
-            "INSERT INTO characters (name, char_name, char_title, personality, scenario, example_dialogue, first_message, author_notes, avatar_path, created_at, updated_at, collection_id, is_favorite, spell_check_overrides_json, quick_notes)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            "INSERT INTO characters (name, char_name, char_title, personality, scenario, example_dialogue, first_message, author_notes, avatar_path, created_at, updated_at, collection_id, is_favorite, is_nsfw, blur_avatar, spell_check_overrides_json, quick_notes)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
         )
         .bind(&character.name)
         .bind(&character.char_name)
@@ -38,6 +38,8 @@ pub async fn upsert(pool: &SqlitePool, character: &mut Character) -> Result<(), 
         .bind(character.updated_at)
         .bind(character.collection_id)
         .bind(character.is_favorite)
+        .bind(character.is_nsfw)
+        .bind(character.blur_avatar)
         .bind(&character.spell_check_overrides_json)
         .bind(&character.quick_notes)
         .execute(pool)
@@ -48,7 +50,7 @@ pub async fn upsert(pool: &SqlitePool, character: &mut Character) -> Result<(), 
     } else {
         // UPDATE
         sqlx::query(
-            "UPDATE characters SET name=?, char_name=?, char_title=?, personality=?, scenario=?, example_dialogue=?, first_message=?, author_notes=?, avatar_path=?, updated_at=?, collection_id=?, is_favorite=?, spell_check_overrides_json=?, quick_notes=? WHERE id=?"
+            "UPDATE characters SET name=?, char_name=?, char_title=?, personality=?, scenario=?, example_dialogue=?, first_message=?, author_notes=?, avatar_path=?, updated_at=?, collection_id=?, is_favorite=?, is_nsfw=?, blur_avatar=?, spell_check_overrides_json=?, quick_notes=? WHERE id=?"
         )
         .bind(&character.name)
         .bind(&character.char_name)
@@ -62,6 +64,8 @@ pub async fn upsert(pool: &SqlitePool, character: &mut Character) -> Result<(), 
         .bind(character.updated_at)
         .bind(character.collection_id)
         .bind(character.is_favorite)
+        .bind(character.is_nsfw)
+        .bind(character.blur_avatar)
         .bind(&character.spell_check_overrides_json)
         .bind(&character.quick_notes)
         .bind(character.id)

@@ -121,4 +121,24 @@ impl CrapApp {
             let _ = db.set_setting("editor_bright_mode", &val).await;
         });
     }
+
+    pub fn set_blur_all_images(&mut self, enabled: bool) {
+        self.blur_all_images = enabled;
+        self.blur_overrides.clear(); // Reset overrides on global change
+        let db = self.db.clone();
+        let val = enabled.to_string();
+        tokio::spawn(async move {
+            let _ = db.set_setting("blur_all_images", &val).await;
+        });
+    }
+
+    pub fn set_blur_all_nsfw(&mut self, enabled: bool) {
+        self.blur_all_nsfw = enabled;
+        self.blur_overrides.clear(); // Reset overrides on global change
+        let db = self.db.clone();
+        let val = enabled.to_string();
+        tokio::spawn(async move {
+            let _ = db.set_setting("blur_all_nsfw", &val).await;
+        });
+    }
 }

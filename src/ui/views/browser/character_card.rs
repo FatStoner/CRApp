@@ -1,82 +1,104 @@
 use crate::models::Tag;
-use crate::ui::CrapApp;
+
 use eframe::egui;
 
-use super::{render_collection_move_menu, BrowserAction};
+use super::render_collection_move_menu;
 
 pub fn render_character_card(
     ui: &mut egui::Ui,
-    _app: &mut CrapApp,
     char: &crate::models::Character,
     all_collections: &Vec<crate::models::Collection>,
-    actions: &mut Vec<BrowserAction>,
+    actions: &mut Vec<crate::ui::browser::BrowserAction>,
+    blur_all_images: bool,
+    blur_all_nsfw: bool,
+    blur_overrides: &std::collections::HashMap<i64, bool>,
 ) {
     let card_width = 180.0;
     let card_height = 260.0;
 
+    // 1. Allocate proper space in the parent UI (Critical for wrapping)
     let (rect, response) =
         ui.allocate_exact_size(egui::vec2(card_width, card_height), egui::Sense::click());
 
-    // Culling for Grid View
-    if !ui.is_rect_visible(rect) {
-        return;
+    // 2. Interaction
+    if response.clicked() {
+        actions.push(crate::ui::browser::BrowserAction::OpenCharacter(char.id));
     }
 
-    // Hover Effect
-    let bg_color = if response.hovered() {
+    // 3. Hover Effects
+    let is_hovered = response.hovered();
+    let bg_color = if is_hovered {
         ui.visuals().widgets.hovered.bg_fill
     } else {
         ui.visuals().widgets.noninteractive.bg_fill
     };
+    let stroke_color = if is_hovered {
+        ui.visuals().widgets.hovered.bg_stroke
+    } else {
+        ui.visuals().widgets.noninteractive.bg_stroke
+    };
 
-    ui.painter().rect_filled(rect, 8.0, bg_color);
-    ui.painter()
-        .rect_stroke(rect, 8.0, ui.visuals().widgets.noninteractive.bg_stroke);
-
-    // Interaction
-    if response.clicked() {
-        actions.push(BrowserAction::OpenCharacter(char.id));
+    if is_hovered {
+        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
     }
 
+    // 4. Paint Background
+    ui.painter().rect_filled(rect, 8.0, bg_color);
+    ui.painter().rect_stroke(rect, 8.0, stroke_color);
+
+    // 5. Context Menu (NO BLUR OPTIONS HERE)
     response.context_menu(|ui| {
         ui.menu_button("Move to...", |ui| {
             if ui.button("Root (Uncategorized)").clicked() {
-                actions.push(BrowserAction::MoveCharacter(char.id, None));
+                actions.push(crate::ui::browser::BrowserAction::MoveCharacter(
+                    char.id, None,
+                ));
                 ui.close_menu();
             }
             ui.separator();
-            render_collection_move_menu(ui, all_collections, None, char.id, actions);
+            render_collection_move_menu(ui, &all_collections, None, char.id, actions);
         });
 
-        ui.separator();
-        let fav_label = if char.is_favorite {
-            "Remove from Favorites"
-        } else {
-            "Add to Favorites"
-        };
-        if ui.button(fav_label).clicked() {
-            actions.push(BrowserAction::ToggleFavorite(char.id));
-            ui.close_menu();
-        }
-        ui.separator();
-
         if ui.button("🗑 Delete").clicked() {
-            actions.push(BrowserAction::DeleteCharacter(char.id));
+            actions.push(crate::ui::browser::BrowserAction::DeleteCharacter(char.id));
             ui.close_menu();
         }
     });
 
-    // Content
-    let content_rect = rect.shrink(8.0);
-
-    // Avatar (Top Square)
-    let avatar_size = content_rect.width();
-    let avatar_rect =
-        egui::Rect::from_min_size(content_rect.min, egui::vec2(avatar_size, avatar_size));
+    // 6. Content Rendering
+    let avatar_rect = egui::Rect::from_min_size(
+        rect.min + egui::vec2(8.0, 8.0),
+        egui::vec2(card_width - 16.0, card_width - 16.0), // Square
+    );
 
     if let Some(path_str) = &char.avatar_path {
         let uri = crate::ui::utils::get_image_uri(path_str);
         crate::ui::widgets::paint_avatar_crop(ui, avatar_rect, &uri, 4.0);
+
+        // Blur Logic
+        let base_blur = blur_all_images || (blur_all_nsfw && char.is_nsfw) || char.blur_avatar;
+        let should_blur = if let Some(&override_val) = blur_overrides.get(&char.id) {
+            override_val
+        } else {
+            base_blur
+        };
+
+        if should_blur {
+            ui.painter().rect_filled(
+                avatar_rect,
+                4.0,
+                egui::Color32::from_black_alpha(255), // Fully opaque black
+            );
+            // Optional: Icon or Text
+            let text = if char.is_nsfw { "NSFW" } else { "BLURRED" };
+            ui.painter().text(
+                avatar_rect.center(),
+                egui::Align2::CENTER_CENTER,
+                text,
+                egui::FontId::proportional(24.0), // Larger text
+                egui::Color32::WHITE,
+            );
+        }
     } else {
         ui.painter()
             .rect_filled(avatar_rect, 4.0, egui::Color32::from_gray(60));
@@ -91,7 +113,7 @@ pub fn render_character_card(
             avatar_rect.center(),
             egui::Align2::CENTER_CENTER,
             initial,
-            egui::FontId::proportional(40.0),
+            egui::FontId::proportional(32.0),
             egui::Color32::WHITE,
         );
     }
@@ -111,12 +133,11 @@ pub fn render_character_card(
         );
     }
 
-    // Text Area
+    // Text Content
     let text_top = avatar_rect.max.y + 8.0;
-    let _text_rect =
-        egui::Rect::from_min_max(egui::pos2(content_rect.min.x, text_top), content_rect.max);
-
     let mut cursor_y = text_top;
+    let content_left = rect.min.x + 8.0;
+    let _content_width = card_width - 16.0;
 
     // Name
     let name_font = egui::FontId::proportional(16.0);
@@ -126,7 +147,7 @@ pub fn render_character_card(
         ui.visuals().text_color(),
     );
     ui.painter().galley(
-        egui::pos2(content_rect.min.x, cursor_y),
+        egui::pos2(content_left, cursor_y),
         name_galley,
         ui.visuals().text_color(),
     );
@@ -135,34 +156,28 @@ pub fn render_character_card(
     // Title
     if !char.char_title.is_empty() {
         let title_font = egui::FontId::proportional(12.0);
-        // Use only the first line to prevent overlap with tags below
         let first_line = char.char_title.lines().next().unwrap_or("");
         let title_galley = ui.painter().layout_no_wrap(
             first_line.to_string(),
             title_font,
             ui.visuals().text_color().linear_multiply(0.7),
         );
-
-        // Clip to content width to prevent horizontal overlap if it's a single very long line
-        let mut title_clip = content_rect;
-        title_clip.set_height(14.0);
-        title_clip.min.y = cursor_y;
-        title_clip.max.y = cursor_y + 14.0;
-
-        ui.painter().with_clip_rect(title_clip).galley(
-            egui::pos2(content_rect.min.x, cursor_y),
+        let mut clip_rect = rect;
+        clip_rect.min.y = cursor_y;
+        clip_rect.max.y = cursor_y + 14.0;
+        ui.painter().with_clip_rect(clip_rect).galley(
+            egui::pos2(content_left, cursor_y),
             title_galley,
             ui.visuals().text_color(),
         );
         cursor_y += 16.0;
     } else {
-        cursor_y += 16.0; // Spacer
+        cursor_y += 16.0;
     }
-
     cursor_y += 4.0;
 
-    // Tags (Chips)
-    let mut tags_to_show: Vec<&Tag> = char.app_tags.iter().collect();
+    // Tags
+    let mut tags_to_show: Vec<&crate::models::Tag> = char.app_tags.iter().collect();
     let mut is_external = false;
     if tags_to_show.is_empty() {
         tags_to_show = char.external_tags.iter().collect();
@@ -171,14 +186,14 @@ pub fn render_character_card(
 
     if !tags_to_show.is_empty() {
         let tag_font = egui::FontId::proportional(10.0);
-        let mut tag_x = content_rect.min.x;
+        let mut tag_x = content_left;
         let bg_color = if is_external {
             egui::Color32::from_rgb(100, 100, 100)
         } else {
             egui::Color32::from_rgb(50, 80, 150)
         };
 
-        for tag in tags_to_show.iter().take(3) {
+        for tag in tags_to_show.iter().take(2) {
             let tag_galley = ui.painter().layout_no_wrap(
                 tag.name.clone(),
                 tag_font.clone(),
@@ -187,7 +202,7 @@ pub fn render_character_card(
             let pad = 4.0;
             let chip_w = tag_galley.rect.width() + pad * 2.0;
 
-            if tag_x + chip_w > content_rect.max.x {
+            if tag_x + chip_w > rect.max.x - 8.0 {
                 break;
             }
 
@@ -200,7 +215,6 @@ pub fn render_character_card(
                 tag_galley,
                 egui::Color32::WHITE,
             );
-
             tag_x += chip_w + 4.0;
         }
     }

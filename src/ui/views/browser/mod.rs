@@ -20,6 +20,7 @@ pub enum BrowserAction {
     OpenCollection(i64),
     ExportCollection(crate::ui::ExportTarget),
     ShowStatistics(i64),
+    ToggleBlur(i64),
 }
 
 pub fn render_collection_move_menu(
@@ -457,7 +458,15 @@ pub fn render_browser_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                             render_subfolder_card(ui, app, folder, &mut actions);
                         }
                         for char in &chars {
-                            render_character_card(ui, app, char, &all_collections, &mut actions);
+                            render_character_card(
+                                ui,
+                                char,
+                                &all_collections,
+                                &mut actions,
+                                app.blur_all_images,
+                                app.blur_all_nsfw,
+                                &app.blur_overrides,
+                            );
                         }
                     });
                 } else {
@@ -524,12 +533,67 @@ pub fn render_browser_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                                                 actions.push(BrowserAction::OpenCharacter(char.id));
                                             }
 
+                                            // Blur options removed from context menu as requested
+                                            response.context_menu(|ui| {
+                                                ui.separator();
+
+                                                ui.menu_button("Move to...", |ui| {
+                                                    if ui.button("Root (Uncategorized)").clicked() {
+                                                        actions.push(BrowserAction::MoveCharacter(
+                                                            char.id, None,
+                                                        ));
+                                                        ui.close_menu();
+                                                    }
+                                                    ui.separator();
+                                                    render_collection_move_menu(
+                                                        ui,
+                                                        &all_collections,
+                                                        None,
+                                                        char.id,
+                                                        &mut actions,
+                                                    );
+                                                });
+
+                                                if ui.button("🗑 Delete").clicked() {
+                                                    actions.push(BrowserAction::DeleteCharacter(
+                                                        char.id,
+                                                    ));
+                                                    ui.close_menu();
+                                                }
+                                            });
+
                                             // Avatar Painting
                                             if let Some(path_str) = &char.avatar_path {
                                                 let uri = crate::ui::utils::get_image_uri(path_str);
+                                                let base_blur = app.blur_all_images
+                                                    || (app.blur_all_nsfw && char.is_nsfw)
+                                                    || char.blur_avatar;
+                                                let should_blur = if let Some(&override_val) =
+                                                    app.blur_overrides.get(&char.id)
+                                                {
+                                                    override_val
+                                                } else {
+                                                    base_blur
+                                                };
+
                                                 crate::ui::widgets::paint_avatar_crop(
                                                     ui, rect, &uri, 4.0,
                                                 );
+
+                                                if should_blur {
+                                                    ui.painter().rect_filled(
+                                                        rect,
+                                                        4.0,
+                                                        egui::Color32::from_black_alpha(240),
+                                                    );
+                                                    ui.painter().text(
+                                                        rect.center(),
+                                                        egui::Align2::CENTER_CENTER,
+                                                        "NSFW",
+                                                        egui::FontId::proportional(20.0),
+                                                        egui::Color32::WHITE,
+                                                    );
+                                                }
                                             } else {
                                                 ui.painter().rect_filled(
                                                     rect,
@@ -741,6 +805,9 @@ pub fn render_browser_view(app: &mut CrapApp, ui: &mut egui::Ui) {
             }
             BrowserAction::ExportCollection(target) => {
                 app.popup_state = crate::ui::PopupState::ExportCollectionOptions { target };
+            }
+            BrowserAction::ToggleBlur(id) => {
+                app.toggle_character_blur(id);
             }
             BrowserAction::ShowStatistics(id) => {
                 app.show_statistics_window = true;
