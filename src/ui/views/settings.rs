@@ -337,6 +337,19 @@ pub fn render_options_window(app: &mut CrapApp, ctx: &egui::Context) {
                                     });
                                 }
                             }
+
+                            ui.add_space(10.0);
+                            if ui.button("📝 Patch Notes").clicked() {
+                                if let Ok(content) = std::fs::read_to_string("data/patch_notes.md")
+                                {
+                                    app.popup_state = crate::ui::PopupState::PatchNotes { content };
+                                } else {
+                                    app.set_status(
+                                        "Failed to load patch notes.".to_string(),
+                                        egui::Color32::RED,
+                                    );
+                                }
+                            }
                         });
                     }
                     SettingsTab::Dictionary => {

@@ -2,6 +2,7 @@ mod deletion;
 mod dictionary;
 mod editing;
 mod import_export;
+mod patch_notes;
 mod templates;
 mod updates;
 
@@ -78,6 +79,9 @@ pub enum PopupState {
         error: String,
     },
     UpToDate,
+    PatchNotes {
+        content: String,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -163,6 +167,10 @@ pub fn render_popups(ctx: &egui::Context, app: &mut CrapApp) {
         | PopupState::Updating
         | PopupState::UpdateError { .. } => {
             updates::render_update_popups(ctx, app, &state);
+        }
+
+        PopupState::PatchNotes { .. } => {
+            patch_notes::render_patch_notes_popup(ctx, app, &state);
         }
     }
 }
