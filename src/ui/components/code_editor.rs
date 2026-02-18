@@ -31,7 +31,6 @@ struct SimpleContextMenu<'a> {
     force_sync: &'a mut bool,
     id: String,
     spell_checker: &'a Option<std::sync::Arc<crate::ui::spell_check::SpellChecker>>,
-    editor_rect: egui::Rect,
 }
 
 impl<'a> egui_cosmic_text::widget::ContextMenu for SimpleContextMenu<'a> {
@@ -41,6 +40,11 @@ impl<'a> egui_cosmic_text::widget::ContextMenu for SimpleContextMenu<'a> {
         editor: &mut CosmicEdit<L>,
         font_system: &mut FontSystem,
     ) -> EditorActions {
+        ui.style_mut().wrap = Some(false);
+        ui.set_min_width(0.0);
+        ui.style_mut().spacing.button_padding = egui::vec2(4.0, 2.0);
+        ui.style_mut().spacing.item_spacing = egui::vec2(0.0, 2.0);
+
         let mut actions = EditorActions::default();
 
         // dictionary logic
@@ -48,12 +52,23 @@ impl<'a> egui_cosmic_text::widget::ContextMenu for SimpleContextMenu<'a> {
             let target_word_id = egui::Id::new(&self.id).with("context_menu_word");
             let target_word: Option<String> = ui.data(|d| d.get_temp(target_word_id));
 
+            if target_word.is_none() {
+                // SQUEEZE: Force the menu to be narrow if only Cut/Copy/Paste are here.
+                ui.set_max_width(60.0);
+            }
+
             if let Some(word) = target_word {
+                let display_word = if word.len() > 12 {
+                    format!("{}...", &word[..12])
+                } else {
+                    word.clone()
+                };
+
                 if ui
-                    .button(format!("Add \"{}\" to Dictionary", word))
+                    .button(format!("➕ Add \"{}\" to Dictionary", display_word))
                     .clicked()
                 {
-                    if let Some(checker) = self.spell_checker {
+                    if let Some(checker) = self.spell_checker.as_ref() {
                         checker.add_word(&word);
                         let glitches_id = egui::Id::new(&self.id).with("glitches");
                         // Clear cache to force re-check
@@ -421,7 +436,6 @@ impl<'a> CodeEditor<'a> {
                         ui.set_width(ui.available_width());
 
                         let mut force_sync_back = false;
-                        let editor_rect = ui.available_rect_before_wrap();
                         let resp = cosmic_edit.ui(
                             ui,
                             font_system,
@@ -432,7 +446,6 @@ impl<'a> CodeEditor<'a> {
                                 force_sync: &mut force_sync_back,
                                 id: self.id.clone(),
                                 spell_checker: &self.spell_checker,
-                                editor_rect,
                             },
                         );
                         force_sync_back_cell.set(force_sync_back);
@@ -687,7 +700,7 @@ impl<'a> CodeEditor<'a> {
 
         // Handle Context Menu Hit Testing on Right Click
         if response.secondary_clicked() {
-            if let Some(checker) = &self.spell_checker {
+            if self.spell_checker.is_some() {
                 let glitches_id = egui::Id::new(&self.id).with("glitches");
                 let cached_glitches: Option<Arc<(Vec<(usize, usize)>, Vec<usize>)>> =
                     ui.data(|d| d.get_temp(glitches_id));

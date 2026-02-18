@@ -92,18 +92,20 @@ pub fn render_subfolder_card(
     }
 
     response.context_menu(|ui| {
-        if ui.button("Rename Folder").clicked() {
+        ui.style_mut().wrap = Some(false);
+        ui.set_min_width(0.0);
+        if ui.button("✏ Rename Folder").clicked() {
             actions.push(BrowserAction::RenameCollection(
                 folder.id,
                 folder.name.clone(),
             ));
             ui.close_menu();
         }
-        if ui.button("Change Icon").clicked() {
+        if ui.button("🖼 Change Icon").clicked() {
             actions.push(BrowserAction::UpdateCollectionIcon(folder.id));
             ui.close_menu();
         }
-        if ui.button("Delete Folder").clicked() {
+        if ui.button("🗑 Delete Folder").clicked() {
             actions.push(BrowserAction::DeleteCollection(folder.id));
             ui.close_menu();
         }
@@ -176,18 +178,20 @@ pub fn render_subfolder_list_item(
                 }
 
                 response.context_menu(|ui| {
-                    if ui.button("Rename Folder").clicked() {
+                    ui.style_mut().wrap = Some(false);
+                    ui.set_min_width(0.0);
+                    if ui.button("✏ Rename Folder").clicked() {
                         actions.push(BrowserAction::RenameCollection(
                             folder.id,
                             folder.name.clone(),
                         ));
                         ui.close_menu();
                     }
-                    if ui.button("Change Icon").clicked() {
+                    if ui.button("🖼 Change Icon").clicked() {
                         actions.push(BrowserAction::UpdateCollectionIcon(folder.id));
                         ui.close_menu();
                     }
-                    if ui.button("Delete Folder").clicked() {
+                    if ui.button("🗑 Delete Folder").clicked() {
                         actions.push(BrowserAction::DeleteCollection(folder.id));
                         ui.close_menu();
                     }
