@@ -33,6 +33,10 @@ A dedicated modal window for application-wide settings.
     -   **Theme**: Toggle Light/Dark/System theme.
     -   **UI Scale**: Adjust global UI scaling.
     -   **Background**: Toggle custom background image and file picker integration.
+    -   **Updates**: Check for application updates and view **Patch Notes**.
+-   **Patch Notes**:
+    -   Displays version-specific updates using a custom markdown renderer.
+    -   **Embedding**: The notes are embedded into the binary using `include_str!` to ensure consistency across auto-updates.
 -   **Editor Appearance**:
     -   **Large Font**: Increases font size in all `CodeEditor` instances.
     -   **Bright Text**: Toggles between high-visibility and standard text colors.

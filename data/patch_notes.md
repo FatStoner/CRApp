@@ -1,3 +1,27 @@
+# Version 0.2.3 - Patch Notes
+
+## New functions
+
+### Edit Character Section Improvements
+- **Text Editor Improvements**: Remade text editor to enable customization options (font, font size, brightness) and better handling of selection and context menu. Optimized large file handling with culling and caching.
+- **Quick Notes**: Added quick character notes.
+- **Global Dictionary**: Implemented a global dictionary management system in settings for the spellchecker. You can also add your own words to the dictionary either through the settings or the context menu of the character editor.
+- **NSFW Marking**: Added NSFW marking to characters. For now this only affects the blur system but it might be expanded in the future.
+- **Blur/Unblur System**: Implemented a blur system. This include global blur setting, per-character blur setting and bluring characters marked as NSFW. You can also change blur state temporarily by right-clicking on the character image.
+
+### Integration
+- **SillyTavern/Chub.ai Lorebook Export**: Added support for lorebook exports compatible with SillyTavern, Chub.ai and afterhour.app.
+- **Chub.ai Character Import**: Added clipboard import support for Chub.ai character edit pages.
+
+## UI & UX Improvements
+- **Embedded Patch Notes**: You can view these patch notes directly in the application settings.
+- **Context Menu**: Added icons to some context menu options across the application.
+- **Context Menu Sizing**: Refined context menu layout to prevent width issues and disabled text wrapping.
+- **Performance**: Implemented asynchronous background thumbnailing and pre-calculated URIs for the character gallery to prevent freezes.
+
+## Bugfixes
+- **JPG Support**: Restored full support for JPG images.
+
 # Version 0.2.2 - Patch Notes
 
 ## New functions

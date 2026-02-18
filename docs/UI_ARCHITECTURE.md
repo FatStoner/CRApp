@@ -17,12 +17,13 @@ The CRApp UI follows an **MVC-like pattern** with clear separation of concerns:
 ```
 src/ui/
 ├── components/          # Reusable UI components
-│   └── popups/         # Categorized popup dialogs (827 LOC)
-│       ├── mod.rs      # Popup dispatcher (94 LOC)
+│   └── popups/         # Categorized popup dialogs (950 LOC)
+│       ├── mod.rs      # Popup dispatcher (105 LOC)
 │       ├── deletion.rs # Delete confirmations (156 LOC)
 │       ├── editing.rs  # Rename/unsaved changes (160 LOC)
 │       ├── import_export.rs # DB import/export (265 LOC)
-│       └── templates.rs # Template selection (152 LOC)
+│       ├── templates.rs # Template selection (152 LOC)
+│       └── patch_notes.rs # Version history rendering (110 LOC)
 │
 ├── controllers/         # Business logic layer
 │   ├── mod.rs          # Controller exports
@@ -112,12 +113,13 @@ Large files (>1000 LOC) are split into focused modules:
 - `side/mod.rs` - Panel structure, mode switching
 - `side/tree.rs` - Tree rendering, search, drag-drop
 
-**Popups** (was 827 LOC → now 5 files)
+**Popups** (was 827 LOC → now 6 files)
 - `popups/mod.rs` - Dispatcher routing
 - `popups/deletion.rs` - Delete confirmations
 - `popups/editing.rs` - Rename/unsaved changes
 - `popups/import_export.rs` - Import/export dialogs
 - `popups/templates.rs` - Template selection
+- `popups/patch_notes.rs` - Markdown-rendered patch notes
 
 **Editor Views** (was ~1,600 LOC → now 10+ files)
 - `editor/character/` - Modular character editor (5 modules)
@@ -263,6 +265,6 @@ The Character Gallery uses a multi-stage loading pipeline to maintain 60fps resp
 
 ---
 
-*Last Updated: 2026-02-17*
-*Total UI LOC: 13,500+*
-*Modules: 45+ files across 12 directories*
+*Last Updated: 2026-02-18*
+*Total UI LOC: 13,600+*
+*Modules: 48+ files across 12 directories*
