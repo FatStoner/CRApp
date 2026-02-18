@@ -195,6 +195,8 @@ pub enum UiEvent {
     UpdateStarted,
     UpdateFailed(String),
     CheckUpdatesAtStartLoaded(bool),
+    BlurAllImagesLoaded(bool),
+    BlurAllNsfwLoaded(bool),
 }
 
 #[derive(Clone, Debug, Default)]

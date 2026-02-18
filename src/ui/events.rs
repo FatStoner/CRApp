@@ -109,6 +109,12 @@ pub fn handle_ui_events(app: &mut CrapApp, ctx: &egui::Context) {
             UiEvent::EditorBrightModeLoaded(enabled) => {
                 app.editor_bright_mode = enabled;
             }
+            UiEvent::BlurAllImagesLoaded(enabled) => {
+                app.blur_all_images = enabled;
+            }
+            UiEvent::BlurAllNsfwLoaded(enabled) => {
+                app.blur_all_nsfw = enabled;
+            }
             UiEvent::LoreLinksBulkLoaded(map) => {
                 app.char_lore_map = map;
             }

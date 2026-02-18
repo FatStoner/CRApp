@@ -33,12 +33,14 @@ pub fn render_lorebook_characters(app: &mut CrapApp, ui: &mut egui::Ui, book: &L
             .show(ui, |ui| {
                 ui.horizontal_wrapped(|ui| {
                     for char in &linked_chars {
-                        crate::ui::browser::render_character_card(
+                        crate::ui::views::browser::render_character_card(
                             ui,
-                            app,
                             char,
                             &all_colls,
                             &mut browser_actions,
+                            app.blur_all_images,
+                            app.blur_all_nsfw,
+                            &app.blur_overrides,
                         );
                     }
                 });
@@ -93,6 +95,9 @@ pub fn render_lorebook_characters(app: &mut CrapApp, ui: &mut egui::Ui, book: &L
             crate::ui::browser::BrowserAction::OpenCollection(_) => {}
             crate::ui::browser::BrowserAction::ExportCollection(_) => {}
             crate::ui::browser::BrowserAction::ShowStatistics(_) => {}
+            crate::ui::browser::BrowserAction::ToggleBlur(id) => {
+                app.toggle_character_blur(id);
+            }
         }
     }
 }

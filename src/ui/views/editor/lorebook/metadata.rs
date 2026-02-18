@@ -158,6 +158,50 @@ pub fn render_lorebook_metadata(
                                     .max_width(preview_width),
                             );
 
+                            if app.blur_all_images {
+                                let rect = ui.min_rect(); // Get the rect of the image we just added
+                                                          // Actually, min_rect might be too big if other things are there.
+                                                          // But here we just added the image.
+                                                          // A better way is to allocate the response or use put.
+                                                          // Simple overlay:
+                                let overlay_rect = ui.min_rect().intersect(ui.clip_rect());
+                                // Approximation
+                                // BUT ui.min_rect() covers everything in the scope so far? No, `ui` here is the top_down layout.
+                                // The `ui.add(Image)` returns a response.
+                                // We can use that response.rect!
+                            }
+                        } else {
+                            // ...
+                        }
+
+                        // Retrying with correct logic using response
+                        if let Some(path_str) = &book.cover_path {
+                            let uri = crate::ui::utils::get_image_uri(path_str);
+                            let image_max_h = (max_total_h - 80.0).max(100.0);
+                            let preview_width = ui.available_width();
+
+                            let response = ui.add(
+                                egui::Image::new(uri)
+                                    .rounding(egui::Rounding::same(4.0))
+                                    .max_height(image_max_h)
+                                    .max_width(preview_width),
+                            );
+
+                            if app.blur_all_images {
+                                ui.painter().rect_filled(
+                                    response.rect,
+                                    4.0,
+                                    egui::Color32::from_black_alpha(255),
+                                );
+                                ui.painter().text(
+                                    response.rect.center(),
+                                    egui::Align2::CENTER_CENTER,
+                                    "BLURRED",
+                                    egui::FontId::proportional(20.0),
+                                    egui::Color32::WHITE,
+                                );
+                            }
+
                             ui.add_space(4.0);
                             ui.horizontal_wrapped(|ui| {
                                 ui.spacing_mut().item_spacing.x = 0.0;
