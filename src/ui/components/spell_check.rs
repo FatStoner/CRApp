@@ -70,4 +70,25 @@ impl SpellChecker {
             }
         }
     }
+    pub fn get_ignored_words(&self) -> Vec<String> {
+        if let Ok(ignored) = self.ignored_words.read() {
+            let mut words: Vec<String> = ignored.iter().cloned().collect();
+            words.sort();
+            words
+        } else {
+            Vec::new()
+        }
+    }
+
+    pub fn remove_word(&self, word: &str) {
+        if let Ok(mut ignored) = self.ignored_words.write() {
+            if ignored.remove(word) {
+                // Re-write the file without the removed word
+                let content: String = ignored.iter().map(|w| format!("{}\n", w)).collect();
+                if let Err(e) = std::fs::write(&self.ignored_words_path, content) {
+                    eprintln!("Failed to update ignored words file: {}", e);
+                }
+            }
+        }
+    }
 }

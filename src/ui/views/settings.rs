@@ -23,6 +23,11 @@ pub fn render_options_window(app: &mut CrapApp, ctx: &egui::Context) {
                     SettingsTab::Updates,
                     "Updates",
                 );
+                ui.selectable_value(
+                    &mut app.active_settings_tab,
+                    SettingsTab::Dictionary,
+                    "Dictionary",
+                );
                 ui.selectable_value(&mut app.active_settings_tab, SettingsTab::About, "About");
             });
             ui.separator();
@@ -333,6 +338,47 @@ pub fn render_options_window(app: &mut CrapApp, ctx: &egui::Context) {
                                 }
                             }
                         });
+                    }
+                    SettingsTab::Dictionary => {
+                        ui.heading("Dictionary");
+                        ui.add_space(8.0);
+                        ui.label("Manage words ignored by the spell checker.");
+
+                        ui.add_space(8.0);
+
+                        if let Some(checker) = &app.spell_checker {
+                            let words = checker.get_ignored_words();
+
+                            egui::ScrollArea::vertical()
+                                .max_height(300.0)
+                                .show(ui, |ui| {
+                                    ui.set_width(ui.available_width());
+                                    if words.is_empty() {
+                                        ui.label(
+                                            egui::RichText::new("No custom words added.")
+                                                .italics()
+                                                .color(egui::Color32::GRAY),
+                                        );
+                                    } else {
+                                        for word in &words {
+                                            ui.label(word);
+                                        }
+                                    }
+                                });
+
+                            ui.add_space(10.0);
+
+                            if ui.button("Edit Dictionary").clicked() {
+                                app.popup_state = crate::ui::PopupState::DictionaryEdit {
+                                    new_word_input: String::new(),
+                                };
+                            }
+                        } else {
+                            ui.label(
+                                egui::RichText::new("Spell checker is not initialized.")
+                                    .color(egui::Color32::RED),
+                            );
+                        }
                     }
                     SettingsTab::About => {
                         ui.heading("About");

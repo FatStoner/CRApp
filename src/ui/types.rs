@@ -23,6 +23,7 @@ pub enum CharacterTab {
 pub enum SettingsTab {
     General,
     Tokens,
+    Dictionary,
     Updates,
     About,
 }

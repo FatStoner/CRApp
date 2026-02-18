@@ -1,4 +1,5 @@
 mod deletion;
+mod dictionary;
 mod editing;
 mod import_export;
 mod templates;
@@ -57,6 +58,9 @@ pub enum PopupState {
     TemplatePreview {
         template_data: crate::models::Template,
         target_char_id: i64,
+    },
+    DictionaryEdit {
+        new_word_input: String,
     },
     ExportCollectionOptions {
         target: crate::ui::ExportTarget,
@@ -142,6 +146,10 @@ pub fn render_popups(ctx: &egui::Context, app: &mut CrapApp) {
         | PopupState::ExportCollectionOptions { .. }
         | PopupState::ExportCollectionAdvanced { .. } => {
             import_export::render_import_export_popups(ctx, app, &state);
+        }
+
+        PopupState::DictionaryEdit { .. } => {
+            dictionary::render_dictionary_edit_popup(ctx, app, &state);
         }
 
         // Template popups
