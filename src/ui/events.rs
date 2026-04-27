@@ -273,7 +273,12 @@ pub fn handle_ui_events(app: &mut CrapApp, ctx: &egui::Context) {
                                 let new_pos_by_id = l
                                     .entries
                                     .iter()
-                                    .position(|e| e.id == app.selected_entry.as_ref().unwrap().id);
+                                    .position(|e| {
+                                        app.selected_entry
+                                            .as_ref()
+                                            .map(|sel| sel.id == e.id)
+                                            .unwrap_or(false)
+                                    });
 
                                 if let Some(new_idx) = new_pos_by_id {
                                     // It still exists! Just update the selected_entry data directly

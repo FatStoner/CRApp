@@ -240,7 +240,8 @@ The `CodeEditor` (wrapper around `cosmic-text`) is optimized for large files (10
 - **Visibility Culling**: Only lines visible on screen are processed for spell-checking and decoration.
 - **Zero-Allocation Sync**: Uses a `Length + Hashing` heuristic for change detection. Full hashing is skipped if file length is identical to the last frame.
 - **Shared Memory**: Spell-check results and line offsets are stored in `Arc` containers to avoid per-frame `Vec` cloning.
-- **State Persistence**: Uses `egui::Memory` to track font changes, brightness, and search queries, preventing expensive re-layouts unless necessary.
+- **State Persistence & Recovery**: Uses `egui::Memory` to track font changes and search queries. Retrieval logic includes a recovery mechanism that creates a fresh editor instance if state is lost during rapid focus transitions, preventing application panics.
+- **Early Input Interception**: Intercepts Enter and Command keys BEFORE the underlying layout engine processes them. This prevents illegal characters (like newlines in single-line mode) from entering the buffer and causing inconsistent states.
 
 ---
 
@@ -265,6 +266,6 @@ The Character Gallery uses a multi-stage loading pipeline to maintain 60fps resp
 
 ---
 
-*Last Updated: 2026-02-18*
-*Total UI LOC: 13,600+*
-*Modules: 48+ files across 12 directories*
+*Last Updated: 2026-04-27*
+*Total UI LOC: 13,800+*
+*Modules: 50+ files across 12 directories*

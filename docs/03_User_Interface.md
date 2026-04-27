@@ -12,6 +12,7 @@ Handles all asynchronous events arriving from the backend via a channel.
 -   **Responsibilities**:
     -   Processing `UiEvent` variants (Loaded data, Saved confirmations, Errors).
     -   Updating the central application state (`CrapApp`) based on these events.
+    -   **Defensive Selection Restoration**: Implements safety checks when reloading lorebook entries to prevent panics if the previously selected entry no longer exists or if no entry was selected (e.g., in Metadata view).
     -   Triggering UI repaints when new data arrives.
 
 ### 0b. Utility Functions (`ui/utils.rs`)

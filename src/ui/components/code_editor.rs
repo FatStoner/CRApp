@@ -310,7 +310,20 @@ impl<'a> CodeEditor<'a> {
             editors.insert(self.id.clone(), widget);
         }
 
-        let mut cosmic_edit = editors.remove(&self.id).unwrap();
+        let mut cosmic_edit = editors.remove(&self.id).unwrap_or_else(|| {
+            // Recover from state loss: create a fresh editor
+            let mut widget = CosmicEdit::new(
+                scaled_font_size,
+                LineHeight::Absolute(scaled_line_height),
+                Interactivity::Enabled,
+                HoverStrategy::Widget,
+                FillWidth::default(),
+                font_system,
+            );
+            let spans = self.build_spans(self.text.as_str(), default_attrs, highlight_attrs);
+            widget.set_text(spans, default_attrs, Shaping::Advanced, font_system);
+            widget
+        });
         // Font Size Caching
         let last_font_size_id = ui.make_persistent_id(format!("{}_last_font_size", self.id));
         let last_font_size: Option<f32> = ui.data(|d| d.get_temp(last_font_size_id));
@@ -436,6 +449,18 @@ impl<'a> CodeEditor<'a> {
                         ui.set_width(ui.available_width());
 
                         let mut force_sync_back = false;
+                        
+                        // INTERCEPT ENTER EARLY for single-line to prevent cosmic-text from processing it
+                        if self.is_single_line {
+                            let resp_id = egui::Id::new(&self.id);
+                            let has_focus = ui.memory(|m| m.has_focus(resp_id));
+                            if has_focus {
+                                if ui.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::Enter)) {
+                                    ui.memory_mut(|m| m.surrender_focus(resp_id));
+                                }
+                            }
+                        }
+
                         let resp = cosmic_edit.ui(
                             ui,
                             font_system,
@@ -619,12 +644,6 @@ impl<'a> CodeEditor<'a> {
                         // Robust Keyboard Overrides
                         if resp.has_focus() {
                             ui.input_mut(|i| {
-                                if self.is_single_line
-                                    && i.consume_key(egui::Modifiers::NONE, egui::Key::Enter)
-                                {
-                                    resp.surrender_focus();
-                                }
-
                                 if i.consume_key(egui::Modifiers::COMMAND, egui::Key::V) {
                                     if let Ok(text) = clipboard.get_text() {
                                         if !text.is_empty() {
