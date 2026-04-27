@@ -1,3 +1,8 @@
+# Version 0.2.4 - Patch Notes (In Progress)
+
+## Bugfixes
+- **Folder Renaming**: Fixed a bug where renaming a subfolder would move it to the root and reset its display order.
+
 # Version 0.2.3 - Patch Notes
 
 ## New functions

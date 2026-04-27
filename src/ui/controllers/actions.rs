@@ -383,9 +383,17 @@ impl CrapApp {
     pub fn save_collection(&mut self, id: i64, name: String, parent_id: Option<i64>) {
         self.is_saving = true;
         let mut image_path = None;
+        let mut display_order = 0;
+        let mut final_parent_id = parent_id;
+
         if id != 0 {
             if let Some(c) = self.collections.iter().find(|c| c.id == id) {
                 image_path = c.image_path.clone();
+                display_order = c.display_order;
+                // If parent_id is None, preserve the existing one for renames
+                if final_parent_id.is_none() {
+                    final_parent_id = c.parent_id;
+                }
             }
         }
 
@@ -394,8 +402,8 @@ impl CrapApp {
         let col = crate::models::Collection {
             id,
             name,
-            parent_id,
-            display_order: 0,
+            parent_id: final_parent_id,
+            display_order,
             image_path,
         };
         let ctx = self.ctx.clone();

@@ -58,6 +58,7 @@ Represents a folder for organizing characters.
     -   `name`: `String`.
     -   `image_path`: `Option<String>` (Path to custom folder icon).
     -   `parent_id`: `Option<i64>` (Allows hierarchical folders).
+    -   `display_order`: `i64` (Sorting order within the same parent).
 
 ### Tag
 A simple label for filtering.

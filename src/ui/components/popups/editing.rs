@@ -22,14 +22,16 @@ pub fn render_editing_popups(ctx: &egui::Context, app: &mut CrapApp, state: &sup
                             };
                         }
                         if response.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
-                            app.save_collection(*id, name.clone(), None);
+                            let parent_id = app.collections.iter().find(|c| c.id == *id).and_then(|c| c.parent_id);
+                            app.save_collection(*id, name.clone(), parent_id);
                             close = true;
                         }
                     });
                     ui.add_space(5.0);
                     ui.horizontal(|ui| {
                         if ui.button("Save").clicked() {
-                            app.save_collection(*id, name.clone(), None);
+                            let parent_id = app.collections.iter().find(|c| c.id == *id).and_then(|c| c.parent_id);
+                            app.save_collection(*id, name.clone(), parent_id);
                             close = true;
                         }
                         if ui.button("Cancel").clicked() {
