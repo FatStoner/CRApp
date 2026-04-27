@@ -78,8 +78,9 @@ Handles the detailed editing interfaces.
     -   **Tabbed Section**:
         -   **Entries Tab**: Master-Detail view for managing individual entries. Feature a swapped layout (Editor on Left, List on Right) and dynamic count badge.
         -   **Characters Tab**: Gallery view of all characters linked to this lorebook with dynamic count badge.
-    -   **Sync**: Automatically synchronizes entry edits to the main lorebook object before saving or navigating, ensuring no data loss.
+    -   **Sync**: Automatically synchronizes entry edits to the main lorebook object before saving, navigating, or switching entries, ensuring no data loss.
     -   **Dirty State Tracking**: Implements robust dirty state detection by comparing deep copies of the lorebook (including entries and tags) with the saved state.
+        -   **Entry Addition/Selection Protection**: Intercepts actions that trigger database reloads (such as adding a new entry or switching entries) with a confirmation popup if unsaved changes are detected.
         -   **Tag Reloading**: Reloads tags from the database immediately after saving to ensure ID consistency and prevent false "dirty" flags.
     -   **Safety**: Delete confirmation for lore entries.
     -   **Quick Search**: In-editor search bar that highlights matches and automatically jumps to matching entries.
@@ -164,7 +165,7 @@ The application supports the following keyboard shortcuts for improved efficienc
 -   **Esc**: Navigate back. Acts identical to the **Back button**. Returns to previous view or parent folder using the navigation history. Triggers "Unsaved Changes" warning in Editor (Character/Lorebook). Only works when no text field is focused.
 -   **Back / Up Buttons**: Utilize `request_back()` and `request_collection_switch()` to ensure state is saved before navigating.
     -   **Navigation History**: The application maintains a navigation stack, allowing the user to return to previous folders or views after deep searches or editor sessions.
-    -   **Unsaved Changes**: If the editor detects changes (via boolean flags like `lorebook_has_changes`), the navigation is intercepted, and a confirmation popup is displayed.
+    -   **Unsaved Changes**: If the editor detects changes (via deep comparison or `is_dirty` flags), the application intercepts high-risk actions—such as global navigation, adding new entries, importing data, or switching between items—and displays a confirmation popup. This prevents data loss from reloads that would otherwise wipe in-memory edits.
 
 ## Performance & Optimization
 To ensure a responsive UI, especially with large numbers of characters (thousands), several optimizations are implemented:

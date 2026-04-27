@@ -88,6 +88,8 @@ pub enum AppAction {
     CreateNewTemplate,
     SwitchTemplate(i64),
     SwitchToTemplates,
+    AddLorebookEntry(i64),
+    SwitchLorebookEntry(i64),
 }
 
 #[derive(Clone, Debug)]

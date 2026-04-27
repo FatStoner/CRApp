@@ -237,6 +237,16 @@ impl CrapApp {
                 self.selected_lorebook = None;
                 self.blur_overrides.clear(); // Clear overrides on navigation
             }
+            AppAction::AddLorebookEntry(lorebook_id) => {
+                self.add_entry_to_lorebook(lorebook_id);
+            }
+            AppAction::SwitchLorebookEntry(entry_id) => {
+                if let Some(book) = &mut self.selected_lorebook {
+                    if let Some(entry) = book.entries.iter().find(|e| e.id == entry_id).cloned() {
+                        self.selected_entry = Some(entry);
+                    }
+                }
+            }
         }
     }
 }

@@ -12,6 +12,7 @@ pub fn render_lorebook_entries(
     entry_save_req: &mut Option<LorebookEntry>,
     entry_add_req: &mut bool,
     status_update: &mut Option<(String, egui::Color32)>,
+    is_dirty: bool,
 ) {
     let font_family = match app.editor_font {
         EditorFontFamily::SansSerif => Family::SansSerif,
@@ -179,7 +180,11 @@ pub fn render_lorebook_entries(
                         .on_hover_text("Paste Entry from Clipboard")
                         .clicked()
                     {
-                        if let Ok(mut clipboard) = Clipboard::new() {
+                        if is_dirty {
+                            app.popup_state = crate::ui::PopupState::UnsavedChanges {
+                                target: crate::ui::AppAction::SwitchLorebook(book.id), // Reload trigger
+                            };
+                        } else if let Ok(mut clipboard) = Clipboard::new() {
                             if let Ok(text) = clipboard.get_text() {
                                 if let Ok(mut new_entry) =
                                     serde_json::from_str::<LorebookEntry>(&text)
@@ -199,7 +204,13 @@ pub fn render_lorebook_entries(
                         }
                     }
                     if ui.small_button("+").clicked() {
-                        *entry_add_req = true;
+                        if is_dirty {
+                            app.popup_state = crate::ui::PopupState::UnsavedChanges {
+                                target: crate::ui::AppAction::AddLorebookEntry(book.id),
+                            };
+                        } else {
+                            *entry_add_req = true;
+                        }
                     }
                 });
                 ui.separator();
@@ -242,7 +253,15 @@ pub fn render_lorebook_entries(
                                 };
 
                                 if ui.selectable_label(selected, label_text).clicked() {
-                                    switch_to_entry = Some(entry.clone());
+                                    if is_dirty {
+                                        app.popup_state = crate::ui::PopupState::UnsavedChanges {
+                                            target: crate::ui::AppAction::SwitchLorebookEntry(
+                                                entry.id,
+                                            ),
+                                        };
+                                    } else {
+                                        switch_to_entry = Some(entry.clone());
+                                    }
                                 }
                             });
                         }

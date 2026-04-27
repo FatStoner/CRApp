@@ -112,10 +112,16 @@ pub fn render_lorebook_editor(app: &mut CrapApp, ui: &mut egui::Ui) {
 
                 // IMPORT
                 if ui.button("IMPORT").clicked() {
-                    app.popup_state = crate::ui::PopupState::LorebookImport {
-                        source_code: String::new(),
-                        parsed_data: None,
-                    };
+                    if is_dirty {
+                        app.popup_state = crate::ui::PopupState::UnsavedChanges {
+                            target: crate::ui::AppAction::SwitchLorebook(book.id), // Re-selecting same book works as a reload trigger for popup
+                        };
+                    } else {
+                        app.popup_state = crate::ui::PopupState::LorebookImport {
+                            source_code: String::new(),
+                            parsed_data: None,
+                        };
+                    }
                 }
 
                 // SAVE
@@ -281,6 +287,7 @@ pub fn render_lorebook_editor(app: &mut CrapApp, ui: &mut egui::Ui) {
                     &mut entry_save_req,
                     &mut entry_add_req,
                     &mut status_update,
+                    is_dirty,
                 );
             }
             crate::ui::LorebookTab::Characters => {

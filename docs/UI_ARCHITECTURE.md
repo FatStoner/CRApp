@@ -267,5 +267,5 @@ The Character Gallery uses a multi-stage loading pipeline to maintain 60fps resp
 ---
 
 *Last Updated: 2026-04-27*
-*Total UI LOC: 13,800+*
+*Total UI LOC: 14,000+*
 *Modules: 50+ files across 12 directories*
