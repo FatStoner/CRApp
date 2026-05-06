@@ -2,7 +2,7 @@
 
 ## Architectural Improvements
 - **Asynchronous Threading Model**: Refactored the core application initialization to properly separate the UI loop from the async Tokio runtime. This prevents potential deadlocks and improves stability across all platforms.
-- **Improved Error Capture**: Integrated a professional logging system (`tracing`) that records application events and errors to `data/logs/crapp.log`.
+- **Improved Error Capture**: Integrated a professional logging system (`tracing`) that records application events and errors to `data/logs/`. Logs are now rotated daily, and the application automatically cleans up old logs (keeping only the 5 most recent files) to prevent indefinite file growth.
 - **Enhanced UI Feedback**: Critical background errors (like database save failures) are now reported directly to the UI through status messages, ensuring you are immediately informed of any issues.
 
 ## UI & UX Improvements

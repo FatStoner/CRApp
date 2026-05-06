@@ -12,9 +12,40 @@ use db::Database;
 use ui::CrapApp;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
+fn cleanup_old_logs(log_dir: &str, keep_max: usize) {
+    if let Ok(entries) = std::fs::read_dir(log_dir) {
+        let mut logs: Vec<_> = entries
+            .filter_map(Result::ok)
+            .filter(|e| {
+                e.path().is_file() && e.file_name().to_string_lossy().starts_with("crapp.log")
+            })
+            .collect();
+
+        if logs.len() <= keep_max {
+            return;
+        }
+
+        // Sort by modification date (newest first)
+        logs.sort_by_key(|e| {
+            std::cmp::Reverse(
+                e.metadata()
+                    .and_then(|m| m.modified())
+                    .unwrap_or(std::time::SystemTime::UNIX_EPOCH),
+            )
+        });
+
+        for entry in logs.into_iter().skip(keep_max) {
+            let _ = std::fs::remove_file(entry.path());
+        }
+    }
+}
+
 fn init_tracing() -> tracing_appender::non_blocking::WorkerGuard {
     std::fs::create_dir_all("data/logs").unwrap_or_default();
-    let file_appender = tracing_appender::rolling::never("data/logs", "crapp.log");
+    
+    cleanup_old_logs("data/logs", 5);
+
+    let file_appender = tracing_appender::rolling::daily("data/logs", "crapp.log");
     let (non_blocking, guard) = tracing_appender::non_blocking(file_appender);
 
     let file_layer = tracing_subscriber::fmt::layer()
@@ -24,7 +55,6 @@ fn init_tracing() -> tracing_appender::non_blocking::WorkerGuard {
     let stdout_layer = tracing_subscriber::fmt::layer()
         .with_writer(std::io::stdout);
 
-    // Domyślny poziom logowania to INFO
     let filter_layer = tracing_subscriber::EnvFilter::try_from_default_env()
         .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info"));
 
@@ -46,8 +76,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .build()?;
     let _enter = rt.enter();
 
-    let result = run_app(&rt);
-    if let Err(e) = result {
+    if let Err(e) = run_app(&rt) {
         rfd::MessageDialog::new()
             .set_title("Startup Error")
             .set_description(&format!("The application failed to start:\n\n{}", e))
@@ -59,27 +88,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn run_app(rt: &tokio::runtime::Runtime) -> Result<(), Box<dyn std::error::Error>> {
-    // Spawn update check in background (non-blocking)
-    #[cfg(not(debug_assertions))]
-    {
-        // We only check if the setting allows it
-        let db_check = rt.block_on(async { Database::init().await.ok() });
-        // Note: we can't easily access the DB here properly without init, but we init below.
-        // Actually, we should probably do this AFTER db init or read the file manually?
-        // Simpler: Just spawn it, and inside the thread check the DB?
-        // Or better: Let CrapApp handle it in its init!
-        // Moving update check to CrapApp::new or CrapApp::update is better for access to settings.
-        // BUT, CrapApp::new is synchronous.
-
-        // Let's defer this to CrapApp initialization where we load settings.
-    }
-
-    // Initialize Database
     let db = rt.block_on(async { Database::init().await })
         .map_err(|e| e as Box<dyn std::error::Error>)?;
 
-    // Clean up unused media
-    // We swallow errors here (logging them) to not crash the app on cleanup failure
     if let Err(e) = rt.block_on(async { cleaner::cleanup_unused_media(&db.pool).await }) {
         tracing::warn!("Failed to cleanup unused media: {}", e);
     }

@@ -237,7 +237,7 @@ impl CrapApp {
                         }
                         Err(e) => {
                             tracing::error!("Failed to save entry: {}", e);
-                            let _ = tx.send(UiEvent::StatusMessage(format!("Failed to save entry: {}", e), egui::Color32::RED)).await;
+                            let _ = tx.send(UiEvent::StatusMessage(format!("Failed to save entry: {}", e), eframe::egui::Color32::RED)).await;
                         }
                     }
                 }

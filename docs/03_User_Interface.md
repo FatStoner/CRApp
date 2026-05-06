@@ -10,8 +10,9 @@ The `mod.rs` file serves as the main entry point for the UI module. It implement
 ### 0a. UI Event Loop (`ui/events.rs`)
 Handles all asynchronous events arriving from the backend via a channel.
 -   **Responsibilities**:
-    -   Processing `UiEvent` variants (Loaded data, Saved confirmations, Errors).
-    -   Updating the central application state (`CrapApp`) based on these events.
+    -   **Processing `UiEvent` variants**: Handles data loading, save confirmations, and background error messages.
+    -   **Background Error Reporting**: Critical errors from async background tasks (e.g., DB save failures) are received via `UiEvent::StatusMessage` and displayed as red toast notifications in the UI.
+    -   **Updating the central application state**: Updates `CrapApp` based on incoming events.
     -   **Defensive Selection Restoration**: Implements safety checks when reloading lorebook entries to prevent panics if the previously selected entry no longer exists or if no entry was selected (e.g., in Metadata view).
     -   Triggering UI repaints when new data arrives.
 

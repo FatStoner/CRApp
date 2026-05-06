@@ -110,6 +110,9 @@ Non-text data is stored on the local filesystem, with paths stored in the databa
 -   **Gallery**: Stored in `data/gallery/` (Reserved for character galleries, managed separately).
 -   **Background**: Stored in `data/background/` (`default.png` and `custom.png`).
 -   **Exports**: Saved to `exports/` (default dialog path).
+-   **Logs**: Application events and errors are stored in `data/logs/`.
+    -   **Rotation**: Logs are rotated daily (`crapp.log.YYYY-MM-DD`).
+    -   **Cleanup**: Only the 5 most recent log files are kept to save space.
 
 ## Automated Media Cleanup
 
