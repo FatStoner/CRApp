@@ -109,7 +109,7 @@ Non-text data is stored on the local filesystem, with paths stored in the databa
 -   **Lorebook Covers**: Stored in `data/covers/`.
 -   **Gallery**: Stored in `data/gallery/` (Reserved for character galleries, managed separately).
 -   **Background**: Stored in `data/background/` (`default.png` and `custom.png`).
--   **Exports**: Saved to `exports/` (default dialog path).
+-   **Exports**: Saved to `exports/` (default dialog path). To ensure cross-platform compatibility (especially for Windows), all exported file and directory names are processed through a robust sanitization system that strips trailing spaces/dots and handles reserved filenames.
 -   **Logs**: Application events and errors are stored in `data/logs/`.
     -   **Rotation**: Logs are rotated daily (`crapp.log.YYYY-MM-DD`).
     -   **Cleanup**: Only the 5 most recent log files are kept to save space.

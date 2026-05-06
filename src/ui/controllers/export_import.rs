@@ -742,5 +742,35 @@ fn recursive_export_helper(
 }
 
 fn sanitize_filename(name: &str) -> String {
-    name.replace(&['/', '\\', ':', '*', '?', '"', '<', '>', '|'][..], "_")
+    // Replace reserved characters and control characters with '_'
+    let mut s: String = name.chars().map(|c| {
+        if ['/', '\\', ':', '*', '?', '"', '<', '>', '|'].contains(&c) || c.is_control() {
+            '_'
+        } else {
+            c
+        }
+    }).collect();
+
+    // Windows drops trailing spaces and dots in directory and file names.
+    // If we keep them in our PathBuf, subsequent operations will fail with "path not found".
+    s = s.trim_end_matches(|c| c == ' ' || c == '.').to_string();
+    
+    // Trim leading whitespace as well just to be tidy
+    s = s.trim_start().to_string();
+
+    let upper = s.to_uppercase();
+    let reserved = [
+        "CON", "PRN", "AUX", "NUL",
+        "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
+        "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+    ];
+    if reserved.contains(&upper.as_str()) {
+        s.push('_');
+    }
+
+    if s.is_empty() {
+        s = "Unnamed".to_string();
+    }
+    
+    s
 }

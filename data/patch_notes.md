@@ -11,14 +11,14 @@
     - Added visual indicators (`*`) in the entry list to show which entries have unsaved modifications.
     - Improved navigation: You can now switch between entries, add new ones, or paste entries from the clipboard without being interrupted by popups. Unsaved changes are preserved in memory and merged seamlessly.
 - **Enhanced Logging**: Added comprehensive diagnostic logging (`tracing`) for all lorebook and character management operations, making it easier to troubleshoot background tasks.
+- **Logging Visibility**: Background operations now provide better diagnostic information in case of failures.
 
 ## Bugfixes
 - **Folder Renaming**: Fixed a bug where renaming a subfolder would move it to the root and reset its display order.
 - **UI Scaling**: Fixed an issue where the Lorebook "Save Entry" button could be obscured when the content field was large.
-- **Selection Safety**: Improved the robustness of selection restoration when reloading data from the database.
-- **Threading Fixes**: Resolved potential crashes and freezes on macOS related to UI/Tokio integration.
 - **Migration Stability**: Improved the robustness of the database migration system to better handle existing schemas.
-- **Export Diagnostic and Compatibility**: Added character and collection name sanitization to prevent failures on Windows. Enhanced mass-export operations with detailed logging and real-time UI error feedback for easier troubleshooting.
+- **Robust Path Sanitization**: Implemented a more comprehensive `sanitize_filename` system that automatically strips trailing spaces and periods, handles Windows reserved filenames (CON, PRN, etc.), and filters out control characters to improve filesystem compatibility across all platforms.
+- **Export Diagnostic and Compatibility**: Enhanced mass-export operations with detailed logging and real-time UI error feedback for easier troubleshooting.
 
 # Version 0.2.3 - Patch Notes
 
