@@ -1,7 +1,17 @@
 # Version 0.2.4 - Patch Notes (In Progress)
 
+## Architectural Improvements
+- **Asynchronous Threading Model**: Refactored the core application initialization to properly separate the UI loop from the async Tokio runtime. This prevents potential deadlocks and improves stability across all platforms.
+- **Improved Error Capture**: Integrated a professional logging system (`tracing`) that records application events and errors to `data/logs/crapp.log`.
+- **Enhanced UI Feedback**: Critical background errors (like database save failures) are now reported directly to the UI through status messages, ensuring you are immediately informed of any issues.
+
+## UI & UX Improvements
+- **Logging Visibility**: Background operations now provide better diagnostic information in case of failures.
+
 ## Bugfixes
 - **Folder Renaming**: Fixed a bug where renaming a subfolder would move it to the root and reset its display order.
+- **Threading Fixes**: Resolved potential crashes and freezes on macOS related to UI/Tokio integration.
+- **Migration Stability**: Improved the robustness of the database migration system to better handle existing schemas.
 
 # Version 0.2.3 - Patch Notes
 

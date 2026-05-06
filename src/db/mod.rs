@@ -27,12 +27,12 @@ impl Database {
 
         // 1. Safety Backup
         if std::path::Path::new(db_path).exists() {
-            println!("Found existing database. Creating safety backup at 'crap_data.db.bak'...");
+            tracing::info!("Found existing database. Creating safety backup at 'crap_data.db.bak'...");
             if let Err(e) = std::fs::copy(db_path, "crap_data.db.bak") {
-                eprintln!("WARNING: Failed to create database backup: {}", e);
+                tracing::warn!("Failed to create database backup: {}", e);
             }
         } else {
-            println!("Creating database {}", db_url);
+            tracing::info!("Creating database {}", db_url);
             Sqlite::create_database(db_url).await?;
         }
 
@@ -42,22 +42,22 @@ impl Database {
             .await?;
 
         // 2. Run Migrations
-        println!("Checking for migrations (templates support)...");
-        println!("Applying migrations...");
+        tracing::info!("Checking for migrations (templates support)...");
+        tracing::info!("Applying migrations...");
         if let Err(e) = MIGRATOR.run(&pool).await {
             let err_msg = e.to_string();
             if err_msg.contains("duplicate column name: content") {
-                println!("Note: 'content' column already exists in 'lorebooks', skipping that part of migration.");
+                tracing::info!("Note: 'content' column already exists in 'lorebooks', skipping that part of migration.");
             } else {
                 return Err(Box::new(e));
             }
         }
-        println!("Migrations applied successfully.");
+        tracing::info!("Migrations applied successfully.");
 
         // Manual Migration Fixes
 
         // 1. Ensure 'templates' table exists
-        println!("Verifying schema for 'templates'...");
+        tracing::info!("Verifying schema for 'templates'...");
         let _ = sqlx::query(
             "CREATE TABLE IF NOT EXISTS templates (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -73,16 +73,16 @@ impl Database {
         )
         .execute(&pool)
         .await
-        .map_err(|e| eprintln!("Warning: Failed to ensure templates table exists: {}", e));
+        .map_err(|e| tracing::warn!("Failed to ensure templates table exists: {}", e));
 
         // 2. Ensure 'image_path' in 'collections'
-        println!("Verifying schema for 'collections'...");
+        tracing::info!("Verifying schema for 'collections'...");
         let _ = sqlx::query("ALTER TABLE collections ADD COLUMN image_path TEXT")
             .execute(&pool)
             .await
             .map_err(|e| {
                 if !e.to_string().contains("duplicate column name") {
-                    eprintln!("Warning: Failed to add image_path column: {}", e);
+                    tracing::warn!("Failed to add image_path column: {}", e);
                 }
             });
 
@@ -92,8 +92,8 @@ impl Database {
             .await
             .map_err(|e| {
                 if !e.to_string().contains("duplicate column name") {
-                    eprintln!(
-                        "Warning: Failed to add spell_check_overrides_json column: {}",
+                    tracing::warn!(
+                        "Failed to add spell_check_overrides_json column: {}",
                         e
                     );
                 }
@@ -106,7 +106,7 @@ impl Database {
                 .await
                 .map_err(|e| {
                     if !e.to_string().contains("duplicate column name") {
-                        eprintln!("Warning: Failed to add quick_notes column: {}", e);
+                        tracing::warn!("Failed to add quick_notes column: {}", e);
                     }
                 });
 
@@ -116,7 +116,7 @@ impl Database {
             .await
             .map_err(|e| {
                 if !e.to_string().contains("duplicate column name") {
-                    eprintln!("Warning: Failed to add is_nsfw column: {}", e);
+                    tracing::warn!("Failed to add is_nsfw column: {}", e);
                 }
             });
 
@@ -127,7 +127,7 @@ impl Database {
                 .await
                 .map_err(|e| {
                     if !e.to_string().contains("duplicate column name") {
-                        eprintln!("Warning: Failed to add blur_avatar column: {}", e);
+                        tracing::warn!("Failed to add blur_avatar column: {}", e);
                     }
                 });
 

@@ -16,7 +16,7 @@ pub fn handle_ui_events(app: &mut CrapApp, ctx: &egui::Context) {
                     app.loading_error = None;
                 }
                 Err(e) => {
-                    eprintln!("Load error: {}", e);
+                    tracing::error!("Load error: {}", e);
                     app.loading_error = Some(e);
                 }
             },
@@ -86,7 +86,7 @@ pub fn handle_ui_events(app: &mut CrapApp, ctx: &egui::Context) {
             }
             UiEvent::LoreLinksLoaded(res) => match res {
                 Ok(set) => app.lore_links = set,
-                Err(e) => eprintln!("Link load error: {}", e),
+                Err(e) => tracing::error!("Link load error: {}", e),
             },
             UiEvent::WatermarkLoaded(show) => {
                 app.show_watermark = show;
@@ -240,7 +240,7 @@ pub fn handle_ui_events(app: &mut CrapApp, ctx: &egui::Context) {
                         cached.tags = tags;
                     }
                 }
-                Err(e) => eprintln!("Lorebook tags load error: {}", e),
+                Err(e) => tracing::error!("Lorebook tags load error: {}", e),
             },
             UiEvent::LorebookTagOperationFinished(res) => {
                 if let Err(e) = res {
@@ -345,7 +345,7 @@ pub fn handle_ui_events(app: &mut CrapApp, ctx: &egui::Context) {
                     app.templates = list;
                 }
                 Err(e) => {
-                    eprintln!("Load error: {}", e);
+                    tracing::error!("Load error: {}", e);
                     app.loading_error = Some(e);
                 }
             },
@@ -605,7 +605,7 @@ pub fn handle_ui_events(app: &mut CrapApp, ctx: &egui::Context) {
                                 egui::Color32::RED,
                             );
                         } else {
-                            eprintln!("Background update check failed: {}", e);
+                            tracing::error!("Background update check failed: {}", e);
                         }
                     }
                 }

@@ -4,7 +4,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 pub async fn cleanup_unused_media(pool: &Pool<Sqlite>) -> Result<(), Box<dyn std::error::Error>> {
-    println!("Starting unused media cleanup...");
+    tracing::info!("Starting unused media cleanup...");
 
     // 1. Collect all used paths from the database
     let mut used_paths = HashSet::new();
@@ -58,7 +58,7 @@ pub async fn cleanup_unused_media(pool: &Pool<Sqlite>) -> Result<(), Box<dyn std
         }
     }
 
-    println!("Found {} active media files in database.", used_paths.len());
+    tracing::info!("Found {} active media files in database.", used_paths.len());
 
     // 2. Define target directories
     let target_dirs = vec!["data/avatars", "data/collection_images", "data/covers"];
@@ -98,9 +98,9 @@ pub async fn cleanup_unused_media(pool: &Pool<Sqlite>) -> Result<(), Box<dyn std
                         }
                     }
 
-                    println!("Deleting unused file: {:?}", file_path);
-                    if let Err(e) = fs::remove_file(&file_path) {
-                        eprintln!("Failed to delete {:?}: {}", file_path, e);
+                    tracing::info!("Deleting unused file: {:?}", file_path);
+                    if let Err(e) = std::fs::remove_file(&file_path) {
+                        tracing::warn!("Failed to delete {:?}: {}", file_path, e);
                     } else {
                         deleted_count += 1;
                     }
@@ -109,7 +109,7 @@ pub async fn cleanup_unused_media(pool: &Pool<Sqlite>) -> Result<(), Box<dyn std
         }
     }
 
-    println!("Cleanup finished. Deleted {} unused files.", deleted_count);
+    tracing::info!("Cleanup finished. Deleted {} unused files.", deleted_count);
 
     Ok(())
 }

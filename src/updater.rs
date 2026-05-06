@@ -8,7 +8,7 @@ pub fn perform_update(tag: String) -> Result<bool, Box<dyn std::error::Error>> {
     cleanup_old_executable()?;
 
     let current_version = env!("CARGO_PKG_VERSION");
-    println!("Current version: {}", current_version);
+    tracing::info!("Current version: {}", current_version);
 
     let status = self_update::backends::github::Update::configure()
         .repo_owner("JustJam-Dev")
@@ -22,11 +22,11 @@ pub fn perform_update(tag: String) -> Result<bool, Box<dyn std::error::Error>> {
 
     match status {
         self_update::Status::UpToDate(v) => {
-            println!("Already up to date (version {})", v);
+            tracing::info!("Already up to date (version {})", v);
             Ok(false)
         }
         self_update::Status::Updated(v) => {
-            println!("Updated to version {}", v);
+            tracing::info!("Updated to version {}", v);
             Ok(true)
         }
     }
@@ -103,10 +103,10 @@ fn cleanup_old_executable() -> Result<(), Box<dyn std::error::Error>> {
     let old_exe = current_exe.with_extension("exe.old");
 
     if old_exe.exists() {
-        println!("Cleaning up old executable: {:?}", old_exe);
+        tracing::info!("Cleaning up old executable: {:?}", old_exe);
         match fs::remove_file(&old_exe) {
-            Ok(_) => println!("Old executable removed successfully"),
-            Err(e) => eprintln!("Warning: Failed to remove old executable: {}", e),
+            Ok(_) => tracing::info!("Old executable removed successfully"),
+            Err(e) => tracing::warn!("Failed to remove old executable: {}", e),
         }
     }
 
@@ -118,7 +118,7 @@ fn cleanup_old_executable() -> Result<(), Box<dyn std::error::Error>> {
 pub fn restart_application() -> Result<(), Box<dyn std::error::Error>> {
     let current_exe = env::current_exe()?;
 
-    println!("Restarting application: {:?}", current_exe);
+    tracing::info!("Restarting application: {:?}", current_exe);
 
     #[cfg(target_os = "windows")]
     {

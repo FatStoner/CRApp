@@ -6,7 +6,7 @@ CRApp (Character Repository Application) is a desktop application built in Rust 
 ## High-Level Architecture
 The application is structured into four main layers:
 
-1.  **Entry Point (`main.rs`)**: Initializes the database, configures the window (eframe options), and launches the application loop.
+1.  **Entry Point (`main.rs`)**: Initializes the professional logging system (`tracing`), sets up the multi-threaded Tokio runtime, performs database initialization/migrations, and launches the application loop.
 2.  **Application State (`ui/app.rs`, `ui/types.rs`)**: Defines `CrapApp` and associated enums/structs. Holds runtime state, database connections, and UI flags.
 3.  **UI Layer (`ui/`)**: Specialized modules for rendering and logic.
     -   **Event Handling**: `events.rs` manages the async event loop.
@@ -21,7 +21,12 @@ The application is structured into four main layers:
     -   **Database**: Async SQLite operations via `sqlx`.
 
 ## Application Loop
-The application runs on the main thread using `eframe::run_native`. The `CrapApp` struct implements `eframe::App`, where the `update` method is called every frame to redraw the UI.
+The application initializes a multi-threaded `tokio` runtime on the main thread. While the UI loop runs on the main thread via `eframe::run_native`, background tasks (database I/O, file cleanup, update checks) are executed on the Tokio runtime's worker threads.
+
+### Async Coordination
+- **Runtime Persistence**: The Tokio runtime is kept alive throughout the application lifecycle.
+- **Worker Communication**: Background tasks communicate with the UI thread using `mpsc` channels, sending `UiEvent` messages that are processed by the main loop in `ui/events.rs`.
+- **UI Repainting**: After sending a message to the UI thread, background tasks call `ctx.request_repaint()` to ensure the UI updates immediately.
 
 ### State Management
 -   **Persistence**: Data is stored in `crap_data.db` (SQLite).

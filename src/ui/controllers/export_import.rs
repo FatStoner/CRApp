@@ -130,7 +130,8 @@ impl CrapApp {
 
                         if path.is_file() {
                             if let Err(e) = zip.start_file(name_str, options) {
-                                eprintln!("Failed to start zip file {}: {}", path.display(), e);
+                                tracing::error!("Failed to start zip file {}: {}", path.display(), e);
+                                let _ = tx.send(UiEvent::StatusMessage(format!("Export error: {}", e), egui::Color32::RED)).await;
                                 continue;
                             }
                             if let Ok(mut f) = std::fs::File::open(path) {

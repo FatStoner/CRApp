@@ -19,3 +19,4 @@ Docs/
 deploy.sh
 exports/
 docs/tmp/
+data/logs/

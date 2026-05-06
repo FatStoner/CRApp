@@ -51,7 +51,7 @@ impl CrapApp {
                             }
                         }
                     } else {
-                        eprintln!("Failed to load specific tags/urls bulk");
+                        tracing::error!("Failed to load specific tags/urls bulk");
                     }
 
                     let _ = tx.send(UiEvent::CharactersLoaded(Ok(chars))).await;

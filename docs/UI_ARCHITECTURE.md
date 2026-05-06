@@ -91,8 +91,9 @@ src/ui/
 
 **Controllers** (Business Logic)
 - Located in `controllers/`
-- Handle async operations (DB, file I/O)
+- Handle async operations (DB, file I/O) on a dedicated Tokio runtime
 - Trigger UI events via `UiEvent` enum
+- Log diagnostics via `tracing` system
 - No direct UI rendering
 
 **Components** (Reusable Widgets)
@@ -266,6 +267,6 @@ The Character Gallery uses a multi-stage loading pipeline to maintain 60fps resp
 
 ---
 
-*Last Updated: 2026-04-27*
-*Total UI LOC: 14,000+*
-*Modules: 50+ files across 12 directories*
+*Last Updated: 2026-05-06*
+*Total UI LOC: 14,500+*
+*Modules: 55+ files across 12 directories*

@@ -274,7 +274,7 @@ impl CrapApp {
                     }
                 }
                 Ok(None) => {} // Default 1.0
-                Err(e) => eprintln!("Failed to load scale: {}", e),
+                Err(e) => tracing::error!("Failed to load scale: {}", e),
             }
         });
 
@@ -291,7 +291,7 @@ impl CrapApp {
                     }
                 }
                 Ok(None) => {}
-                Err(e) => eprintln!("Failed to load theme: {}", e),
+                Err(e) => tracing::error!("Failed to load theme: {}", e),
             }
         });
 
@@ -307,7 +307,7 @@ impl CrapApp {
                     ctx.request_repaint();
                 }
                 Ok(None) => {}
-                Err(e) => eprintln!("Failed to load background setting: {}", e),
+                Err(e) => tracing::error!("Failed to load background setting: {}", e),
             }
         });
 
@@ -325,7 +325,7 @@ impl CrapApp {
                 Ok(None) => {
                     let _ = tx.send(UiEvent::WatermarkLoaded(true)).await;
                 }
-                Err(e) => eprintln!("Failed to load watermark setting: {}", e),
+                Err(e) => tracing::error!("Failed to load watermark setting: {}", e),
             }
         });
 
@@ -343,7 +343,7 @@ impl CrapApp {
                 Ok(None) => {
                     let _ = tx.send(UiEvent::BackgroundLoaded(true)).await;
                 }
-                Err(e) => eprintln!("Failed to load background visibility setting: {}", e),
+                Err(e) => tracing::error!("Failed to load background visibility setting: {}", e),
             }
         });
 
@@ -360,7 +360,7 @@ impl CrapApp {
                     }
                 }
                 Ok(None) => {} // Default 0.9
-                Err(e) => eprintln!("Failed to load background scale: {}", e),
+                Err(e) => tracing::error!("Failed to load background scale: {}", e),
             }
         });
 
@@ -378,7 +378,7 @@ impl CrapApp {
                 Ok(None) => {
                     let _ = tx.send(UiEvent::SpellCheckSettingLoaded(true)).await;
                 }
-                Err(e) => eprintln!("Failed to load spell check setting: {}", e),
+                Err(e) => tracing::error!("Failed to load spell check setting: {}", e),
             }
         });
 
@@ -395,7 +395,7 @@ impl CrapApp {
                     // Default to true
                     let _ = tx.send(UiEvent::CheckUpdatesAtStartLoaded(true)).await;
                 }
-                Err(e) => eprintln!("Failed to load check updates setting: {}", e),
+                Err(e) => tracing::error!("Failed to load check updates setting: {}", e),
             }
         });
 
@@ -410,7 +410,7 @@ impl CrapApp {
                     }
                 }
                 Ok(None) => {}
-                Err(e) => eprintln!("Failed to load editor font setting: {}", e),
+                Err(e) => tracing::error!("Failed to load editor font setting: {}", e),
             }
         });
 
@@ -424,7 +424,7 @@ impl CrapApp {
                     let _ = tx.send(UiEvent::EditorLargeFontLoaded(enabled)).await;
                 }
                 Ok(None) => {}
-                Err(e) => eprintln!("Failed to load large font setting: {}", e),
+                Err(e) => tracing::error!("Failed to load large font setting: {}", e),
             }
         });
 
@@ -440,7 +440,7 @@ impl CrapApp {
                 Ok(None) => {
                     let _ = tx.send(UiEvent::EditorBrightModeLoaded(true)).await;
                 }
-                Err(e) => eprintln!("Failed to load bright mode setting: {}", e),
+                Err(e) => tracing::error!("Failed to load bright mode setting: {}", e),
             }
         });
 
@@ -456,7 +456,7 @@ impl CrapApp {
                 Ok(None) => {
                     let _ = tx.send(UiEvent::BlurAllImagesLoaded(false)).await;
                 }
-                Err(e) => eprintln!("Failed to load blur all images setting: {}", e),
+                Err(e) => tracing::error!("Failed to load blur all images setting: {}", e),
             }
         });
 
@@ -472,7 +472,7 @@ impl CrapApp {
                 Ok(None) => {
                     let _ = tx.send(UiEvent::BlurAllNsfwLoaded(false)).await;
                 }
-                Err(e) => eprintln!("Failed to load blur all nsfw setting: {}", e),
+                Err(e) => tracing::error!("Failed to load blur all nsfw setting: {}", e),
             }
         });
 

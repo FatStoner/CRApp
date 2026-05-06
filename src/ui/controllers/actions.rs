@@ -235,7 +235,10 @@ impl CrapApp {
                             entry.id = new_id;
                             updated_entries.push(entry.clone());
                         }
-                        Err(e) => eprintln!("Failed to save entry: {}", e),
+                        Err(e) => {
+                            tracing::error!("Failed to save entry: {}", e);
+                            let _ = tx.send(UiEvent::StatusMessage(format!("Failed to save entry: {}", e), egui::Color32::RED)).await;
+                        }
                     }
                 }
                 lorebook.entries = updated_entries;
