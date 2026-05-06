@@ -12,6 +12,7 @@
 - **Folder Renaming**: Fixed a bug where renaming a subfolder would move it to the root and reset its display order.
 - **Threading Fixes**: Resolved potential crashes and freezes on macOS related to UI/Tokio integration.
 - **Migration Stability**: Improved the robustness of the database migration system to better handle existing schemas.
+- **Export Diagnostic and Compatibility**: Added character and collection name sanitization to prevent failures on Windows. Enhanced mass-export operations with detailed logging and real-time UI error feedback for easier troubleshooting.
 
 # Version 0.2.3 - Patch Notes
 
