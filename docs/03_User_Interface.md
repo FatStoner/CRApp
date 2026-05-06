@@ -70,19 +70,20 @@ Handles the detailed editing interfaces.
     -   **Navigation**: "Back" and "Up" buttons with **Unsaved Changes Protection**.
         -   **History Context Menu**: Right-clicking the "Back" button opens a menu of the navigation stack, allowing jumping to specific past states.
         -   **Lorebook Entry Tracking**: The navigation history captures the specific Lorebook entry being viewed, including its ID and Name, ensuring accurate restoration even if data isn't fully loaded in the background.
-    -   **Export**: Export to .crapp (Native), .json (SpicyChat), .md, or .png (Card).
+    -   **Export**: Export to .crapp (Native), .json (SpicyChat), .md, or .png (Card). Filenames and collection directories are automatically sanitized for Windows compatibility.
     -   **Legacy Compat**: Supports importing V1 and V2 PNG cards.
 -   **Lorebook Editor**:
     -   **Import**: "IMPORT" button allowing users to paste HTML source from SpicyChat (both Edit and Profile views) to automatically allow population of Title, Description, and Entries.
     -   **Export**: "EXPORT" button supporting **SillyTavern** and **Chub.ai** compatible JSON formats (Standard V2).
     -   **Metadata**: Title, Description (Content), Tags, and Cover management.
     -   **Tabbed Section**:
-        -   **Entries Tab**: Master-Detail view for managing individual entries. Feature a swapped layout (Editor on Left, List on Right) and dynamic count badge.
+        -   **Entries Tab**: Master-Detail view for managing individual entries. Features a pinned layout where the entry list and the editor fields (Name, Keywords, Content) are independent. The editor fields use a bottom-up layout to ensure the **Save Entry** and **Delete** buttons are always visible at the bottom of the screen, regardless of content length.
         -   **Characters Tab**: Gallery view of all characters linked to this lorebook with dynamic count badge.
-    -   **Sync**: Automatically synchronizes entry edits to the main lorebook object before saving, navigating, or switching entries, ensuring no data loss.
-    -   **Dirty State Tracking**: Implements robust dirty state detection by comparing deep copies of the lorebook (including entries and tags) with the saved state.
-        -   **Entry Addition/Selection Protection**: Intercepts actions that trigger database reloads (such as adding a new entry or switching entries) with a confirmation popup if unsaved changes are detected.
-        -   **Tag Reloading**: Reloads tags from the database immediately after saving to ensure ID consistency and prevent false "dirty" flags.
+    -   **Sync**: Automatically synchronizes entry edits to the main lorebook object in memory.
+    -   **Dirty State Tracking**: Implements granular dirty state detection on a per-entry basis.
+        -   **Visual Feedback**: Entries with unsaved changes are marked with an asterisk (`*`) in the entry list.
+        -   **Seamless Navigation**: Users can switch between entries, add new ones, or paste from clipboard without popups, as changes are preserved in memory and merged during background reloads.
+        -   **Global Protection**: Navigating away from the lorebook editor entirely still triggers an "Unsaved Changes" warning if any entries or metadata are modified.
     -   **Safety**: Delete confirmation for lore entries.
     -   **Quick Search**: In-editor search bar that highlights matches and automatically jumps to matching entries.
 

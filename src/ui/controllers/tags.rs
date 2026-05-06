@@ -42,6 +42,7 @@ impl CrapApp {
 
             match res {
                 Ok(_) => {
+                    tracing::info!("Added tag '{}' to lorebook ID: {}", name, lorebook_id);
                     let tags = db.get_tags_for_lorebook(lorebook_id).await;
                     if let Ok(t) = tags {
                         let _ = tx
@@ -51,6 +52,7 @@ impl CrapApp {
                     let _ = tx.send(UiEvent::LorebookTagOperationFinished(Ok(()))).await;
                 }
                 Err(e) => {
+                    tracing::error!("Failed to add tag '{}' to lorebook ID {}: {}", name, lorebook_id, e);
                     let _ = tx
                         .send(UiEvent::LorebookTagOperationFinished(Err(e.to_string())))
                         .await;
@@ -68,6 +70,7 @@ impl CrapApp {
         tokio::spawn(async move {
             match db.remove_tag_from_lorebook(lorebook_id, tag_id).await {
                 Ok(_) => {
+                    tracing::info!("Removed tag ID {} from lorebook ID: {}", tag_id, lorebook_id);
                     let tags = db.get_tags_for_lorebook(lorebook_id).await;
                     if let Ok(t) = tags {
                         let _ = tx
@@ -97,6 +100,7 @@ impl CrapApp {
 
             match db.add_entry_to_lorebook(&entry).await {
                 Ok(id) => {
+                    tracing::info!("Added new entry to lorebook ID: {} (Entry ID: {})", lorebook_id, id);
                     let _ = tx.send(UiEvent::LorebookEntryAdded(Ok(id))).await;
                     // Auto-reload
                     match db.get_entries_for_lorebook(lorebook_id).await {
@@ -131,6 +135,7 @@ impl CrapApp {
             let lid = entry.lorebook_id;
             match db.add_entry_to_lorebook(&entry).await {
                 Ok(id) => {
+                    tracing::info!("Added specific entry to lorebook ID: {} (Entry ID: {})", lid, id);
                     let _ = tx.send(UiEvent::LorebookEntryAdded(Ok(id))).await;
                     // Auto-reload
                     match db.get_entries_for_lorebook(lid).await {
@@ -160,6 +165,7 @@ impl CrapApp {
         tokio::spawn(async move {
             match db.update_lorebook_entry(&entry).await {
                 Ok(_) => {
+                    tracing::info!("Updated lorebook entry ID: {} (Lorebook ID: {})", entry.id, entry.lorebook_id);
                     let _ = tx.send(UiEvent::LorebookEntrySaved(Ok(()))).await;
                     if let Ok(entries) = db.get_entries_for_lorebook(entry.lorebook_id).await {
                         let _ = tx

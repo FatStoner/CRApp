@@ -12,7 +12,7 @@ pub fn render_lorebook_entries(
     entry_save_req: &mut Option<LorebookEntry>,
     entry_add_req: &mut bool,
     status_update: &mut Option<(String, egui::Color32)>,
-    is_dirty: bool,
+    _is_dirty: bool,
 ) {
     let font_family = match app.editor_font {
         EditorFontFamily::SansSerif => Family::SansSerif,
@@ -29,85 +29,54 @@ pub fn render_lorebook_entries(
                     // Ensure we are editing an entry belonging to this lorebook
                     if entry.lorebook_id == book.id {
                         ui.heading("Edit Entry");
-                        ui.label("Name");
-                        crate::ui::components::CodeEditor::new(
-                            &mut entry.name,
-                            format!("lore_entry_name_{}", entry.id),
-                            font_family,
-                        )
-                        .single_line()
-                        .font_size_offset(if app.editor_large_font { 2.0 } else { 0.0 })
-                        .bright_mode(app.editor_bright_mode)
-                        .highlight(app.editor_search_query.clone())
-                        .spell_check(if app.enable_spell_check {
-                            app.spell_checker.clone()
-                        } else {
-                            None
-                        })
-                        .show(
-                            ui,
-                            &mut app.cosmic_font_system,
-                            &mut app.cosmic_swash_cache,
-                            &mut app.cosmic_atlas,
-                            &mut app.cosmic_editors,
-                            &mut app.cosmic_clipboard,
-                        );
 
-                        ui.label("Keywords (comma separated)");
-                        crate::ui::components::CodeEditor::new(
-                            &mut entry.keywords,
-                            format!("lore_entry_keywords_{}", entry.id),
-                            font_family,
-                        )
-                        .single_line()
-                        .font_size_offset(if app.editor_large_font { 2.0 } else { 0.0 })
-                        .bright_mode(app.editor_bright_mode)
-                        .highlight(app.editor_search_query.clone())
-                        .spell_check(if app.enable_spell_check {
-                            app.spell_checker.clone()
-                        } else {
-                            None
-                        })
-                        .show(
-                            ui,
-                            &mut app.cosmic_font_system,
-                            &mut app.cosmic_swash_cache,
-                            &mut app.cosmic_atlas,
-                            &mut app.cosmic_editors,
-                            &mut app.cosmic_clipboard,
-                        );
+                        // --- LAYOUT FIX: Put buttons at the bottom ---
+                        ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
+                            ui.add_space(8.0);
+                            ui.horizontal(|ui| {
+                                ui.with_layout(egui::Layout::left_to_right(egui::Align::Min), |ui| {
+                                    if ui.button("Save Entry").clicked() {
+                                        *entry_save_req = Some(entry.clone());
+                                    }
+                                    if ui.button("📋 Copy").clicked() {
+                                        if let Ok(mut clipboard) = Clipboard::new() {
+                                            if let Ok(json) = serde_json::to_string(&entry) {
+                                                if let Ok(_) = clipboard.set_text(json) {
+                                                    *status_update = Some((
+                                                        "Entry copied to clipboard".to_string(),
+                                                        egui::Color32::GREEN,
+                                                    ));
+                                                }
+                                            }
+                                        }
+                                    }
+                                });
 
-                        ui.horizontal(|ui| {
-                            ui.label("Content");
-                            ui.with_layout(
-                                egui::Layout::right_to_left(egui::Align::Center),
-                                |ui| {
-                                    ui.label(
-                                        egui::RichText::new(format!(
-                                            "Tokens: {} | Chars: {}",
-                                            count_tokens(&entry.content),
-                                            entry.content.chars().count()
-                                        ))
-                                        .size(12.0)
-                                        .color(egui::Color32::GRAY),
-                                    );
-                                },
-                            );
-                        });
-                        egui::ScrollArea::vertical()
-                            .id_source("entry_content_scroll")
-                            .show(ui, |ui| {
-                                // The provided snippet uses `book.entries[idx].content` and `idx` which are not available here.
-                                // Assuming `entry.content` is the correct variable to modify.
-                                // Also, the CodeEditor doesn't seem to take a layouter directly,
-                                // and the search query highlighting might need to be handled differently or not at all by CodeEditor.
-                                // For faithful replacement, we'll use CodeEditor directly.
+                                ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
+                                    if ui
+                                        .button(egui::RichText::new("Delete").color(egui::Color32::RED))
+                                        .clicked()
+                                    {
+                                        // Trigger confirmation popup
+                                        app.popup_state =
+                                            crate::ui::PopupState::DeleteLorebookEntryConfirmation {
+                                                id: entry.id,
+                                                lorebook_id: book.id,
+                                                name: entry.name.clone(),
+                                            };
+                                    }
+                                });
+                            });
+
+                            // --- FIELDS (Now in the remaining top space) ---
+                            ui.vertical(|ui| {
+                                ui.label("Name");
                                 crate::ui::components::CodeEditor::new(
-                                    &mut entry.content,
-                                    format!("lore_entry_content_{}", entry.id), // Using entry.id for unique ID
+                                    &mut entry.name,
+                                    format!("lore_entry_name_{}", entry.id),
                                     font_family,
                                 )
-                                .desired_lines(15)
+                                .single_line()
                                 .font_size_offset(if app.editor_large_font { 2.0 } else { 0.0 })
                                 .bright_mode(app.editor_bright_mode)
                                 .highlight(app.editor_search_query.clone())
@@ -124,41 +93,75 @@ pub fn render_lorebook_entries(
                                     &mut app.cosmic_editors,
                                     &mut app.cosmic_clipboard,
                                 );
-                            });
 
-                        ui.add_space(8.0);
-                        ui.horizontal(|ui| {
-                            ui.with_layout(egui::Layout::left_to_right(egui::Align::Min), |ui| {
-                                if ui.button("Save Entry").clicked() {
-                                    *entry_save_req = Some(entry.clone());
-                                }
-                                if ui.button("📋 Copy").clicked() {
-                                    if let Ok(mut clipboard) = Clipboard::new() {
-                                        if let Ok(json) = serde_json::to_string(&entry) {
-                                            if let Ok(_) = clipboard.set_text(json) {
-                                                *status_update = Some((
-                                                    "Entry copied to clipboard".to_string(),
-                                                    egui::Color32::GREEN,
-                                                ));
-                                            }
-                                        }
-                                    }
-                                }
-                            });
+                                ui.label("Keywords (comma separated)");
+                                crate::ui::components::CodeEditor::new(
+                                    &mut entry.keywords,
+                                    format!("lore_entry_keywords_{}", entry.id),
+                                    font_family,
+                                )
+                                .single_line()
+                                .font_size_offset(if app.editor_large_font { 2.0 } else { 0.0 })
+                                .bright_mode(app.editor_bright_mode)
+                                .highlight(app.editor_search_query.clone())
+                                .spell_check(if app.enable_spell_check {
+                                    app.spell_checker.clone()
+                                } else {
+                                    None
+                                })
+                                .show(
+                                    ui,
+                                    &mut app.cosmic_font_system,
+                                    &mut app.cosmic_swash_cache,
+                                    &mut app.cosmic_atlas,
+                                    &mut app.cosmic_editors,
+                                    &mut app.cosmic_clipboard,
+                                );
 
-                            ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
-                                if ui
-                                    .button(egui::RichText::new("Delete").color(egui::Color32::RED))
-                                    .clicked()
-                                {
-                                    // Trigger confirmation popup
-                                    app.popup_state =
-                                        crate::ui::PopupState::DeleteLorebookEntryConfirmation {
-                                            id: entry.id,
-                                            lorebook_id: book.id,
-                                            name: entry.name.clone(),
-                                        };
-                                }
+                                ui.horizontal(|ui| {
+                                    ui.label("Content");
+                                    ui.with_layout(
+                                        egui::Layout::right_to_left(egui::Align::Center),
+                                        |ui| {
+                                            ui.label(
+                                                egui::RichText::new(format!(
+                                                    "Tokens: {} | Chars: {}",
+                                                    count_tokens(&entry.content),
+                                                    entry.content.chars().count()
+                                                ))
+                                                .size(12.0)
+                                                .color(egui::Color32::GRAY),
+                                            );
+                                        },
+                                    );
+                                });
+                                egui::ScrollArea::vertical()
+                                    .id_source("entry_content_scroll")
+                                    .auto_shrink([false, false])
+                                    .show(ui, |ui| {
+                                        crate::ui::components::CodeEditor::new(
+                                            &mut entry.content,
+                                            format!("lore_entry_content_{}", entry.id),
+                                            font_family,
+                                        )
+                                        .desired_lines(15)
+                                        .font_size_offset(if app.editor_large_font { 2.0 } else { 0.0 })
+                                        .bright_mode(app.editor_bright_mode)
+                                        .highlight(app.editor_search_query.clone())
+                                        .spell_check(if app.enable_spell_check {
+                                            app.spell_checker.clone()
+                                        } else {
+                                            None
+                                        })
+                                        .show(
+                                            ui,
+                                            &mut app.cosmic_font_system,
+                                            &mut app.cosmic_swash_cache,
+                                            &mut app.cosmic_atlas,
+                                            &mut app.cosmic_editors,
+                                            &mut app.cosmic_clipboard,
+                                        );
+                                    });
                             });
                         });
                     } else {
@@ -180,11 +183,7 @@ pub fn render_lorebook_entries(
                         .on_hover_text("Paste Entry from Clipboard")
                         .clicked()
                     {
-                        if is_dirty {
-                            app.popup_state = crate::ui::PopupState::UnsavedChanges {
-                                target: crate::ui::AppAction::SwitchLorebook(book.id), // Reload trigger
-                            };
-                        } else if let Ok(mut clipboard) = Clipboard::new() {
+                        if let Ok(mut clipboard) = Clipboard::new() {
                             if let Ok(text) = clipboard.get_text() {
                                 if let Ok(mut new_entry) =
                                     serde_json::from_str::<LorebookEntry>(&text)
@@ -204,13 +203,7 @@ pub fn render_lorebook_entries(
                         }
                     }
                     if ui.small_button("+").clicked() {
-                        if is_dirty {
-                            app.popup_state = crate::ui::PopupState::UnsavedChanges {
-                                target: crate::ui::AppAction::AddLorebookEntry(book.id),
-                            };
-                        } else {
-                            *entry_add_req = true;
-                        }
+                        *entry_add_req = true;
                     }
                 });
                 ui.separator();
@@ -232,6 +225,20 @@ pub fn render_lorebook_entries(
                                 false
                             };
 
+                            let is_entry_dirty =
+                                if let Some(original) = app.lorebooks.iter().find(|b| b.id == book.id)
+                                {
+                                    if let Some(orig_entry) =
+                                        original.entries.iter().find(|e| e.id == entry.id)
+                                    {
+                                        entry != orig_entry
+                                    } else {
+                                        true // New entry
+                                    }
+                                } else {
+                                    true // New lorebook
+                                };
+
                             ui.horizontal(|ui| {
                                 ui.spacing_mut().item_spacing.x = 2.0;
                                 if is_match {
@@ -240,6 +247,13 @@ pub fn render_lorebook_entries(
                                             .size(10.0)
                                             .color(egui::Color32::from_rgb(255, 215, 0)),
                                     ); // Gold
+                                } else if is_entry_dirty {
+                                    ui.label(
+                                        egui::RichText::new("*")
+                                            .size(14.0)
+                                            .strong()
+                                            .color(egui::Color32::from_rgb(200, 100, 50)),
+                                    ); // Dirty marker
                                 } else {
                                     // Add empty space to align with matched items
                                     ui.add_space(12.0);
@@ -248,22 +262,20 @@ pub fn render_lorebook_entries(
                                 let label_text = if is_match {
                                     egui::RichText::new(&entry.name)
                                         .color(egui::Color32::from_rgb(255, 215, 0))
+                                } else if is_entry_dirty {
+                                    egui::RichText::new(&entry.name)
+                                        .color(egui::Color32::from_rgb(200, 150, 100))
                                 } else {
                                     egui::RichText::new(&entry.name)
                                 };
 
                                 if ui.selectable_label(selected, label_text).clicked() {
-                                    if is_dirty {
-                                        app.popup_state = crate::ui::PopupState::UnsavedChanges {
-                                            target: crate::ui::AppAction::SwitchLorebookEntry(
-                                                entry.id,
-                                            ),
-                                        };
-                                    } else {
-                                        switch_to_entry = Some(entry.clone());
-                                    }
+                                    // Internal entry switching is now allowed without popup
+                                    // because changes are synced to memory anyway.
+                                    switch_to_entry = Some(entry.clone());
                                 }
                             });
+
                         }
 
                         if let Some(new_entry) = switch_to_entry {

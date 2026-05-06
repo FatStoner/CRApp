@@ -6,10 +6,16 @@
 - **Enhanced UI Feedback**: Critical background errors (like database save failures) are now reported directly to the UI through status messages, ensuring you are immediately informed of any issues.
 
 ## UI & UX Improvements
-- **Logging Visibility**: Background operations now provide better diagnostic information in case of failures.
+- **Lorebook Layout Fixes**: Redesigned the Lorebook Entry editor to use a pinned layout. The "Save Entry" and "Delete" buttons are now anchored to the bottom of the screen, ensuring they are always accessible regardless of the content length or window scaling.
+- **Granular Dirty State Tracking**: Lorebook entries now track unsaved changes individually.
+    - Added visual indicators (`*`) in the entry list to show which entries have unsaved modifications.
+    - Improved navigation: You can now switch between entries, add new ones, or paste entries from the clipboard without being interrupted by popups. Unsaved changes are preserved in memory and merged seamlessly.
+- **Enhanced Logging**: Added comprehensive diagnostic logging (`tracing`) for all lorebook and character management operations, making it easier to troubleshoot background tasks.
 
 ## Bugfixes
 - **Folder Renaming**: Fixed a bug where renaming a subfolder would move it to the root and reset its display order.
+- **UI Scaling**: Fixed an issue where the Lorebook "Save Entry" button could be obscured when the content field was large.
+- **Selection Safety**: Improved the robustness of selection restoration when reloading data from the database.
 - **Threading Fixes**: Resolved potential crashes and freezes on macOS related to UI/Tokio integration.
 - **Migration Stability**: Improved the robustness of the database migration system to better handle existing schemas.
 - **Export Diagnostic and Compatibility**: Added character and collection name sanitization to prevent failures on Windows. Enhanced mass-export operations with detailed logging and real-time UI error feedback for easier troubleshooting.

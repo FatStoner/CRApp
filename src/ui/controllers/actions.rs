@@ -57,17 +57,21 @@ impl CrapApp {
         let ctx = self.ctx.clone();
         tokio::spawn(async move {
             let is_new = character.id == 0;
-            if let Err(e) = db.upsert_character(&mut character).await {
-                let _ = tx.send(UiEvent::CharacterSaved(Err(e.to_string()))).await;
-                // FEEDBACK RESTORED
-                let _ = tx
-                    .send(UiEvent::StatusMessage(
-                        format!("Save Failed: {}", e),
-                        egui::Color32::RED,
-                    ))
-                    .await;
-                ctx.request_repaint();
-            } else {
+            match db.upsert_character(&mut character).await {
+                Err(e) => {
+                    tracing::error!("Failed to save character: {}", e);
+                    let _ = tx.send(UiEvent::CharacterSaved(Err(e.to_string()))).await;
+                    // FEEDBACK RESTORED
+                    let _ = tx
+                        .send(UiEvent::StatusMessage(
+                            format!("Save Failed: {}", e),
+                            egui::Color32::RED,
+                        ))
+                        .await;
+                    ctx.request_repaint();
+                }
+                Ok(_) => {
+                    tracing::info!("Saved character: {} (ID: {})", character.name, character.id);
                 // Sync Tags (For both New and Existing)
                 // We wipe and re-insert to match the editor state exactly (Overwrite behavior)
                 // This handles deletions logic implicitly.
@@ -152,8 +156,9 @@ impl CrapApp {
                 let _ = tx.send(UiEvent::CharactersLoaded(chars)).await;
                 ctx.request_repaint();
             }
-        });
-    }
+        }
+    });
+}
 
     pub fn create_new_lorebook(&mut self) {
         if self.has_unsaved_changes() {
@@ -183,11 +188,10 @@ impl CrapApp {
         let ctx = self.ctx.clone();
 
         tokio::spawn(async move {
-            if let Err(e) = db.upsert_lorebook(&mut lorebook).await {
-                let _ = tx.send(UiEvent::LorebookSaved(Err(e.to_string()))).await;
-                ctx.request_repaint();
-            } else {
-                let lid = lorebook.id;
+            match db.upsert_lorebook(&mut lorebook).await {
+                Ok(_) => {
+                    let lid = lorebook.id;
+                    tracing::info!("Saved lorebook: {} (ID: {})", lorebook.title, lid);
 
                 // 1. Sync Tags
                 // Simple wipe and replace strategy for correctness with editor state
@@ -270,8 +274,14 @@ impl CrapApp {
                     ctx.request_repaint();
                 }
             }
-        });
-    }
+            Err(e) => {
+                tracing::error!("Failed to save lorebook: {}", e);
+                let _ = tx.send(UiEvent::LorebookSaved(Err(e.to_string()))).await;
+                ctx.request_repaint();
+            }
+        }
+    });
+}
 
     // Now just a simplified helper that spawns a load
     pub fn load_character(&mut self, id: i64) {
@@ -311,12 +321,16 @@ impl CrapApp {
         let db = self.db.clone();
         let ctx = self.ctx.clone();
         tokio::spawn(async move {
-            let res = db.delete_lorebook(id).await;
-            let _ = tx
-                .send(UiEvent::LorebookDeleted(
-                    res.map(|_| id).map_err(|e| e.to_string()),
-                ))
-                .await;
+            match db.delete_lorebook(id).await {
+                Ok(_) => {
+                    tracing::info!("Deleted lorebook ID: {}", id);
+                    let _ = tx.send(UiEvent::LorebookDeleted(Ok(id))).await;
+                }
+                Err(e) => {
+                    tracing::error!("Failed to delete lorebook ID {}: {}", id, e);
+                    let _ = tx.send(UiEvent::LorebookDeleted(Err(e.to_string()))).await;
+                }
+            }
             ctx.request_repaint();
         });
     }
@@ -333,35 +347,20 @@ impl CrapApp {
         let db = self.db.clone();
         let ctx = self.ctx.clone();
         tokio::spawn(async move {
-            let res = db.delete_character(id).await;
-            let success = res.is_ok();
-
-            if success {
-                if let Some(ref path) = avatar_to_delete {
-                    cleanup_avatar(path);
+            match db.delete_character(id).await {
+                Ok(_) => {
+                    tracing::info!("Deleted character ID: {}", id);
+                    if let Some(ref path) = avatar_to_delete {
+                        cleanup_avatar(path);
+                    }
+                    let _ = tx.send(UiEvent::CharacterDeleted(Ok(id))).await;
+                    let _ = tx.send(UiEvent::StatusMessage("Character Deleted".to_string(), egui::Color32::GREEN)).await;
                 }
-            }
-
-            let _ = tx
-                .send(UiEvent::CharacterDeleted(
-                    res.map(|_| id).map_err(|e| e.to_string()),
-                ))
-                .await;
-
-            if success {
-                let _ = tx
-                    .send(UiEvent::StatusMessage(
-                        "Character Deleted".to_string(),
-                        egui::Color32::GREEN,
-                    ))
-                    .await;
-            } else {
-                let _ = tx
-                    .send(UiEvent::StatusMessage(
-                        "Delete Failed".to_string(),
-                        egui::Color32::RED,
-                    ))
-                    .await;
+                Err(e) => {
+                    tracing::error!("Failed to delete character ID {}: {}", id, e);
+                    let _ = tx.send(UiEvent::CharacterDeleted(Err(e.to_string()))).await;
+                    let _ = tx.send(UiEvent::StatusMessage("Delete Failed".to_string(), egui::Color32::RED)).await;
+                }
             }
             ctx.request_repaint();
         });
@@ -372,13 +371,16 @@ impl CrapApp {
         let db = self.db.clone();
         let ctx = self.ctx.clone();
         tokio::spawn(async move {
-            let res = db.move_character(char_id, target_coll_id).await;
-            let _ = tx
-                .send(UiEvent::CharacterMoved(
-                    res.map(|_| (char_id, target_coll_id))
-                        .map_err(|e| e.to_string()),
-                ))
-                .await;
+            match db.move_character(char_id, target_coll_id).await {
+                Ok(_) => {
+                    tracing::info!("Moved character ID {} to collection ID {:?}", char_id, target_coll_id);
+                    let _ = tx.send(UiEvent::CharacterMoved(Ok((char_id, target_coll_id)))).await;
+                }
+                Err(e) => {
+                    tracing::error!("Failed to move character ID {}: {}", char_id, e);
+                    let _ = tx.send(UiEvent::CharacterMoved(Err(e.to_string()))).await;
+                }
+            }
             ctx.request_repaint();
         });
     }

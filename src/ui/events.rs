@@ -264,8 +264,20 @@ pub fn handle_ui_events(app: &mut CrapApp, ctx: &egui::Context) {
                                 current_idx = l.entries.iter().position(|e| e.id == selected.id);
                             }
 
-                            // 2. Update the entries
-                            l.entries = entries;
+                            // 2. Update the entries (Preserve dirty state for entries to avoid losing concurrent edits)
+                            let mut merged_entries = Vec::new();
+                            for new_entry in entries {
+                                let mut to_add = new_entry.clone();
+                                if let Some(existing) = l.entries.iter().find(|e| e.id == new_entry.id) {
+                                    // If we have a version in memory that is different from the DB version just loaded,
+                                    // we preserve the memory version.
+                                    if existing != &new_entry {
+                                        to_add = existing.clone();
+                                    }
+                                }
+                                merged_entries.push(to_add);
+                            }
+                            l.entries = merged_entries;
 
                             // 3. Try to restore selection or pick nearest
                             if let Some(old_idx) = current_idx {

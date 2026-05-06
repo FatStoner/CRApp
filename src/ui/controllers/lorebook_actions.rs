@@ -10,6 +10,7 @@ impl CrapApp {
         tokio::spawn(async move {
             match db.delete_lorebook_entry(entry_id).await {
                 Ok(_) => {
+                    tracing::info!("Deleted lorebook entry ID: {} (Lorebook ID: {})", entry_id, lorebook_id);
                     let _ = tx.send(UiEvent::LorebookEntryDeleted(Ok(entry_id))).await;
                 }
                 Err(e) => {
