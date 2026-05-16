@@ -19,6 +19,7 @@
 - **Migration Stability**: Improved the robustness of the database migration system to better handle existing schemas.
 - **Robust Path Sanitization**: Implemented a more comprehensive `sanitize_filename` system that automatically strips trailing spaces and periods, handles Windows reserved filenames (CON, PRN, etc.), and filters out control characters to improve filesystem compatibility across all platforms.
 - **Export Diagnostic and Compatibility**: Enhanced mass-export operations with detailed logging and real-time UI error feedback for easier troubleshooting.
+- **SillyTavern Export Compatibility**: Fixed compatibility issues when exporting lorebooks to SillyTavern. Corrected the `position` field format from string to integer mapping and added the required `enabled` boolean field to prevent SillyTavern from silently skipping exported entries.
 
 # Version 0.2.3 - Patch Notes
 
