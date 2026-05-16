@@ -144,6 +144,7 @@ pub struct GalleryImage {
 #[derive(Clone, Debug)]
 pub enum UiEvent {
     UiRepaint, // Generic repaint signal
+    AppError(crate::error::AppError),
     DeepSearchCompleted(Result<Vec<DeepSearchResult>, String>),
     CharacterDeleted(Result<i64, String>),
     CharacterMoved(Result<(i64, Option<i64>), String>),

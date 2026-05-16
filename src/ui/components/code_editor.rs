@@ -40,7 +40,7 @@ impl<'a> egui_cosmic_text::widget::ContextMenu for SimpleContextMenu<'a> {
         editor: &mut CosmicEdit<L>,
         font_system: &mut FontSystem,
     ) -> EditorActions {
-        ui.style_mut().wrap = Some(false);
+        ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Extend);
         ui.set_min_width(0.0);
         ui.style_mut().spacing.button_padding = egui::vec2(4.0, 2.0);
         ui.style_mut().spacing.item_spacing = egui::vec2(0.0, 2.0);

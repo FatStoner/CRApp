@@ -10,6 +10,10 @@ pub fn handle_ui_events(app: &mut CrapApp, ctx: &egui::Context) {
     while let Ok(event) = app.rx.try_recv() {
         received_event = true;
         match event {
+            UiEvent::AppError(e) => {
+                tracing::error!("Background Task Error: {}", e);
+                app.set_status(format!("System Error: {}", e), egui::Color32::RED);
+            }
             UiEvent::CharactersLoaded(res) => match res {
                 Ok(list) => {
                     app.characters = list;

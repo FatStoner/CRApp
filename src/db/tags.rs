@@ -1,3 +1,4 @@
+use crate::error::DbError;
 use crate::models::Tag;
 use sqlx::SqlitePool;
 
@@ -5,7 +6,7 @@ pub async fn get_for_character(
     pool: &SqlitePool,
     char_id: i64,
     is_external: bool,
-) -> Result<Vec<Tag>, sqlx::Error> {
+) -> Result<Vec<Tag>, DbError> {
     let (join_table, tag_table) = if is_external {
         ("character_external_tags", "external_tags")
     } else {
@@ -19,10 +20,11 @@ pub async fn get_for_character(
         tag_table, join_table
     );
 
-    sqlx::query_as::<_, Tag>(&query)
+    let list = sqlx::query_as::<_, Tag>(&query)
         .bind(char_id)
         .fetch_all(pool)
-        .await
+        .await?;
+    Ok(list)
 }
 
 pub async fn add_to_character(
@@ -30,7 +32,7 @@ pub async fn add_to_character(
     char_id: i64,
     tag_name: &str,
     is_external: bool,
-) -> Result<(), sqlx::Error> {
+) -> Result<(), DbError> {
     let (join_table, tag_table) = if is_external {
         ("character_external_tags", "external_tags")
     } else {
@@ -70,7 +72,7 @@ pub async fn remove_from_character(
     char_id: i64,
     tag_id: i64,
     is_external: bool,
-) -> Result<(), sqlx::Error> {
+) -> Result<(), DbError> {
     let join_table = if is_external {
         "character_external_tags"
     } else {
@@ -94,7 +96,7 @@ pub async fn remove_all_from_character(
     pool: &SqlitePool,
     char_id: i64,
     is_external: bool,
-) -> Result<(), sqlx::Error> {
+) -> Result<(), DbError> {
     let join_table = if is_external {
         "character_external_tags"
     } else {
@@ -111,7 +113,7 @@ pub async fn remove_all_from_character(
 pub async fn get_all_flat(
     pool: &SqlitePool,
     is_external: bool,
-) -> Result<Vec<(i64, Tag)>, sqlx::Error> {
+) -> Result<Vec<(i64, Tag)>, DbError> {
     let (join_table, tag_table) = if is_external {
         ("character_external_tags", "external_tags")
     } else {
@@ -143,7 +145,7 @@ pub async fn get_all_flat(
 pub async fn search_matching(
     pool: &SqlitePool,
     query: &str,
-) -> Result<Vec<(i64, String, bool)>, sqlx::Error> {
+) -> Result<Vec<(i64, String, bool)>, DbError> {
     let pattern = format!("%{}%", query);
     let q = "
         SELECT ct.character_id, t.name, 0 as is_ext

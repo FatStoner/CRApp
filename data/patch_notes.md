@@ -1,9 +1,11 @@
-# Version 0.2.4 - Patch Notes (In Progress)
+# Version 0.2.4 - Patch Notes
 
 ## Architectural Improvements
-- **Asynchronous Threading Model**: Refactored the core application initialization to properly separate the UI loop from the async Tokio runtime. This prevents potential deadlocks and improves stability across all platforms.
-- **Improved Error Capture**: Integrated a professional logging system (`tracing`) that records application events and errors to `data/logs/`. Logs are now rotated daily, and the application automatically cleans up old logs (keeping only the 5 most recent files) to prevent indefinite file growth.
-- **Enhanced UI Feedback**: Critical background errors (like database save failures) are now reported directly to the UI through status messages, ensuring you are immediately informed of any issues.
+- **Asynchronous Threading & Task Supervision**: Refactored the core application initialization and background task execution. All async Tokio tasks are now managed by a robust supervisor (`spawn_supervised`) that intercepts both expected errors and unexpected panics, immediately notifying the UI thread and forcing instant canvas repaints without locking up.
+- **Pre-GUI Gatekeeper & Crash Handler**: Implemented a strict startup initialization gatekeeper ensuring storage, logging, Tokio, and database subsystems boot cleanly before the GUI launches. Added a low-overhead panic hook dumping unhandled exceptions directly to `data/logs/crash.log` and exiting gracefully.
+- **Database Corruption Resilience**: Enhanced database initialization with an automatic corruption isolation routine. If the SQLite database file or schema is malformed or corrupted, the system automatically isolates the corrupted file (`crap_data.corrupted.<timestamp>.db`) and boots a fresh database to prevent permanent lockout.
+- **Improved Error Capture**: Integrated a professional logging system (`tracing`) that records application events and errors to `data/logs/`. Logs are rotated daily, and the application automatically cleans up old logs (keeping only the 5 most recent files).
+- **Enhanced UI Feedback**: All background operations (CRUD actions, importing, exporting, settings) now propagate domain-specific errors (`AppError`, `DbError`) directly to the UI, displaying color-coded status toasts in real-time.
 
 ## UI & UX Improvements
 - **Lorebook Layout Fixes**: Redesigned the Lorebook Entry editor to use a pinned layout. The "Save Entry" and "Delete" buttons are now anchored to the bottom of the screen, ensuring they are always accessible regardless of the content length or window scaling.

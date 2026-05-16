@@ -33,5 +33,7 @@ egui_cosmic_text = "0.2"
 # Force enable features for the version of image used by egui_extras
 image_v25 = { package = "image", version = "0.25", features = ["jpeg", "png"] }
 tracing = "0.1.44"
-tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
+tracing-subscriber = { version = "0.3.23", features = ["env-filter", "json"] }
 tracing-appender = "0.2.5"
+anyhow = "1.0.102"
+thiserror = "2.0.18"

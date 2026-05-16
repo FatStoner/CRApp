@@ -1,13 +1,15 @@
+use crate::error::DbError;
 use crate::models::Collection;
 use sqlx::SqlitePool;
 
-pub async fn get_all(pool: &SqlitePool) -> Result<Vec<Collection>, sqlx::Error> {
-    sqlx::query_as::<_, Collection>("SELECT * FROM collections ORDER BY display_order ASC")
+pub async fn get_all(pool: &SqlitePool) -> Result<Vec<Collection>, DbError> {
+    let list = sqlx::query_as::<_, Collection>("SELECT * FROM collections ORDER BY display_order ASC")
         .fetch_all(pool)
-        .await
+        .await?;
+    Ok(list)
 }
 
-pub async fn upsert(pool: &SqlitePool, collection: &Collection) -> Result<i64, sqlx::Error> {
+pub async fn upsert(pool: &SqlitePool, collection: &Collection) -> Result<i64, DbError> {
     if collection.id == 0 {
         // New Collection: Determine display_order (Max in siblings + 1)
         let max_order: Option<i64> = if let Some(pid) = collection.parent_id {
@@ -48,7 +50,7 @@ pub async fn upsert(pool: &SqlitePool, collection: &Collection) -> Result<i64, s
     }
 }
 
-pub async fn delete(pool: &SqlitePool, id: i64) -> Result<(), sqlx::Error> {
+pub async fn delete(pool: &SqlitePool, id: i64) -> Result<(), DbError> {
     // Orphan children
     sqlx::query("UPDATE collections SET parent_id = NULL WHERE parent_id = ?")
         .bind(id)
@@ -69,7 +71,7 @@ pub async fn delete(pool: &SqlitePool, id: i64) -> Result<(), sqlx::Error> {
     Ok(())
 }
 
-pub async fn reorder(pool: &SqlitePool, id: i64, move_up: bool) -> Result<(), sqlx::Error> {
+pub async fn reorder(pool: &SqlitePool, id: i64, move_up: bool) -> Result<(), DbError> {
     // 1. Get current item info
     let current: Collection = sqlx::query_as("SELECT * FROM collections WHERE id = ?")
         .bind(id)

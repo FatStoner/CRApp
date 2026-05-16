@@ -1,13 +1,15 @@
+use crate::error::DbError;
 use crate::models::Template;
 use sqlx::SqlitePool;
 
-pub async fn get_all(pool: &SqlitePool) -> Result<Vec<Template>, sqlx::Error> {
-    sqlx::query_as::<_, Template>("SELECT * FROM templates ORDER BY name ASC")
+pub async fn get_all(pool: &SqlitePool) -> Result<Vec<Template>, DbError> {
+    let list = sqlx::query_as::<_, Template>("SELECT * FROM templates ORDER BY name ASC")
         .fetch_all(pool)
-        .await
+        .await?;
+    Ok(list)
 }
 
-pub async fn upsert(pool: &SqlitePool, template: &mut Template) -> Result<(), sqlx::Error> {
+pub async fn upsert(pool: &SqlitePool, template: &mut Template) -> Result<(), DbError> {
     template.updated_at = chrono::Utc::now();
     if template.id == 0 {
         // INSERT
@@ -48,7 +50,7 @@ pub async fn upsert(pool: &SqlitePool, template: &mut Template) -> Result<(), sq
     Ok(())
 }
 
-pub async fn delete(pool: &SqlitePool, id: i64) -> Result<(), sqlx::Error> {
+pub async fn delete(pool: &SqlitePool, id: i64) -> Result<(), DbError> {
     sqlx::query("DELETE FROM templates WHERE id = ?")
         .bind(id)
         .execute(pool)

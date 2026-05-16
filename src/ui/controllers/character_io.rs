@@ -232,11 +232,17 @@ impl CrapApp {
     /// Import character from file (JSON, PNG, or CRAPP)
     pub fn import_character_from_file(&self, target_id: Option<u64>) {
         let tx = self.tx.clone();
-        tokio::spawn(async move {
-            if let Some(path) = rfd::FileDialog::new()
-                .add_filter("Supported", &["crapp", "json", "png"])
-                .pick_file()
-            {
+        let ctx = self.ctx.clone();
+        crate::task::spawn_supervised(ctx.clone(), async move {
+            let path_opt = tokio::task::spawn_blocking(move || {
+                rfd::FileDialog::new()
+                    .add_filter("Supported", &["crapp", "json", "png"])
+                    .pick_file()
+            })
+            .await
+            .map_err(|e| crate::error::AppError::TokioTask(e.to_string()))?;
+
+            if let Some(path) = path_opt {
                 match std::fs::read(&path) {
                     Ok(bytes) => {
                         let ext = path
@@ -355,7 +361,9 @@ impl CrapApp {
                             .await;
                     }
                 }
+                ctx.request_repaint();
             }
-        });
+            Ok(())
+        }, self.tx.clone());
     }
 }

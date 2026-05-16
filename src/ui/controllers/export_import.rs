@@ -7,7 +7,8 @@ impl CrapApp {
     pub fn trigger_db_export_file_only(&self) {
         let db = self.db.clone();
         let tx = self.tx.clone();
-        tokio::spawn(async move {
+        let ctx = self.ctx.clone();
+        crate::task::spawn_supervised(ctx.clone(), async move {
             if let Some(path) = rfd::FileDialog::new()
                 .set_title("Export Database Value")
                 .set_file_name(
@@ -36,14 +37,17 @@ impl CrapApp {
                     }
                 }
             }
-        });
+            ctx.request_repaint();
+            Ok(())
+        }, self.tx.clone());
     }
 
     /// Exports full backup as ZIP (database + data folder)
     pub fn perform_full_zip_export(&self) {
         let db = self.db.clone();
         let tx = self.tx.clone();
-        tokio::spawn(async move {
+        let ctx = self.ctx.clone();
+        crate::task::spawn_supervised(ctx.clone(), async move {
             if let Some(zip_path) = rfd::FileDialog::new()
                 .set_title("Export Full Backup")
                 .set_file_name(
@@ -67,7 +71,7 @@ impl CrapApp {
                             e
                         ))))
                         .await;
-                    return;
+                    return Ok(());
                 }
 
                 // 2. Create Zip
@@ -82,7 +86,7 @@ impl CrapApp {
                             .await;
                         // Cleanup
                         let _ = std::fs::remove_file(&temp_db_path);
-                        return;
+                        return Ok(());
                     }
                 };
 
@@ -100,7 +104,7 @@ impl CrapApp {
                         ))))
                         .await;
                     let _ = std::fs::remove_file(&temp_db_path);
-                    return;
+                    return Ok(());
                 }
 
                 if let Ok(mut f) = std::fs::File::open(&temp_db_path) {
@@ -112,7 +116,7 @@ impl CrapApp {
                             ))))
                             .await;
                         let _ = std::fs::remove_file(&temp_db_path);
-                        return;
+                        return Ok(());
                     }
                 }
 
@@ -158,14 +162,17 @@ impl CrapApp {
                         .await;
                 }
             }
-        });
+            ctx.request_repaint();
+            Ok(())
+        }, self.tx.clone());
     }
 
     /// Imports database from file or ZIP backup
     pub fn trigger_db_import(&self) {
         let db = self.db.clone();
         let tx = self.tx.clone();
-        tokio::spawn(async move {
+        let ctx = self.ctx.clone();
+        crate::task::spawn_supervised(ctx.clone(), async move {
             if let Some(path) = rfd::FileDialog::new()
                 .set_title("Import Data")
                 .add_filter("All Supported", &["db", "sqlite", "sqlite3", "zip"])
@@ -181,7 +188,7 @@ impl CrapApp {
                             e
                         ))))
                         .await;
-                    return;
+                    return Ok(());
                 }
 
                 // 2. Close DB Connections using the existing async close
@@ -206,7 +213,7 @@ impl CrapApp {
                             let _ = tx.send(UiEvent::DbReloaded(Err(re_e.to_string()))).await;
                         }
                     }
-                    return;
+                    return Ok(());
                 }
 
                 let import_path = path.as_path();
@@ -267,7 +274,9 @@ impl CrapApp {
                     }
                 }
             }
-        });
+            ctx.request_repaint();
+            Ok(())
+        }, self.tx.clone());
     }
 
     /// Triggers the mass export of a collection (or All/Favorites)

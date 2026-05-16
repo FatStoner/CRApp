@@ -10,17 +10,13 @@ impl CrapApp {
     pub fn delete_collection(&self, id: i64) {
         let tx = self.tx.clone();
         let db = self.db.clone();
-        let _ctx = self.ctx.clone();
         let ctx = self.ctx.clone();
-        tokio::spawn(async move {
-            let res = db.delete_collection(id).await;
-            let _ = tx
-                .send(UiEvent::CollectionDeleted(
-                    res.map(|_| id).map_err(|e| e.to_string()),
-                ))
-                .await;
+        crate::task::spawn_supervised(ctx.clone(), async move {
+            db.delete_collection(id).await?;
+            let _ = tx.send(UiEvent::CollectionDeleted(Ok(id))).await;
             ctx.request_repaint();
-        });
+            Ok(())
+        }, self.tx.clone());
     }
 
     pub fn update_collection_icon(&self, id: i64, path: Option<String>) {
@@ -30,11 +26,14 @@ impl CrapApp {
 
             let tx = self.tx.clone();
             let db = self.db.clone();
-            tokio::spawn(async move {
-                let _ = db.upsert_collection(&new_col).await;
+            let ctx = self.ctx.clone();
+            crate::task::spawn_supervised(ctx.clone(), async move {
+                db.upsert_collection(&new_col).await?;
                 // We reuse CollectionSaved event to trigger reload
                 let _ = tx.send(UiEvent::CollectionSaved(Ok(id))).await;
-            });
+                ctx.request_repaint();
+                Ok(())
+            }, self.tx.clone());
         }
     }
 
@@ -55,110 +54,85 @@ impl CrapApp {
         let tx = self.tx.clone();
         let db = self.db.clone();
         let ctx = self.ctx.clone();
-        tokio::spawn(async move {
+        crate::task::spawn_supervised(self.ctx.clone(), async move {
             let is_new = character.id == 0;
-            match db.upsert_character(&mut character).await {
-                Err(e) => {
-                    tracing::error!("Failed to save character: {}", e);
-                    let _ = tx.send(UiEvent::CharacterSaved(Err(e.to_string()))).await;
-                    // FEEDBACK RESTORED
-                    let _ = tx
-                        .send(UiEvent::StatusMessage(
-                            format!("Save Failed: {}", e),
-                            egui::Color32::RED,
-                        ))
-                        .await;
-                    ctx.request_repaint();
-                }
-                Ok(_) => {
-                    tracing::info!("Saved character: {} (ID: {})", character.name, character.id);
-                // Sync Tags (For both New and Existing)
-                // We wipe and re-insert to match the editor state exactly (Overwrite behavior)
-                // This handles deletions logic implicitly.
-                let cid = character.id;
+            db.upsert_character(&mut character).await?;
+            
+            tracing::info!("Saved character: {} (ID: {})", character.name, character.id);
+            // Sync Tags (For both New and Existing)
+            let cid = character.id;
 
-                // 1. External Tags
-                let _ = db.remove_all_tags_from_character(cid, true).await;
-                for tag in &character.external_tags {
-                    let _ = db.add_tag_to_character(cid, &tag.name, true).await;
-                }
-
-                // 2. App Tags
-                let _ = db.remove_all_tags_from_character(cid, false).await;
-                for tag in &character.app_tags {
-                    let _ = db.add_tag_to_character(cid, &tag.name, false).await;
-                }
-
-                if !is_new {
-                    // Cleanup old avatar if changed
-                    if let Some(path) = old_avatar_to_delete {
-                        cleanup_avatar(&path);
-                    }
-                }
-
-                // Reload tags to ensure we have correct database IDs (otherwise dirty check fails)
-                // UPSERT handles URLs, but we manually handled Tags above, so we must reload them to get IDs.
-                if let Ok(saved_app_tags) = db.get_tags_for_character(cid, false).await {
-                    character.app_tags = saved_app_tags;
-                }
-                if let Ok(saved_ext_tags) = db.get_tags_for_character(cid, true).await {
-                    character.external_tags = saved_ext_tags;
-                }
-
-                let _ = tx.send(UiEvent::CharacterSaved(Ok(character))).await;
-                // FEEDBACK RESTORED
-                let _ = tx
-                    .send(UiEvent::StatusMessage(
-                        "Character Saved!".to_string(),
-                        egui::Color32::GREEN,
-                    ))
-                    .await;
-                ctx.request_repaint();
-                let mut chars = db.get_all_characters().await.map_err(|e| e.to_string());
-                if let Ok(ref mut characters) = chars {
-                    let app_tags_res = db.get_all_tags_flat(false).await;
-                    let ext_tags_res = db.get_all_tags_flat(true).await;
-                    let urls_res = db.get_all_character_urls_flat().await;
-
-                    if let (Ok(app_flat), Ok(ext_flat), Ok(urls_flat)) =
-                        (app_tags_res, ext_tags_res, urls_res)
-                    {
-                        let mut app_map: HashMap<i64, Vec<Tag>> = HashMap::new();
-                        for (cid, tag) in app_flat {
-                            app_map.entry(cid).or_default().push(tag);
-                        }
-
-                        let mut ext_map: HashMap<i64, Vec<crate::models::Tag>> = HashMap::new();
-                        for (cid, tag) in ext_flat {
-                            ext_map.entry(cid).or_default().push(tag);
-                        }
-
-                        let mut url_map: HashMap<i64, Vec<crate::models::CharacterUrl>> =
-                            HashMap::new();
-                        for url in urls_flat {
-                            url_map.entry(url.character_id).or_default().push(url);
-                        }
-
-                        for c in characters {
-                            if let Some(tags) = app_map.remove(&c.id) {
-                                c.app_tags = tags;
-                            }
-                            if let Some(tags) = ext_map.remove(&c.id) {
-                                c.external_tags = tags;
-                            }
-                            if let Some(urls) = url_map.remove(&c.id) {
-                                c.urls = urls;
-                            }
-                        }
-                    }
-                }
-
-                let _ = tx.send(UiEvent::CharactersLoaded(chars)).await;
-                ctx.request_repaint();
+            // 1. External Tags
+            db.remove_all_tags_from_character(cid, true).await.map_err(crate::error::DbError::from)?;
+            for tag in &character.external_tags {
+                db.add_tag_to_character(cid, &tag.name, true).await.map_err(crate::error::DbError::from)?;
             }
-        }
-    });
-}
+
+            // 2. App Tags
+            db.remove_all_tags_from_character(cid, false).await.map_err(crate::error::DbError::from)?;
+            for tag in &character.app_tags {
+                db.add_tag_to_character(cid, &tag.name, false).await.map_err(crate::error::DbError::from)?;
+            }
+
+            if !is_new {
+                if let Some(path) = old_avatar_to_delete {
+                    cleanup_avatar(&path);
+                }
+            }
+
+            if let Ok(saved_app_tags) = db.get_tags_for_character(cid, false).await {
+                character.app_tags = saved_app_tags;
+            }
+            if let Ok(saved_ext_tags) = db.get_tags_for_character(cid, true).await {
+                character.external_tags = saved_ext_tags;
+            }
+
+            let _ = tx.send(UiEvent::CharacterSaved(Ok(character))).await;
+            let _ = tx.send(UiEvent::StatusMessage("Character Saved!".to_string(), egui::Color32::GREEN)).await;
+            ctx.request_repaint();
+            
+            let mut chars = db.get_all_characters().await.map_err(|e| e.to_string());
+            if let Ok(ref mut characters) = chars {
+                let app_tags_res = db.get_all_tags_flat(false).await;
+                let ext_tags_res = db.get_all_tags_flat(true).await;
+                let urls_res = db.get_all_character_urls_flat().await;
+
+                if let (Ok(app_flat), Ok(ext_flat), Ok(urls_flat)) = (app_tags_res, ext_tags_res, urls_res) {
+                    let mut app_map: HashMap<i64, Vec<Tag>> = HashMap::new();
+                    for (cid, tag) in app_flat {
+                        app_map.entry(cid).or_default().push(tag);
+                    }
+
+                    let mut ext_map: HashMap<i64, Vec<crate::models::Tag>> = HashMap::new();
+                    for (cid, tag) in ext_flat {
+                        ext_map.entry(cid).or_default().push(tag);
+                    }
+
+                    let mut url_map: HashMap<i64, Vec<crate::models::CharacterUrl>> = HashMap::new();
+                    for url in urls_flat {
+                        url_map.entry(url.character_id).or_default().push(url);
+                    }
+
+                    for c in characters {
+                        if let Some(tags) = app_map.remove(&c.id) {
+                            c.app_tags = tags;
+                        }
+                        if let Some(tags) = ext_map.remove(&c.id) {
+                            c.external_tags = tags;
+                        }
+                        if let Some(urls) = url_map.remove(&c.id) {
+                            c.urls = urls;
+                        }
+                    }
+                }
+            }
+
+            let _ = tx.send(UiEvent::CharactersLoaded(chars)).await;
+            ctx.request_repaint();
+            
+            Ok(())
+        }, self.tx.clone());
+    }
 
     pub fn create_new_lorebook(&mut self) {
         if self.has_unsaved_changes() {
@@ -187,101 +161,77 @@ impl CrapApp {
         let db = self.db.clone();
         let ctx = self.ctx.clone();
 
-        tokio::spawn(async move {
-            match db.upsert_lorebook(&mut lorebook).await {
-                Ok(_) => {
-                    let lid = lorebook.id;
-                    tracing::info!("Saved lorebook: {} (ID: {})", lorebook.title, lid);
+        crate::task::spawn_supervised(ctx.clone(), async move {
+            db.upsert_lorebook(&mut lorebook).await?;
+            let lid = lorebook.id;
+            tracing::info!("Saved lorebook: {} (ID: {})", lorebook.title, lid);
 
-                // 1. Sync Tags
-                // Simple wipe and replace strategy for correctness with editor state
-                // This assumes `lorebook.tags` is the source of truth
-                let get_tags_res = db.get_tags_for_lorebook(lid).await;
-                if let Ok(existing_tags) = get_tags_res {
-                    for t in existing_tags {
-                        let _ = db.remove_tag_from_lorebook(lid, t.id).await;
-                    }
-                }
-                for tag in &lorebook.tags {
-                    let _ = db.add_tag_to_lorebook(lid, &tag.name).await;
-                }
-
-                // 2. Sync Entries
-                // We need to handle:
-                // - Updates (existing ID)
-                // - Inserts (ID 0)
-                // - Deletions (ID exists in DB but not in `lorebook.entries`)
-                let get_entries_res = db.get_entries_for_lorebook(lid).await;
-                if let Ok(existing_entries) = get_entries_res {
-                    let current_ids: HashSet<i64> = lorebook
-                        .entries
-                        .iter()
-                        .filter(|e| e.id != 0)
-                        .map(|e| e.id)
-                        .collect();
-
-                    for existing in existing_entries {
-                        if !current_ids.contains(&existing.id) {
-                            let _ = db.delete_lorebook_entry(existing.id).await;
-                        }
-                    }
-                }
-
-                let mut updated_entries = Vec::new();
-                for entry in &mut lorebook.entries {
-                    entry.lorebook_id = lid; // Ensure consistency
-                    match if entry.id == 0 {
-                        db.add_entry_to_lorebook(entry).await
-                    } else {
-                        db.update_lorebook_entry(entry).await.map(|_| entry.id)
-                    } {
-                        Ok(new_id) => {
-                            entry.id = new_id;
-                            updated_entries.push(entry.clone());
-                        }
-                        Err(e) => {
-                            tracing::error!("Failed to save entry: {}", e);
-                            let _ = tx.send(UiEvent::StatusMessage(format!("Failed to save entry: {}", e), eframe::egui::Color32::RED)).await;
-                        }
-                    }
-                }
-                lorebook.entries = updated_entries;
-
-                // Reload tags
-                if let Ok(tags) = db.get_tags_for_lorebook(lid).await {
-                    lorebook.tags = tags;
-                }
-
-                let _ = tx.send(UiEvent::LorebookSaved(Ok(lorebook))).await;
-                ctx.request_repaint();
-
-                // Reload list
-                let res = db.get_all_lorebooks().await;
-                if let Ok(mut books) = res {
-                    let tags_res = db.get_all_lorebook_tags_flat().await;
-                    if let Ok(tags_flat) = tags_res {
-                        let mut tag_map: HashMap<i64, Vec<crate::models::Tag>> = HashMap::new();
-                        for (lid, tag) in tags_flat {
-                            tag_map.entry(lid).or_default().push(tag);
-                        }
-                        for b in &mut books {
-                            if let Some(tags) = tag_map.remove(&b.id) {
-                                b.tags = tags;
-                            }
-                        }
-                    }
-                    let _ = tx.send(UiEvent::LorebooksLoaded(Ok(books))).await;
-                    ctx.request_repaint();
+            // 1. Sync Tags
+            if let Ok(existing_tags) = db.get_tags_for_lorebook(lid).await {
+                for t in existing_tags {
+                    let _ = db.remove_tag_from_lorebook(lid, t.id).await;
                 }
             }
-            Err(e) => {
-                tracing::error!("Failed to save lorebook: {}", e);
-                let _ = tx.send(UiEvent::LorebookSaved(Err(e.to_string()))).await;
-                ctx.request_repaint();
+            for tag in &lorebook.tags {
+                let _ = db.add_tag_to_lorebook(lid, &tag.name).await;
             }
-        }
-    });
-}
+
+            // 2. Sync Entries
+            if let Ok(existing_entries) = db.get_entries_for_lorebook(lid).await {
+                let current_ids: HashSet<i64> = lorebook
+                    .entries
+                    .iter()
+                    .filter(|e| e.id != 0)
+                    .map(|e| e.id)
+                    .collect();
+
+                for existing in existing_entries {
+                    if !current_ids.contains(&existing.id) {
+                        let _ = db.delete_lorebook_entry(existing.id).await;
+                    }
+                }
+            }
+
+            let mut updated_entries = Vec::new();
+            for entry in &mut lorebook.entries {
+                entry.lorebook_id = lid; // Ensure consistency
+                let new_id = if entry.id == 0 {
+                    db.add_entry_to_lorebook(entry).await?
+                } else {
+                    db.update_lorebook_entry(entry).await?;
+                    entry.id
+                };
+                entry.id = new_id;
+                updated_entries.push(entry.clone());
+            }
+            lorebook.entries = updated_entries;
+
+            // Reload tags
+            if let Ok(tags) = db.get_tags_for_lorebook(lid).await {
+                lorebook.tags = tags;
+            }
+
+            let _ = tx.send(UiEvent::LorebookSaved(Ok(lorebook))).await;
+            ctx.request_repaint();
+
+            // Reload list
+            let mut books = db.get_all_lorebooks().await?;
+            if let Ok(tags_flat) = db.get_all_lorebook_tags_flat().await {
+                let mut tag_map: HashMap<i64, Vec<crate::models::Tag>> = HashMap::new();
+                for (lid, tag) in tags_flat {
+                    tag_map.entry(lid).or_default().push(tag);
+                }
+                for b in &mut books {
+                    if let Some(tags) = tag_map.remove(&b.id) {
+                        b.tags = tags;
+                    }
+                }
+            }
+            let _ = tx.send(UiEvent::LorebooksLoaded(Ok(books))).await;
+            ctx.request_repaint();
+            Ok(())
+        }, self.tx.clone());
+    }
 
     // Now just a simplified helper that spawns a load
     pub fn load_character(&mut self, id: i64) {
@@ -320,19 +270,13 @@ impl CrapApp {
         let tx = self.tx.clone();
         let db = self.db.clone();
         let ctx = self.ctx.clone();
-        tokio::spawn(async move {
-            match db.delete_lorebook(id).await {
-                Ok(_) => {
-                    tracing::info!("Deleted lorebook ID: {}", id);
-                    let _ = tx.send(UiEvent::LorebookDeleted(Ok(id))).await;
-                }
-                Err(e) => {
-                    tracing::error!("Failed to delete lorebook ID {}: {}", id, e);
-                    let _ = tx.send(UiEvent::LorebookDeleted(Err(e.to_string()))).await;
-                }
-            }
+        crate::task::spawn_supervised(ctx.clone(), async move {
+            db.delete_lorebook(id).await?;
+            tracing::info!("Deleted lorebook ID: {}", id);
+            let _ = tx.send(UiEvent::LorebookDeleted(Ok(id))).await;
             ctx.request_repaint();
-        });
+            Ok(())
+        }, self.tx.clone());
     }
 
     pub fn delete_character(&self, id: i64) {
@@ -346,43 +290,30 @@ impl CrapApp {
         let tx = self.tx.clone();
         let db = self.db.clone();
         let ctx = self.ctx.clone();
-        tokio::spawn(async move {
-            match db.delete_character(id).await {
-                Ok(_) => {
-                    tracing::info!("Deleted character ID: {}", id);
-                    if let Some(ref path) = avatar_to_delete {
-                        cleanup_avatar(path);
-                    }
-                    let _ = tx.send(UiEvent::CharacterDeleted(Ok(id))).await;
-                    let _ = tx.send(UiEvent::StatusMessage("Character Deleted".to_string(), egui::Color32::GREEN)).await;
-                }
-                Err(e) => {
-                    tracing::error!("Failed to delete character ID {}: {}", id, e);
-                    let _ = tx.send(UiEvent::CharacterDeleted(Err(e.to_string()))).await;
-                    let _ = tx.send(UiEvent::StatusMessage("Delete Failed".to_string(), egui::Color32::RED)).await;
-                }
+        crate::task::spawn_supervised(ctx.clone(), async move {
+            db.delete_character(id).await?;
+            tracing::info!("Deleted character ID: {}", id);
+            if let Some(ref path) = avatar_to_delete {
+                cleanup_avatar(path);
             }
+            let _ = tx.send(UiEvent::CharacterDeleted(Ok(id))).await;
+            let _ = tx.send(UiEvent::StatusMessage("Character Deleted".to_string(), egui::Color32::GREEN)).await;
             ctx.request_repaint();
-        });
+            Ok(())
+        }, self.tx.clone());
     }
 
     pub fn move_character(&self, char_id: i64, target_coll_id: Option<i64>) {
         let tx = self.tx.clone();
         let db = self.db.clone();
         let ctx = self.ctx.clone();
-        tokio::spawn(async move {
-            match db.move_character(char_id, target_coll_id).await {
-                Ok(_) => {
-                    tracing::info!("Moved character ID {} to collection ID {:?}", char_id, target_coll_id);
-                    let _ = tx.send(UiEvent::CharacterMoved(Ok((char_id, target_coll_id)))).await;
-                }
-                Err(e) => {
-                    tracing::error!("Failed to move character ID {}: {}", char_id, e);
-                    let _ = tx.send(UiEvent::CharacterMoved(Err(e.to_string()))).await;
-                }
-            }
+        crate::task::spawn_supervised(ctx.clone(), async move {
+            db.move_character(char_id, target_coll_id).await?;
+            tracing::info!("Moved character ID {} to collection ID {:?}", char_id, target_coll_id);
+            let _ = tx.send(UiEvent::CharacterMoved(Ok((char_id, target_coll_id)))).await;
             ctx.request_repaint();
-        });
+            Ok(())
+        }, self.tx.clone());
     }
 
     pub fn save_collection(&mut self, id: i64, name: String, parent_id: Option<i64>) {
@@ -412,27 +343,24 @@ impl CrapApp {
             image_path,
         };
         let ctx = self.ctx.clone();
-        tokio::spawn(async move {
-            let result = db.upsert_collection(&col).await.map_err(|e| e.to_string());
-            let _ = tx.send(UiEvent::CollectionSaved(result)).await;
+        crate::task::spawn_supervised(ctx.clone(), async move {
+            db.upsert_collection(&col).await?;
+            let _ = tx.send(UiEvent::CollectionSaved(Ok(id))).await;
             ctx.request_repaint();
-        });
+            Ok(())
+        }, self.tx.clone());
     }
 
     pub fn reorder_collection(&self, id: i64, move_up: bool) {
         let tx = self.tx.clone();
         let db = self.db.clone();
         let ctx = self.ctx.clone();
-        tokio::spawn(async move {
-            if let Err(e) = db.reorder_collection(id, move_up).await {
-                let _ = tx.send(UiEvent::CollectionSaved(Err(e.to_string()))).await;
-            } else {
-                let _ = tx
-                    .send(UiEvent::CollectionSaved(Ok(id))) // Reuse Saved event to trigger reload
-                    .await;
-            }
+        crate::task::spawn_supervised(ctx.clone(), async move {
+            db.reorder_collection(id, move_up).await?;
+            let _ = tx.send(UiEvent::CollectionSaved(Ok(id))).await;
             ctx.request_repaint();
-        });
+            Ok(())
+        }, self.tx.clone());
     }
 
     pub fn toggle_lore_link(&mut self, char_id: i64, lore_id: i64, link: bool) {
@@ -454,17 +382,16 @@ impl CrapApp {
         let tx = self.tx.clone();
         let db = self.db.clone();
         let ctx = self.ctx.clone();
-        tokio::spawn(async move {
-            let res = if link {
-                db.link_lore(char_id, lore_id).await
+        crate::task::spawn_supervised(ctx.clone(), async move {
+            if link {
+                db.link_lore(char_id, lore_id).await?;
             } else {
-                db.unlink_lore(char_id, lore_id).await
-            };
-            let _ = tx
-                .send(UiEvent::LinkUpdated(res.map_err(|e| e.to_string())))
-                .await;
+                db.unlink_lore(char_id, lore_id).await?;
+            }
+            let _ = tx.send(UiEvent::LinkUpdated(Ok(()))).await;
             ctx.request_repaint();
-        });
+            Ok(())
+        }, self.tx.clone());
     }
 
     pub fn create_new_character(&mut self, collection_id: Option<i64>) {
@@ -548,69 +475,37 @@ impl CrapApp {
         let tx = self.tx.clone();
         let db = self.db.clone();
         let ctx = self.ctx.clone();
-        tokio::spawn(async move {
-            if let Err(e) = db.upsert_template(&mut template).await {
-                let _ = tx.send(UiEvent::TemplateSaved(Err(e.to_string()))).await;
-                let _ = tx
-                    .send(UiEvent::StatusMessage(
-                        format!("Template Save Failed: {}", e),
-                        egui::Color32::RED,
-                    ))
-                    .await;
-                ctx.request_repaint();
-            } else {
-                let _ = tx.send(UiEvent::TemplateSaved(Ok(template))).await;
-                let _ = tx
-                    .send(UiEvent::StatusMessage(
-                        "Template Saved!".to_string(),
-                        egui::Color32::GREEN,
-                    ))
-                    .await;
-                ctx.request_repaint();
-                // Reload
-                match db.get_all_templates().await {
-                    Ok(templates) => {
-                        let _ = tx.send(UiEvent::TemplatesLoaded(Ok(templates))).await;
-                    }
-                    Err(e) => {
-                        let _ = tx.send(UiEvent::TemplatesLoaded(Err(e.to_string()))).await;
-                    }
-                }
-                ctx.request_repaint();
-            }
-        });
+        crate::task::spawn_supervised(ctx.clone(), async move {
+            db.upsert_template(&mut template).await?;
+            let _ = tx.send(UiEvent::TemplateSaved(Ok(template))).await;
+            let _ = tx
+                .send(UiEvent::StatusMessage(
+                    "Template Saved!".to_string(),
+                    egui::Color32::GREEN,
+                ))
+                .await;
+            let templates = db.get_all_templates().await?;
+            let _ = tx.send(UiEvent::TemplatesLoaded(Ok(templates))).await;
+            ctx.request_repaint();
+            Ok(())
+        }, self.tx.clone());
     }
 
     pub fn delete_template(&self, id: i64) {
         let tx = self.tx.clone();
         let db = self.db.clone();
         let ctx = self.ctx.clone();
-        tokio::spawn(async move {
-            let res = db.delete_template(id).await;
-            let success = res.is_ok();
-
+        crate::task::spawn_supervised(ctx.clone(), async move {
+            db.delete_template(id).await?;
+            let _ = tx.send(UiEvent::TemplateDeleted(Ok(id))).await;
             let _ = tx
-                .send(UiEvent::TemplateDeleted(
-                    res.map(|_| id).map_err(|e| e.to_string()),
+                .send(UiEvent::StatusMessage(
+                    "Template Deleted".to_string(),
+                    egui::Color32::GREEN,
                 ))
                 .await;
-
-            if success {
-                let _ = tx
-                    .send(UiEvent::StatusMessage(
-                        "Template Deleted".to_string(),
-                        egui::Color32::GREEN,
-                    ))
-                    .await;
-            } else {
-                let _ = tx
-                    .send(UiEvent::StatusMessage(
-                        "Delete Failed".to_string(),
-                        egui::Color32::RED,
-                    ))
-                    .await;
-            }
             ctx.request_repaint();
-        });
+            Ok(())
+        }, self.tx.clone());
     }
 }

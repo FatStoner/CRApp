@@ -265,216 +265,182 @@ impl CrapApp {
         let tx = self.tx.clone();
         let db = self.db.clone();
         let ctx = self.ctx.clone();
-        tokio::spawn(async move {
-            match db.get_setting("ui_scale").await {
-                Ok(Some(val)) => {
-                    if let Ok(scale) = val.parse::<f32>() {
-                        let _ = tx.send(UiEvent::ScaleLoaded(Ok(scale))).await;
-                        ctx.request_repaint();
-                    }
+        crate::task::spawn_supervised(ctx.clone(), async move {
+            if let Some(val) = db.get_setting("ui_scale").await? {
+                if let Ok(scale) = val.parse::<f32>() {
+                    let _ = tx.send(UiEvent::ScaleLoaded(Ok(scale))).await;
+                    ctx.request_repaint();
                 }
-                Ok(None) => {} // Default 1.0
-                Err(e) => tracing::error!("Failed to load scale: {}", e),
             }
-        });
+            Ok(())
+        }, self.tx.clone());
 
         // Initial Theme Load
         let tx = self.tx.clone();
         let db = self.db.clone();
         let ctx = self.ctx.clone();
-        tokio::spawn(async move {
-            match db.get_setting("theme").await {
-                Ok(Some(val)) => {
-                    if let Ok(mode) = val.parse::<ThemeMode>() {
-                        let _ = tx.send(UiEvent::ThemeLoaded(Ok(mode))).await;
-                        ctx.request_repaint();
-                    }
+        crate::task::spawn_supervised(ctx.clone(), async move {
+            if let Some(val) = db.get_setting("theme").await? {
+                if let Ok(mode) = val.parse::<ThemeMode>() {
+                    let _ = tx.send(UiEvent::ThemeLoaded(Ok(mode))).await;
+                    ctx.request_repaint();
                 }
-                Ok(None) => {}
-                Err(e) => tracing::error!("Failed to load theme: {}", e),
             }
-        });
+            Ok(())
+        }, self.tx.clone());
 
         // Initial Background Setting Load
         let tx = self.tx.clone();
         let db = self.db.clone();
         let ctx = self.ctx.clone();
-        tokio::spawn(async move {
-            match db.get_setting("use_custom_background").await {
-                Ok(Some(val)) => {
-                    let enabled = val == "true";
-                    let _ = tx.send(UiEvent::CustomBackgroundLoaded(enabled)).await;
-                    ctx.request_repaint();
-                }
-                Ok(None) => {}
-                Err(e) => tracing::error!("Failed to load background setting: {}", e),
+        crate::task::spawn_supervised(ctx.clone(), async move {
+            if let Some(val) = db.get_setting("use_custom_background").await? {
+                let enabled = val == "true";
+                let _ = tx.send(UiEvent::CustomBackgroundLoaded(enabled)).await;
+                ctx.request_repaint();
             }
-        });
+            Ok(())
+        }, self.tx.clone());
 
         // Initial Watermark Load
         let tx = self.tx.clone();
         let db = self.db.clone();
         let ctx = self.ctx.clone();
-        tokio::spawn(async move {
-            match db.get_setting("show_watermark").await {
-                Ok(Some(val)) => {
-                    let show = val != "false";
-                    let _ = tx.send(UiEvent::WatermarkLoaded(show)).await;
-                    ctx.request_repaint();
-                }
-                Ok(None) => {
-                    let _ = tx.send(UiEvent::WatermarkLoaded(true)).await;
-                }
-                Err(e) => tracing::error!("Failed to load watermark setting: {}", e),
+        crate::task::spawn_supervised(ctx.clone(), async move {
+            if let Some(val) = db.get_setting("show_watermark").await? {
+                let show = val != "false";
+                let _ = tx.send(UiEvent::WatermarkLoaded(show)).await;
+                ctx.request_repaint();
+            } else {
+                let _ = tx.send(UiEvent::WatermarkLoaded(true)).await;
             }
-        });
+            Ok(())
+        }, self.tx.clone());
 
         // Initial Background Visibility Load
         let tx = self.tx.clone();
         let db = self.db.clone();
         let ctx = self.ctx.clone();
-        tokio::spawn(async move {
-            match db.get_setting("show_background").await {
-                Ok(Some(val)) => {
-                    let show = val != "false";
-                    let _ = tx.send(UiEvent::BackgroundLoaded(show)).await;
-                    ctx.request_repaint();
-                }
-                Ok(None) => {
-                    let _ = tx.send(UiEvent::BackgroundLoaded(true)).await;
-                }
-                Err(e) => tracing::error!("Failed to load background visibility setting: {}", e),
+        crate::task::spawn_supervised(ctx.clone(), async move {
+            if let Some(val) = db.get_setting("show_background").await? {
+                let show = val != "false";
+                let _ = tx.send(UiEvent::BackgroundLoaded(show)).await;
+                ctx.request_repaint();
+            } else {
+                let _ = tx.send(UiEvent::BackgroundLoaded(true)).await;
             }
-        });
+            Ok(())
+        }, self.tx.clone());
 
         // Initial Background Scale Load
         let tx = self.tx.clone();
         let db = self.db.clone();
         let ctx = self.ctx.clone();
-        tokio::spawn(async move {
-            match db.get_setting("background_scale").await {
-                Ok(Some(val)) => {
-                    if let Ok(scale) = val.parse::<f32>() {
-                        let _ = tx.send(UiEvent::BackgroundScaleLoaded(scale)).await;
-                        ctx.request_repaint();
-                    }
+        crate::task::spawn_supervised(ctx.clone(), async move {
+            if let Some(val) = db.get_setting("background_scale").await? {
+                if let Ok(scale) = val.parse::<f32>() {
+                    let _ = tx.send(UiEvent::BackgroundScaleLoaded(scale)).await;
+                    ctx.request_repaint();
                 }
-                Ok(None) => {} // Default 0.9
-                Err(e) => tracing::error!("Failed to load background scale: {}", e),
             }
-        });
+            Ok(())
+        }, self.tx.clone());
 
         // Initial Spell Check Load
         let tx = self.tx.clone();
         let db = self.db.clone();
         let ctx = self.ctx.clone();
-        tokio::spawn(async move {
-            match db.get_setting("enable_spell_check").await {
-                Ok(Some(val)) => {
-                    let enabled = val != "false";
-                    let _ = tx.send(UiEvent::SpellCheckSettingLoaded(enabled)).await;
-                    ctx.request_repaint();
-                }
-                Ok(None) => {
-                    let _ = tx.send(UiEvent::SpellCheckSettingLoaded(true)).await;
-                }
-                Err(e) => tracing::error!("Failed to load spell check setting: {}", e),
+        crate::task::spawn_supervised(ctx.clone(), async move {
+            if let Some(val) = db.get_setting("enable_spell_check").await? {
+                let enabled = val != "false";
+                let _ = tx.send(UiEvent::SpellCheckSettingLoaded(enabled)).await;
+                ctx.request_repaint();
+            } else {
+                let _ = tx.send(UiEvent::SpellCheckSettingLoaded(true)).await;
             }
-        });
+            Ok(())
+        }, self.tx.clone());
 
         // Initial Check Updates at Start Load
         let tx = self.tx.clone();
         let db = self.db.clone();
-        tokio::spawn(async move {
-            match db.get_setting("check_updates_at_start").await {
-                Ok(Some(val)) => {
-                    let enabled = val != "false"; // Default true if present but somehow empty? "false" is explicit false.
-                    let _ = tx.send(UiEvent::CheckUpdatesAtStartLoaded(enabled)).await;
-                }
-                Ok(None) => {
-                    // Default to true
-                    let _ = tx.send(UiEvent::CheckUpdatesAtStartLoaded(true)).await;
-                }
-                Err(e) => tracing::error!("Failed to load check updates setting: {}", e),
+        let ctx = self.ctx.clone();
+        crate::task::spawn_supervised(ctx.clone(), async move {
+            if let Some(val) = db.get_setting("check_updates_at_start").await? {
+                let enabled = val != "false";
+                let _ = tx.send(UiEvent::CheckUpdatesAtStartLoaded(enabled)).await;
+            } else {
+                let _ = tx.send(UiEvent::CheckUpdatesAtStartLoaded(true)).await;
             }
-        });
+            Ok(())
+        }, self.tx.clone());
 
         // Initial Editor Font Load
         let tx = self.tx.clone();
         let db = self.db.clone();
-        tokio::spawn(async move {
-            match db.get_setting("editor_font").await {
-                Ok(Some(val)) => {
-                    if let Ok(font) = val.parse::<EditorFontFamily>() {
-                        let _ = tx.send(UiEvent::EditorFontLoaded(font)).await;
-                    }
+        let ctx = self.ctx.clone();
+        crate::task::spawn_supervised(ctx.clone(), async move {
+            if let Some(val) = db.get_setting("editor_font").await? {
+                if let Ok(font) = val.parse::<EditorFontFamily>() {
+                    let _ = tx.send(UiEvent::EditorFontLoaded(font)).await;
                 }
-                Ok(None) => {}
-                Err(e) => tracing::error!("Failed to load editor font setting: {}", e),
             }
-        });
+            Ok(())
+        }, self.tx.clone());
 
         // Initial Large Font Load
         let tx = self.tx.clone();
         let db = self.db.clone();
-        tokio::spawn(async move {
-            match db.get_setting("editor_large_font").await {
-                Ok(Some(val)) => {
-                    let enabled = val == "true";
-                    let _ = tx.send(UiEvent::EditorLargeFontLoaded(enabled)).await;
-                }
-                Ok(None) => {}
-                Err(e) => tracing::error!("Failed to load large font setting: {}", e),
+        let ctx = self.ctx.clone();
+        crate::task::spawn_supervised(ctx.clone(), async move {
+            if let Some(val) = db.get_setting("editor_large_font").await? {
+                let enabled = val == "true";
+                let _ = tx.send(UiEvent::EditorLargeFontLoaded(enabled)).await;
             }
-        });
+            Ok(())
+        }, self.tx.clone());
 
         // Initial Bright Mode Load
         let tx = self.tx.clone();
         let db = self.db.clone();
-        tokio::spawn(async move {
-            match db.get_setting("editor_bright_mode").await {
-                Ok(Some(val)) => {
-                    let enabled = val != "false"; // Default true
-                    let _ = tx.send(UiEvent::EditorBrightModeLoaded(enabled)).await;
-                }
-                Ok(None) => {
-                    let _ = tx.send(UiEvent::EditorBrightModeLoaded(true)).await;
-                }
-                Err(e) => tracing::error!("Failed to load bright mode setting: {}", e),
+        let ctx = self.ctx.clone();
+        crate::task::spawn_supervised(ctx.clone(), async move {
+            if let Some(val) = db.get_setting("editor_bright_mode").await? {
+                let enabled = val != "false";
+                let _ = tx.send(UiEvent::EditorBrightModeLoaded(enabled)).await;
+            } else {
+                let _ = tx.send(UiEvent::EditorBrightModeLoaded(true)).await;
             }
-        });
+            Ok(())
+        }, self.tx.clone());
 
         // Initial Blur All Images Load
         let tx = self.tx.clone();
         let db = self.db.clone();
-        tokio::spawn(async move {
-            match db.get_setting("blur_all_images").await {
-                Ok(Some(val)) => {
-                    let enabled = val == "true";
-                    let _ = tx.send(UiEvent::BlurAllImagesLoaded(enabled)).await;
-                }
-                Ok(None) => {
-                    let _ = tx.send(UiEvent::BlurAllImagesLoaded(false)).await;
-                }
-                Err(e) => tracing::error!("Failed to load blur all images setting: {}", e),
+        let ctx = self.ctx.clone();
+        crate::task::spawn_supervised(ctx.clone(), async move {
+            if let Some(val) = db.get_setting("blur_all_images").await? {
+                let enabled = val == "true";
+                let _ = tx.send(UiEvent::BlurAllImagesLoaded(enabled)).await;
+            } else {
+                let _ = tx.send(UiEvent::BlurAllImagesLoaded(false)).await;
             }
-        });
+            Ok(())
+        }, self.tx.clone());
 
         // Initial Blur All NSFW Load
         let tx = self.tx.clone();
         let db = self.db.clone();
-        tokio::spawn(async move {
-            match db.get_setting("blur_all_nsfw").await {
-                Ok(Some(val)) => {
-                    let enabled = val == "true";
-                    let _ = tx.send(UiEvent::BlurAllNsfwLoaded(enabled)).await;
-                }
-                Ok(None) => {
-                    let _ = tx.send(UiEvent::BlurAllNsfwLoaded(false)).await;
-                }
-                Err(e) => tracing::error!("Failed to load blur all nsfw setting: {}", e),
+        let ctx = self.ctx.clone();
+        crate::task::spawn_supervised(ctx.clone(), async move {
+            if let Some(val) = db.get_setting("blur_all_nsfw").await? {
+                let enabled = val == "true";
+                let _ = tx.send(UiEvent::BlurAllNsfwLoaded(enabled)).await;
+            } else {
+                let _ = tx.send(UiEvent::BlurAllNsfwLoaded(false)).await;
             }
-        });
+            Ok(())
+        }, self.tx.clone());
 
         self.refresh_all();
     }
