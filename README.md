@@ -19,6 +19,8 @@ Character Repository leverages the power of a local SQLite database to handle th
 -   **🔄 Import/Export**: Full support for TavernAI V2 cards (PNG) and JSON. Quick clipboard importing from **SpicyChat**, **JanitorAI**, **Chub.ai**, **AfterHour.app**, **GirlfriendGPT**, and **CraveU**. **Lorebook export** compatible with **SillyTavern** and **Chub.ai**.
 -   **🧹 Auto-Cleanup**: Automatically removes unused images to keep your storage efficient.
 -   **✨ Auto-Updates**: Stay up to date automatically with the built-in update system.
+-   **📜 Logging**: Built-in logging for troubleshooting.
+-   **🪲 Error Handling**: Built-in error handling.
 
 ## Shortcuts
 
