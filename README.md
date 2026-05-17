@@ -1,13 +1,13 @@
-# CRApp (Character Repository Application)
+# Character Repository Application
 
-**CRApp** is a high-performance, local-first Desktop Character Manager built with **Rust**, **SQLite**, and **egui**, designed for power users who need distinct organization and deep integration for their character cards and lorebooks.
+**Character Repository** is a high-performance, local-first Desktop Character Manager built with **Rust**, **SQLite**, and **egui**, designed for power users who need distinct organization and deep integration for their character cards and lorebooks.
 
 ![Status](https://img.shields.io/badge/Status-Beta-orange)
 ![License](https://img.shields.io/badge/License-MIT-blue)
 
 ## Overview
 
-C.R.App leverages the power of a local SQLite database to handle thousands of characters instantly, with advanced search capabilities that go beyond simple filename matching.
+Character Repository leverages the power of a local SQLite database to handle thousands of characters instantly, with advanced search capabilities that go beyond simple filename matching.
 
 ## Key Features
 
