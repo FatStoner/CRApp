@@ -1,7 +1,7 @@
 use eframe::egui;
 use egui_cosmic_text::{
     atlas::TextureAtlas,
-    cosmic_text::{Action, Attrs, Color, Edit, Family, FontSystem, Motion, Shaping, SwashCache},
+    cosmic_text::{Action, Attrs, Color, Edit, Family, FontSystem, Motion, Selection, Shaping, SwashCache},
     widget::{
         CosmicEdit, EditorActions, FillWidth, HoverStrategy, Interactivity, LayoutMode, LineHeight,
     },
@@ -31,6 +31,7 @@ struct SimpleContextMenu<'a> {
     force_sync: &'a mut bool,
     id: String,
     spell_checker: &'a Option<std::sync::Arc<crate::ui::spell_check::SpellChecker>>,
+    correction_action: &'a mut Option<(usize, usize, String)>,
 }
 
 impl<'a> egui_cosmic_text::widget::ContextMenu for SimpleContextMenu<'a> {
@@ -50,14 +51,23 @@ impl<'a> egui_cosmic_text::widget::ContextMenu for SimpleContextMenu<'a> {
         // dictionary logic
         if self.spell_checker.is_some() {
             let target_word_id = egui::Id::new(&self.id).with("context_menu_word");
-            let target_word: Option<String> = ui.data(|d| d.get_temp(target_word_id));
+            let target_word: Option<(String, usize, usize, Vec<String>)> = ui.data(|d| d.get_temp(target_word_id));
 
             if target_word.is_none() {
                 // SQUEEZE: Force the menu to be narrow if only Cut/Copy/Paste are here.
                 ui.set_max_width(60.0);
             }
 
-            if let Some(word) = target_word {
+            if let Some((word, start, end, suggestions)) = target_word {
+                for suggestion in suggestions {
+                    if ui.button(egui::RichText::new(&suggestion).strong()).clicked() {
+                        *self.correction_action = Some((start, end, suggestion));
+                        ui.close_menu();
+                    }
+                }
+                
+                ui.separator();
+                
                 let display_word = if word.len() > 12 {
                     format!("{}...", &word[..12])
                 } else {
@@ -75,7 +85,7 @@ impl<'a> egui_cosmic_text::widget::ContextMenu for SimpleContextMenu<'a> {
                         ui.data_mut(|d| {
                             d.remove_temp::<Arc<(Vec<(usize, usize)>, Vec<usize>)>>(glitches_id)
                         });
-                        ui.data_mut(|d| d.remove_temp::<String>(target_word_id));
+                        ui.data_mut(|d| d.remove_temp::<(String, usize, usize, Vec<String>)>(target_word_id));
                         ui.close_menu();
                         ui.ctx().request_repaint();
                     }
@@ -461,6 +471,8 @@ impl<'a> CodeEditor<'a> {
                             }
                         }
 
+                        let mut correction_action: Option<(usize, usize, String)> = None;
+                        
                         let resp = cosmic_edit.ui(
                             ui,
                             font_system,
@@ -471,9 +483,48 @@ impl<'a> CodeEditor<'a> {
                                 force_sync: &mut force_sync_back,
                                 id: self.id.clone(),
                                 spell_checker: &self.spell_checker,
+                                correction_action: &mut correction_action,
                             },
                         );
                         force_sync_back_cell.set(force_sync_back);
+
+                        if let Some((start, end, suggestion)) = correction_action {
+                            if self.text.is_char_boundary(start) && self.text.is_char_boundary(end) {
+                                let mut editor = cosmic_edit.into_editor();
+                                
+                                let get_cursor = |global_offset: usize| -> egui_cosmic_text::cosmic_text::Cursor {
+                                    editor.with_buffer(|buffer| {
+                                        let mut current_offset = 0;
+                                        for (line_i, line) in buffer.lines.iter().enumerate() {
+                                            let text_len = line.text().len();
+                                            let line_end_offset = current_offset + text_len;
+                                            if global_offset <= line_end_offset {
+                                                return egui_cosmic_text::cosmic_text::Cursor::new(line_i, global_offset - current_offset);
+                                            }
+                                            current_offset = line_end_offset + 1; // +1 for newline
+                                        }
+                                        egui_cosmic_text::cosmic_text::Cursor::new(buffer.lines.len().saturating_sub(1), 0)
+                                    })
+                                };
+
+                                let start_cursor = get_cursor(start);
+                                let end_cursor = get_cursor(end);
+
+                                editor.set_selection(Selection::Normal(start_cursor));
+                                editor.action(font_system, Action::Motion(Motion::BufferEnd)); // Just a flush state helper
+                                editor.set_cursor(end_cursor);
+                                editor.set_selection(Selection::Normal(start_cursor));
+                                editor.insert_string(&suggestion, None);
+
+                                cosmic_edit = CosmicEdit::from_editor(
+                                    editor,
+                                    Interactivity::Enabled,
+                                    HoverStrategy::Widget,
+                                    FillWidth::default(),
+                                );
+                                force_sync_back_cell.set(true);
+                            }
+                        }
 
                         // Capture changed status BEFORE any potential reconstruction
                         let internal_changed = cosmic_edit.changed_this_frame();
@@ -781,8 +832,9 @@ impl<'a> CodeEditor<'a> {
                                                     full_text.push_str(line.text());
                                                 }
                                                 if end <= full_text.len() {
-                                                    found_word =
-                                                        Some(full_text[start..end].to_string());
+                                                    let word = full_text[start..end].to_string();
+                                                    let suggestions = self.spell_checker.as_ref().unwrap().suggest(&word);
+                                                    found_word = Some((word, start, end, suggestions));
                                                     break 'hit_test;
                                                 }
                                             }
@@ -813,7 +865,9 @@ impl<'a> CodeEditor<'a> {
                                         full_text.push_str(line.text());
                                     }
                                     if *end <= full_text.len() {
-                                        found_word = Some(full_text[*start..*end].to_string());
+                                        let word = full_text[*start..*end].to_string();
+                                        let suggestions = self.spell_checker.as_ref().unwrap().suggest(&word);
+                                        found_word = Some((word, *start, *end, suggestions));
                                     }
                                 }
                             }
@@ -821,10 +875,10 @@ impl<'a> CodeEditor<'a> {
                     }
                 }
 
-                if let Some(word) = found_word {
-                    ui.data_mut(|d| d.insert_temp(target_word_id, word));
+                if let Some(word_data) = found_word {
+                    ui.data_mut(|d| d.insert_temp(target_word_id, word_data));
                 } else {
-                    ui.data_mut(|d| d.remove_temp::<String>(target_word_id));
+                    ui.data_mut(|d| d.remove_temp::<(String, usize, usize, Vec<String>)>(target_word_id));
                 }
             }
         }

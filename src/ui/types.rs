@@ -1,5 +1,5 @@
 use crate::db::Database;
-use crate::models::{Character, Collection, DeepSearchResult, Lorebook, Tag, Template, ThemeMode};
+use crate::models::{Character, Collection, DeepSearchResult, Lorebook, Tag, Template, ThemeMode, SpellcheckLanguage};
 use eframe::egui;
 use std::collections::{HashMap, HashSet};
 
@@ -187,6 +187,7 @@ pub enum UiEvent {
     WatermarkLoaded(bool),
     BackgroundLoaded(bool),
     SpellCheckSettingLoaded(bool),
+    SpellCheckLanguageLoaded(SpellcheckLanguage),
     BackgroundScaleLoaded(f32),
     EditorFontLoaded(EditorFontFamily),
     EditorLargeFontLoaded(bool),

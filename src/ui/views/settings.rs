@@ -1,4 +1,4 @@
-use crate::models::ThemeMode;
+use crate::models::{ThemeMode, SpellcheckLanguage};
 use crate::ui::types::{EditorFontFamily, SettingsTab};
 use crate::ui::CrapApp;
 use eframe::egui;
@@ -350,6 +350,31 @@ pub fn render_options_window(app: &mut CrapApp, ctx: &egui::Context) {
                     SettingsTab::Dictionary => {
                         ui.heading("Dictionary");
                         ui.add_space(8.0);
+                        
+                        ui.horizontal(|ui| {
+                            ui.label("Language:");
+                            let current_lang = app.spellcheck_language;
+                            let mut selected = current_lang;
+                            
+                            egui::ComboBox::from_id_source("spellcheck_language_combo")
+                                .selected_text(match selected {
+                                    SpellcheckLanguage::EnUS => "English (US)",
+                                    SpellcheckLanguage::EnGB => "English (UK)",
+                                })
+                                .show_ui(ui, |ui| {
+                                    if ui.selectable_value(&mut selected, SpellcheckLanguage::EnUS, "English (US)").clicked() {
+                                        app.set_spellcheck_language(selected);
+                                    }
+                                    if ui.selectable_value(&mut selected, SpellcheckLanguage::EnGB, "English (UK)").clicked() {
+                                        app.set_spellcheck_language(selected);
+                                    }
+                                });
+                        });
+                        
+                        ui.add_space(8.0);
+                        ui.separator();
+                        ui.add_space(8.0);
+
                         ui.label("Manage words ignored by the spell checker.");
 
                         ui.add_space(8.0);

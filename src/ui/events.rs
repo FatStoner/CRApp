@@ -104,6 +104,10 @@ pub fn handle_ui_events(app: &mut CrapApp, ctx: &egui::Context) {
             UiEvent::SpellCheckSettingLoaded(enabled) => {
                 app.enable_spell_check = enabled;
             }
+            UiEvent::SpellCheckLanguageLoaded(lang) => {
+                app.spellcheck_language = lang;
+                app.spell_checker = crate::ui::spell_check::SpellChecker::new(&lang).map(std::sync::Arc::new);
+            }
             UiEvent::EditorFontLoaded(font) => {
                 app.editor_font = font;
             }

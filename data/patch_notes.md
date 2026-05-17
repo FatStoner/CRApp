@@ -1,5 +1,9 @@
 # Version 0.2.4 - Patch Notes
 
+## New functions
+- **Regional Dictionaries**: Added toggleable dictionary selection between American (`en_US`) and British (`en_GB`) English in the Options window under the Dictionary tab.
+- **Context-Menu Spellcheck Corrections**: Right-clicking on any red-underlined misspelled word in the text editor now displays up to 5 suggested corrections. Clicking a suggestion instantly replaces the misspelled word while preserving text layout and cursor positioning.
+
 ## Architectural Improvements
 - **Asynchronous Threading & Task Supervision**: Refactored the core application initialization and background task execution. All async Tokio tasks are now managed by a robust supervisor (`spawn_supervised`) that intercepts both expected errors and unexpected panics, immediately notifying the UI thread and forcing instant canvas repaints without locking up.
 - **Pre-GUI Gatekeeper & Crash Handler**: Implemented a strict startup initialization gatekeeper ensuring storage, logging, Tokio, and database subsystems boot cleanly before the GUI launches. Added a low-overhead panic hook dumping unhandled exceptions directly to `data/logs/crash.log` and exiting gracefully.

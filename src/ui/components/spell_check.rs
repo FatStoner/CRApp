@@ -10,9 +10,13 @@ pub struct SpellChecker {
 }
 
 impl SpellChecker {
-    pub fn new() -> Option<Self> {
-        let aff_content = std::fs::read_to_string("data/dictionaries/en_US.aff").ok()?;
-        let dic_content = std::fs::read_to_string("data/dictionaries/en_US.dic").ok()?;
+    pub fn new(lang: &crate::models::SpellcheckLanguage) -> Option<Self> {
+        let prefix = lang.to_string();
+        let aff_path = format!("data/dictionaries/{}.aff", prefix);
+        let dic_path = format!("data/dictionaries/{}.dic", prefix);
+
+        let aff_content = std::fs::read_to_string(&aff_path).ok()?;
+        let dic_content = std::fs::read_to_string(&dic_path).ok()?;
 
         let dict = zspell::builder()
             .config_str(&aff_content)
@@ -51,6 +55,17 @@ impl SpellChecker {
                 .map(|(offset, word)| (offset, offset + word.len()))
                 .collect()
         }
+    }
+
+    pub fn suggest(&self, word: &str) -> Vec<String> {
+        self.dict
+            .entry(word)
+            .suggest()
+            .unwrap_or_default()
+            .into_iter()
+            .take(5)
+            .map(|s| s.to_string())
+            .collect()
     }
 
     pub fn add_word(&self, word: &str) {

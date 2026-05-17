@@ -1,5 +1,5 @@
 use super::state::CrapApp;
-use crate::models::ThemeMode;
+use crate::models::{ThemeMode, SpellcheckLanguage};
 use crate::ui::types::EditorFontFamily;
 use eframe::egui;
 
@@ -84,6 +84,18 @@ impl CrapApp {
         let ctx = self.ctx.clone();
         crate::task::spawn_supervised(ctx.clone(), async move {
             db.set_setting("enable_spell_check", &val).await?;
+            Ok(())
+        }, self.tx.clone());
+    }
+
+    pub fn set_spellcheck_language(&mut self, lang: SpellcheckLanguage) {
+        self.spellcheck_language = lang;
+        self.spell_checker = crate::ui::spell_check::SpellChecker::new(&lang).map(std::sync::Arc::new);
+        let db = self.db.clone();
+        let val = lang.to_string();
+        let ctx = self.ctx.clone();
+        crate::task::spawn_supervised(ctx.clone(), async move {
+            db.set_setting("spellcheck_language", &val).await?;
             Ok(())
         }, self.tx.clone());
     }

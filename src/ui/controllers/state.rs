@@ -1,7 +1,7 @@
 use crate::db::Database;
 use eframe::egui;
 
-use crate::models::{Character, Collection, DeepSearchResult, Lorebook, Template, ThemeMode};
+use crate::models::{Character, Collection, DeepSearchResult, Lorebook, Template, ThemeMode, SpellcheckLanguage};
 
 use tokio::sync::mpsc;
 
@@ -111,6 +111,7 @@ pub struct CrapApp {
     pub show_background: bool,
     pub background_scale: f32,
     pub enable_spell_check: bool,
+    pub spellcheck_language: SpellcheckLanguage,
     pub editor_font: EditorFontFamily,
     pub editor_large_font: bool,
 
@@ -193,7 +194,7 @@ impl CrapApp {
             app_tag_input: String::new(),
             ext_tag_input: String::new(),
 
-            spell_checker: spell_check::SpellChecker::new().map(std::sync::Arc::new),
+            spell_checker: spell_check::SpellChecker::new(&SpellcheckLanguage::EnUS).map(std::sync::Arc::new),
 
             show_import_modal: false,
             show_options_window: false,
@@ -227,6 +228,7 @@ impl CrapApp {
             show_background: true,
             background_scale: 0.9,
             enable_spell_check: true,
+            spellcheck_language: SpellcheckLanguage::EnUS,
             editor_font: EditorFontFamily::SansSerif,
             editor_large_font: false,
 
@@ -357,6 +359,19 @@ impl CrapApp {
                 ctx.request_repaint();
             } else {
                 let _ = tx.send(UiEvent::SpellCheckSettingLoaded(true)).await;
+            }
+            Ok(())
+        }, self.tx.clone());
+
+        // Initial Spell Check Language Load
+        let tx = self.tx.clone();
+        let db = self.db.clone();
+        let ctx = self.ctx.clone();
+        crate::task::spawn_supervised(ctx.clone(), async move {
+            if let Some(val) = db.get_setting("spellcheck_language").await? {
+                if let Ok(lang) = val.parse::<SpellcheckLanguage>() {
+                    let _ = tx.send(UiEvent::SpellCheckLanguageLoaded(lang)).await;
+                }
             }
             Ok(())
         }, self.tx.clone());

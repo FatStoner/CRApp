@@ -1,6 +1,6 @@
 [package]
 name = "crap"
-version = "0.2.3"
+version = "0.2.4"
 edition = "2021"
 repository = "https://github.com/JustJam-Dev/CRApp"
 
@@ -21,7 +21,7 @@ arboard = "3.4"
 rusqlite = { version = "0.32", features = ["bundled"] }
 url = "2.5.8"
 uuid = { version = "1.0", features = ["v4"] }
-zspell = "0.5"
+zspell = { version = "0.5", features = ["unstable-suggestions"] }
 zip = "0.6"
 walkdir = "2"
 self_update = { version = "0.41", features = ["archive-zip", "compression-zip-deflate"] }
