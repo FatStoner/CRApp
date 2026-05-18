@@ -1,7 +1,7 @@
 use eframe::egui;
 use egui_cosmic_text::{
     atlas::TextureAtlas,
-    cosmic_text::{Action, Attrs, Color, Edit, Family, FontSystem, Motion, Selection, Shaping, SwashCache},
+    cosmic_text::{Action, Attrs, Color, Edit, Family, FontSystem, Motion, Shaping, SwashCache},
     widget::{
         CosmicEdit, EditorActions, FillWidth, HoverStrategy, Interactivity, LayoutMode, LineHeight,
     },
@@ -62,7 +62,14 @@ impl<'a> egui_cosmic_text::widget::ContextMenu for SimpleContextMenu<'a> {
                 for suggestion in suggestions {
                     if ui.button(egui::RichText::new(&suggestion).strong()).clicked() {
                         *self.correction_action = Some((start, end, suggestion));
+                        let glitches_id = egui::Id::new(&self.id).with("glitches");
+                        let target_word_id = egui::Id::new(&self.id).with("context_menu_word");
+                        ui.data_mut(|d| {
+                            d.remove_temp::<Arc<(Vec<(usize, usize)>, Vec<usize>)>>(glitches_id)
+                        });
+                        ui.data_mut(|d| d.remove_temp::<(String, usize, usize, Vec<String>)>(target_word_id));
                         ui.close_menu();
+                        ui.ctx().request_repaint();
                     }
                 }
                 
@@ -361,7 +368,7 @@ impl<'a> CodeEditor<'a> {
         let cursor_req: Option<bool> = ui.data(|d| d.get_temp(cursor_req_id));
 
         // Use string comparison for query/font to avoid TypeId issues with Option<String> persistence
-        let current_query_str = self.search_query.as_deref().unwrap_or("");
+        let current_query_str = self.search_query.clone().unwrap_or_default();
         let last_query_str = last_search_query.as_deref().unwrap_or("");
 
         let current_font_str = format!("{:?}", self.font_family);
@@ -404,6 +411,8 @@ impl<'a> CodeEditor<'a> {
                 HoverStrategy::Widget,
                 FillWidth::default(),
             );
+            let spans = self.build_spans(self.text.as_str(), default_attrs, highlight_attrs);
+            cosmic_edit.set_text(spans, default_attrs, Shaping::Advanced, font_system);
             ui.data_mut(|d| d.remove_temp::<bool>(cursor_req_id));
         }
 
@@ -436,8 +445,9 @@ impl<'a> CodeEditor<'a> {
         let line_height_val = line_height_val;
         let force_sync_back_cell = std::cell::Cell::new(false);
 
+        let id_clone = self.id.clone();
         let (response, cosmic_edit) = ui
-            .push_id(&self.id, |ui| {
+            .push_id(id_clone, |ui| {
                 egui::Frame::canvas(ui.style())
                     .fill(ui.visuals().extreme_bg_color)
                     .stroke(ui.visuals().widgets.noninteractive.bg_stroke)
@@ -490,38 +500,9 @@ impl<'a> CodeEditor<'a> {
 
                         if let Some((start, end, suggestion)) = correction_action {
                             if self.text.is_char_boundary(start) && self.text.is_char_boundary(end) {
-                                let mut editor = cosmic_edit.into_editor();
-                                
-                                let get_cursor = |global_offset: usize| -> egui_cosmic_text::cosmic_text::Cursor {
-                                    editor.with_buffer(|buffer| {
-                                        let mut current_offset = 0;
-                                        for (line_i, line) in buffer.lines.iter().enumerate() {
-                                            let text_len = line.text().len();
-                                            let line_end_offset = current_offset + text_len;
-                                            if global_offset <= line_end_offset {
-                                                return egui_cosmic_text::cosmic_text::Cursor::new(line_i, global_offset - current_offset);
-                                            }
-                                            current_offset = line_end_offset + 1; // +1 for newline
-                                        }
-                                        egui_cosmic_text::cosmic_text::Cursor::new(buffer.lines.len().saturating_sub(1), 0)
-                                    })
-                                };
-
-                                let start_cursor = get_cursor(start);
-                                let end_cursor = get_cursor(end);
-
-                                editor.set_selection(Selection::Normal(start_cursor));
-                                editor.action(font_system, Action::Motion(Motion::BufferEnd)); // Just a flush state helper
-                                editor.set_cursor(end_cursor);
-                                editor.set_selection(Selection::Normal(start_cursor));
-                                editor.insert_string(&suggestion, None);
-
-                                cosmic_edit = CosmicEdit::from_editor(
-                                    editor,
-                                    Interactivity::Enabled,
-                                    HoverStrategy::Widget,
-                                    FillWidth::default(),
-                                );
+                                self.text.replace_range(start..end, &suggestion);
+                                let spans = self.build_spans(self.text.as_str(), default_attrs, highlight_attrs);
+                                cosmic_edit.set_text(spans, default_attrs, Shaping::Advanced, font_system);
                                 force_sync_back_cell.set(true);
                             }
                         }
@@ -541,7 +522,7 @@ impl<'a> CodeEditor<'a> {
                             // - external_change: Model text changed from outside
                             // - cached_glitches.is_none(): First run or cache cleared
                             let need_check =
-                                internal_changed || external_change || cached_glitches.is_none();
+                                internal_changed || external_change || force_sync_back_cell.get() || cached_glitches.is_none();
 
                             // Access the internal buffer once to ensure consistent coordinates and indices
                             cosmic_edit.editor().with_buffer(|buffer| {
@@ -892,7 +873,7 @@ impl<'a> CodeEditor<'a> {
 
             d.insert_temp(last_model_hash_id, final_hash);
             // Store as plain String to match retrieval type
-            d.insert_temp(last_search_query_id, current_query_str.to_string());
+            d.insert_temp(last_search_query_id, current_query_str);
             d.insert_temp(last_font_family_id, current_font_str);
             d.insert_temp(
                 ui.make_persistent_id(format!("{}_last_bright_mode", self.id)),
