@@ -11,7 +11,7 @@ pub fn render_export_menu(ui: &mut egui::Ui, app: &CrapApp, character: &Characte
         if on_st_tab {
             // On SillyTavern tab: export from ST-specific fields only
             if ui.button("Native (.crapp)").clicked() {
-                app.export_character_native_from_sillytavern(character);
+                app.export_character_native(character);
                 ui.close_menu();
             }
 
