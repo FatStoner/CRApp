@@ -1,9 +1,15 @@
-# Version 0.2.4 - Patch Notes (In Progress)
+# Version 0.2.4 - Patch Notes
+
+## New functions
+- **Regional Dictionaries**: Added toggleable dictionary selection between American (`en_US`) and British (`en_GB`) English in the Options window under the Dictionary tab.
+- **Context-Menu Spellcheck Corrections**: Right-clicking on any red-underlined misspelled word in the text editor now displays up to 5 suggested corrections. Clicking a suggestion instantly replaces the misspelled word while preserving text layout and cursor positioning.
 
 ## Architectural Improvements
-- **Asynchronous Threading Model**: Refactored the core application initialization to properly separate the UI loop from the async Tokio runtime. This prevents potential deadlocks and improves stability across all platforms.
-- **Improved Error Capture**: Integrated a professional logging system (`tracing`) that records application events and errors to `data/logs/`. Logs are now rotated daily, and the application automatically cleans up old logs (keeping only the 5 most recent files) to prevent indefinite file growth.
-- **Enhanced UI Feedback**: Critical background errors (like database save failures) are now reported directly to the UI through status messages, ensuring you are immediately informed of any issues.
+- **Asynchronous Threading & Task Supervision**: Refactored the core application initialization and background task execution. All async Tokio tasks are now managed by a robust supervisor (`spawn_supervised`) that intercepts both expected errors and unexpected panics, immediately notifying the UI thread and forcing instant canvas repaints without locking up.
+- **Pre-GUI Gatekeeper & Crash Handler**: Implemented a strict startup initialization gatekeeper ensuring storage, logging, Tokio, and database subsystems boot cleanly before the GUI launches. Added a low-overhead panic hook dumping unhandled exceptions directly to `data/logs/crash.log` and exiting gracefully.
+- **Database Corruption Resilience**: Enhanced database initialization with an automatic corruption isolation routine. If the SQLite database file or schema is malformed or corrupted, the system automatically isolates the corrupted file (`crap_data.corrupted.<timestamp>.db`) and boots a fresh database to prevent permanent lockout.
+- **Improved Error Capture**: Integrated a professional logging system (`tracing`) that records application events and errors to `data/logs/`. Logs are rotated daily, and the application automatically cleans up old logs (keeping only the 5 most recent files).
+- **Enhanced UI Feedback**: All background operations (CRUD actions, importing, exporting, settings) now propagate domain-specific errors (`AppError`, `DbError`) directly to the UI, displaying color-coded status toasts in real-time.
 
 ## UI & UX Improvements
 - **Lorebook Layout Fixes**: Redesigned the Lorebook Entry editor to use a pinned layout. The "Save Entry" and "Delete" buttons are now anchored to the bottom of the screen, ensuring they are always accessible regardless of the content length or window scaling.
@@ -19,6 +25,7 @@
 - **Migration Stability**: Improved the robustness of the database migration system to better handle existing schemas.
 - **Robust Path Sanitization**: Implemented a more comprehensive `sanitize_filename` system that automatically strips trailing spaces and periods, handles Windows reserved filenames (CON, PRN, etc.), and filters out control characters to improve filesystem compatibility across all platforms.
 - **Export Diagnostic and Compatibility**: Enhanced mass-export operations with detailed logging and real-time UI error feedback for easier troubleshooting.
+- **SillyTavern Export Compatibility**: Fixed compatibility issues when exporting lorebooks to SillyTavern. Corrected the `position` field format from string to integer mapping and added the required `enabled` boolean field to prevent SillyTavern from silently skipping exported entries.
 
 # Version 0.2.3 - Patch Notes
 

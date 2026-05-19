@@ -42,6 +42,9 @@ A dedicated modal window for application-wide settings.
 -   **Editor Appearance**:
     -   **Large Font**: Increases font size in all `CodeEditor` instances.
     -   **Bright Text**: Toggles between high-visibility and standard text colors.
+-   **Dictionary**:
+    -   **Language Selection**: Toggle between American (`en_US`) and British (`en_GB`) English regional dictionaries.
+    -   **Custom Dictionary**: Manage words ignored by the spell checker.
 
 ### 2. Browser View (`ui/browser.rs`)
 Handles the "Gallery" or "Browser" view where characters are listed.
@@ -65,6 +68,7 @@ Handles the detailed editing interfaces.
         -   **Context Menu**: Custom Cut/Copy/Paste actions with selection persistence.
     -   **Avatars**: Image preview, clipboard pasting, file browsing.
     -   **Configurable Appearance**: Respects user-defined font size and brightness settings from the Options window for all text fields.
+    -   **Spellcheck & Context Menu Corrections**: Real-time spellchecking underlines misspelled words in red. Right-clicking a misspelled word in any text editor provides up to 5 correction suggestions, replacing the word instantly without disrupting layout or cursor positioning.
     -   **Tags**: Management of App and External tags.
     -   **Lorebooks**: Selection of linked lorebooks with "Go to Lorebook" navigation button.
     -   **Navigation**: "Back" and "Up" buttons with **Unsaved Changes Protection**.

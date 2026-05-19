@@ -239,6 +239,8 @@ pub use collection_card::render_subfolder_card;
 The `CodeEditor` (wrapper around `cosmic-text`) is optimized for large files (10MB+) by minimizing per-frame operations:
 
 - **Visibility Culling**: Only lines visible on screen are processed for spell-checking and decoration.
+- **Context-Menu Hit-Testing & Suggestion Caching**: On right-click events, the editor performs a hit-test against pre-computed glitch coordinates. If a misspelled word is targeted, dictionary suggestions (`zspell`) are pre-computed once and cached in temporary memory, ensuring the UI rendering loop remains 60fps while the context menu is open.
+- **Global-to-Line Coordinate Translation**: For text replacements from suggestions, the editor translates global byte offsets into line-relative `cosmic_text::Cursor` structures by inspecting buffer line metrics. This ensures accurate replacement even across multi-line text with varying newline representations (`\n` vs `\r\n`).
 - **Zero-Allocation Sync**: Uses a `Length + Hashing` heuristic for change detection. Full hashing is skipped if file length is identical to the last frame.
 - **Shared Memory**: Spell-check results and line offsets are stored in `Arc` containers to avoid per-frame `Vec` cloning.
 - **State Persistence & Recovery**: Uses `egui::Memory` to track font changes and search queries. Retrieval logic includes a recovery mechanism that creates a fresh editor instance if state is lost during rapid focus transitions, preventing application panics.
