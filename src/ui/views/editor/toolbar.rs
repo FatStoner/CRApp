@@ -25,7 +25,7 @@ impl Default for ToolbarAction {
 pub fn render_toolbar(
     ui: &mut egui::Ui,
     app: &mut CrapApp,
-    character: &Character,
+    character: &mut Character,
     is_dirty: bool,
     trigger_import: &mut bool,
 ) -> ToolbarAction {
@@ -79,6 +79,32 @@ pub fn render_toolbar(
             super::export::render_export_menu(ui, app, character);
             // Import menu
             super::export::render_import_menu(ui, app, character, trigger_import);
+
+            ui.add_space(10.0);
+            if ui
+                .button("➡ Copy Main Data to SillyTavern")
+                .on_hover_text(
+                    "Copies Main Data into the matching SillyTavern fields. This overwrites those ST fields.",
+                )
+                .clicked()
+            {
+                let st_name = if character.char_name.trim().is_empty() {
+                    character.name.clone()
+                } else {
+                    character.char_name.clone()
+                };
+
+                character.st_name = st_name;
+                character.st_first_mes = character.first_message.clone();
+                character.st_description = character.personality.clone();
+                character.st_scenario = character.scenario.clone();
+                character.st_mes_example = character.example_dialogue.clone();
+
+                app.status_message = Some((
+                    "Copied Main Data into SillyTavern fields".to_string(),
+                    egui::Color32::GREEN,
+                ));
+            }
 
             ui.add_space(10.0);
             if ui.button("APPLY TEMPLATE").clicked() {

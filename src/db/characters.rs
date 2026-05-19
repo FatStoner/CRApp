@@ -1,7 +1,8 @@
 use crate::models::{Character, CharacterUrl};
+use crate::error::DbError;
 use sqlx::SqlitePool;
 
-pub async fn get_all(pool: &SqlitePool) -> Result<Vec<Character>, sqlx::Error> {
+pub async fn get_all(pool: &SqlitePool) -> Result<Vec<Character>, DbError> {
     let mut list = sqlx::query_as::<_, Character>("SELECT * FROM characters")
         .fetch_all(pool)
         .await?;
@@ -11,7 +12,7 @@ pub async fn get_all(pool: &SqlitePool) -> Result<Vec<Character>, sqlx::Error> {
     Ok(list)
 }
 
-pub async fn upsert(pool: &SqlitePool, character: &mut Character) -> Result<(), sqlx::Error> {
+pub async fn upsert(pool: &SqlitePool, character: &mut Character) -> Result<(), DbError> {
     character.updated_at = chrono::Utc::now();
     character.spell_check_overrides_json = if character.spell_check_overrides.is_empty() {
         None
@@ -141,7 +142,7 @@ pub async fn upsert(pool: &SqlitePool, character: &mut Character) -> Result<(), 
     Ok(())
 }
 
-pub async fn delete(pool: &SqlitePool, id: i64) -> Result<(), sqlx::Error> {
+pub async fn delete(pool: &SqlitePool, id: i64) -> Result<(), DbError> {
     sqlx::query("DELETE FROM characters WHERE id = ?")
         .bind(id)
         .execute(pool)
@@ -153,7 +154,7 @@ pub async fn move_to_collection(
     pool: &SqlitePool,
     char_id: i64,
     collection_id: Option<i64>,
-) -> Result<(), sqlx::Error> {
+) -> Result<(), DbError> {
     sqlx::query(
         "UPDATE characters SET collection_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
     )
@@ -164,13 +165,14 @@ pub async fn move_to_collection(
     Ok(())
 }
 
-pub async fn get_all_urls_flat(pool: &SqlitePool) -> Result<Vec<CharacterUrl>, sqlx::Error> {
-    sqlx::query_as::<_, CharacterUrl>("SELECT * FROM character_urls")
+pub async fn get_all_urls_flat(pool: &SqlitePool) -> Result<Vec<CharacterUrl>, DbError> {
+    let list = sqlx::query_as::<_, CharacterUrl>("SELECT * FROM character_urls")
         .fetch_all(pool)
-        .await
+        .await?;
+    Ok(list)
 }
 
-pub async fn search_text(pool: &SqlitePool, query: &str) -> Result<Vec<Character>, sqlx::Error> {
+pub async fn search_text(pool: &SqlitePool, query: &str) -> Result<Vec<Character>, DbError> {
     let pattern = format!("%{}%", query);
     // We search in all text fields
     let mut list = sqlx::query_as::<_, Character>(
@@ -206,7 +208,7 @@ pub async fn search_text(pool: &SqlitePool, query: &str) -> Result<Vec<Character
     Ok(list)
 }
 
-pub async fn get_by_ids(pool: &SqlitePool, ids: &[i64]) -> Result<Vec<Character>, sqlx::Error> {
+pub async fn get_by_ids(pool: &SqlitePool, ids: &[i64]) -> Result<Vec<Character>, DbError> {
     if ids.is_empty() {
         return Ok(Vec::new());
     }

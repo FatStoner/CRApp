@@ -1,14 +1,16 @@
+use crate::error::DbError;
 use crate::models::{Lorebook, LorebookEntry, Tag};
 use sqlx::SqlitePool;
 use std::collections::HashSet;
 
-pub async fn get_all(pool: &SqlitePool) -> Result<Vec<Lorebook>, sqlx::Error> {
-    sqlx::query_as::<_, Lorebook>("SELECT * FROM lorebooks")
+pub async fn get_all(pool: &SqlitePool) -> Result<Vec<Lorebook>, DbError> {
+    let list = sqlx::query_as::<_, Lorebook>("SELECT * FROM lorebooks")
         .fetch_all(pool)
-        .await
+        .await?;
+    Ok(list)
 }
 
-pub async fn get_by_ids(pool: &SqlitePool, ids: &[i64]) -> Result<Vec<Lorebook>, sqlx::Error> {
+pub async fn get_by_ids(pool: &SqlitePool, ids: &[i64]) -> Result<Vec<Lorebook>, DbError> {
     if ids.is_empty() {
         return Ok(Vec::new());
     }
@@ -21,12 +23,13 @@ pub async fn get_by_ids(pool: &SqlitePool, ids: &[i64]) -> Result<Vec<Lorebook>,
     for id in ids {
         q = q.bind(id);
     }
-    q.fetch_all(pool).await
+    let list = q.fetch_all(pool).await?;
+    Ok(list)
 }
 
-pub async fn search_text(pool: &SqlitePool, query: &str) -> Result<Vec<Lorebook>, sqlx::Error> {
+pub async fn search_text(pool: &SqlitePool, query: &str) -> Result<Vec<Lorebook>, DbError> {
     let pattern = format!("%{}%", query);
-    sqlx::query_as::<_, Lorebook>(
+    let list = sqlx::query_as::<_, Lorebook>(
         "SELECT * FROM lorebooks WHERE 
          title LIKE ? OR 
          description LIKE ? OR
@@ -36,10 +39,11 @@ pub async fn search_text(pool: &SqlitePool, query: &str) -> Result<Vec<Lorebook>
     .bind(&pattern)
     .bind(&pattern)
     .fetch_all(pool)
-    .await
+    .await?;
+    Ok(list)
 }
 
-pub async fn upsert(pool: &SqlitePool, lorebook: &mut Lorebook) -> Result<(), sqlx::Error> {
+pub async fn upsert(pool: &SqlitePool, lorebook: &mut Lorebook) -> Result<(), DbError> {
     // Keep description and content in sync for search compatibility
     lorebook.description = lorebook.content.clone();
 
@@ -74,7 +78,7 @@ pub async fn upsert(pool: &SqlitePool, lorebook: &mut Lorebook) -> Result<(), sq
     Ok(())
 }
 
-pub async fn delete(pool: &SqlitePool, id: i64) -> Result<(), sqlx::Error> {
+pub async fn delete(pool: &SqlitePool, id: i64) -> Result<(), DbError> {
     // 1. Delete Entries
     sqlx::query("DELETE FROM lorebook_entries WHERE lorebook_id = ?")
         .bind(id)
@@ -107,17 +111,18 @@ pub async fn delete(pool: &SqlitePool, id: i64) -> Result<(), sqlx::Error> {
 pub async fn get_entries(
     pool: &SqlitePool,
     lorebook_id: i64,
-) -> Result<Vec<LorebookEntry>, sqlx::Error> {
-    sqlx::query_as::<_, LorebookEntry>(
+) -> Result<Vec<LorebookEntry>, DbError> {
+    let list = sqlx::query_as::<_, LorebookEntry>(
         "SELECT * FROM lorebook_entries WHERE lorebook_id = ? ORDER BY name ASC",
     )
     .bind(lorebook_id)
     .fetch_all(pool)
-    .await
+    .await?;
+    Ok(list)
 }
 
-pub async fn add_entry(pool: &SqlitePool, entry: &LorebookEntry) -> Result<i64, sqlx::Error> {
-    sqlx::query("INSERT INTO lorebook_entries (lorebook_id, name, keywords, content, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)")
+pub async fn add_entry(pool: &SqlitePool, entry: &LorebookEntry) -> Result<i64, DbError> {
+    let id = sqlx::query("INSERT INTO lorebook_entries (lorebook_id, name, keywords, content, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)")
         .bind(entry.lorebook_id)
         .bind(&entry.name)
         .bind(&entry.keywords)
@@ -125,11 +130,12 @@ pub async fn add_entry(pool: &SqlitePool, entry: &LorebookEntry) -> Result<i64, 
         .bind(entry.created_at)
         .bind(entry.updated_at)
         .execute(pool)
-        .await
-        .map(|r| r.last_insert_rowid())
+        .await?
+        .last_insert_rowid();
+    Ok(id)
 }
 
-pub async fn update_entry(pool: &SqlitePool, entry: &LorebookEntry) -> Result<(), sqlx::Error> {
+pub async fn update_entry(pool: &SqlitePool, entry: &LorebookEntry) -> Result<(), DbError> {
     sqlx::query(
         "UPDATE lorebook_entries SET name=?, keywords=?, content=?, updated_at=? WHERE id=?",
     )
@@ -143,7 +149,7 @@ pub async fn update_entry(pool: &SqlitePool, entry: &LorebookEntry) -> Result<()
     Ok(())
 }
 
-pub async fn delete_entry(pool: &SqlitePool, id: i64) -> Result<(), sqlx::Error> {
+pub async fn delete_entry(pool: &SqlitePool, id: i64) -> Result<(), DbError> {
     sqlx::query("DELETE FROM lorebook_entries WHERE id = ?")
         .bind(id)
         .execute(pool)
@@ -154,9 +160,9 @@ pub async fn delete_entry(pool: &SqlitePool, id: i64) -> Result<(), sqlx::Error>
 pub async fn search_entries_text(
     pool: &SqlitePool,
     query: &str,
-) -> Result<Vec<LorebookEntry>, sqlx::Error> {
+) -> Result<Vec<LorebookEntry>, DbError> {
     let pattern = format!("%{}%", query);
-    sqlx::query_as::<_, LorebookEntry>(
+    let list = sqlx::query_as::<_, LorebookEntry>(
         "SELECT * FROM lorebook_entries WHERE 
          name LIKE ? OR 
          keywords LIKE ? OR 
@@ -166,7 +172,8 @@ pub async fn search_entries_text(
     .bind(&pattern)
     .bind(&pattern)
     .fetch_all(pool)
-    .await
+    .await?;
+    Ok(list)
 }
 
 // --- Tags ---
@@ -175,7 +182,7 @@ pub async fn add_tag(
     pool: &SqlitePool,
     lorebook_id: i64,
     tag_name: &str,
-) -> Result<(), sqlx::Error> {
+) -> Result<(), DbError> {
     // 1. Ensure tag exists
     let insert_tag_query = "INSERT OR IGNORE INTO tags (name) VALUES (?)";
     sqlx::query(insert_tag_query)
@@ -205,7 +212,7 @@ pub async fn remove_tag(
     pool: &SqlitePool,
     lorebook_id: i64,
     tag_id: i64,
-) -> Result<(), sqlx::Error> {
+) -> Result<(), DbError> {
     sqlx::query("DELETE FROM lorebook_tags WHERE lorebook_id = ? AND tag_id = ?")
         .bind(lorebook_id)
         .bind(tag_id)
@@ -214,19 +221,20 @@ pub async fn remove_tag(
     Ok(())
 }
 
-pub async fn get_tags(pool: &SqlitePool, lorebook_id: i64) -> Result<Vec<Tag>, sqlx::Error> {
+pub async fn get_tags(pool: &SqlitePool, lorebook_id: i64) -> Result<Vec<Tag>, DbError> {
     let query = "
         SELECT t.id, t.name FROM tags t
         JOIN lorebook_tags lt ON t.id = lt.tag_id
         WHERE lt.lorebook_id = ?
     ";
-    sqlx::query_as::<_, Tag>(query)
+    let list = sqlx::query_as::<_, Tag>(query)
         .bind(lorebook_id)
         .fetch_all(pool)
-        .await
+        .await?;
+    Ok(list)
 }
 
-pub async fn get_all_tags_flat(pool: &SqlitePool) -> Result<Vec<(i64, Tag)>, sqlx::Error> {
+pub async fn get_all_tags_flat(pool: &SqlitePool) -> Result<Vec<(i64, Tag)>, DbError> {
     let query = "
         SELECT lt.lorebook_id, t.id, t.name FROM tags t
         JOIN lorebook_tags lt ON t.id = lt.tag_id
@@ -249,7 +257,7 @@ pub async fn get_all_tags_flat(pool: &SqlitePool) -> Result<Vec<(i64, Tag)>, sql
 pub async fn search_tags_matching(
     pool: &SqlitePool,
     query: &str,
-) -> Result<Vec<(i64, String)>, sqlx::Error> {
+) -> Result<Vec<(i64, String)>, DbError> {
     let pattern = format!("%{}%", query);
     let q = "
         SELECT lt.lorebook_id, t.name
@@ -271,7 +279,7 @@ pub async fn search_tags_matching(
 
 // --- Lore Links ---
 
-pub async fn get_links(pool: &SqlitePool, character_id: i64) -> Result<HashSet<i64>, sqlx::Error> {
+pub async fn get_links(pool: &SqlitePool, character_id: i64) -> Result<HashSet<i64>, DbError> {
     let rows = sqlx::query("SELECT lore_id FROM character_lore_link WHERE character_id = ?")
         .bind(character_id)
         .fetch_all(pool)
@@ -282,7 +290,7 @@ pub async fn get_links(pool: &SqlitePool, character_id: i64) -> Result<HashSet<i
     Ok(set)
 }
 
-pub async fn link(pool: &SqlitePool, character_id: i64, lore_id: i64) -> Result<(), sqlx::Error> {
+pub async fn link(pool: &SqlitePool, character_id: i64, lore_id: i64) -> Result<(), DbError> {
     sqlx::query("INSERT OR IGNORE INTO character_lore_link (character_id, lore_id) VALUES (?, ?)")
         .bind(character_id)
         .bind(lore_id)
@@ -291,7 +299,7 @@ pub async fn link(pool: &SqlitePool, character_id: i64, lore_id: i64) -> Result<
     Ok(())
 }
 
-pub async fn unlink(pool: &SqlitePool, character_id: i64, lore_id: i64) -> Result<(), sqlx::Error> {
+pub async fn unlink(pool: &SqlitePool, character_id: i64, lore_id: i64) -> Result<(), DbError> {
     sqlx::query("DELETE FROM character_lore_link WHERE character_id = ? AND lore_id = ?")
         .bind(character_id)
         .bind(lore_id)
@@ -300,7 +308,7 @@ pub async fn unlink(pool: &SqlitePool, character_id: i64, lore_id: i64) -> Resul
     Ok(())
 }
 
-pub async fn get_all_links_flat(pool: &SqlitePool) -> Result<Vec<(i64, i64)>, sqlx::Error> {
+pub async fn get_all_links_flat(pool: &SqlitePool) -> Result<Vec<(i64, i64)>, DbError> {
     let rows = sqlx::query("SELECT character_id, lore_id FROM character_lore_link")
         .fetch_all(pool)
         .await?;

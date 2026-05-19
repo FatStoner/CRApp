@@ -151,6 +151,118 @@ impl CrapApp {
         }
     }
 
+    pub fn write_character_sillytavern_png_static(
+        character: &Character,
+        path: &std::path::Path,
+    ) -> Result<(), String> {
+        if let Some(avatar_path) = &character.avatar_path {
+            let card = crate::card_v2::SillyTavernCard::from_character(character);
+            let json = serde_json::to_string(&card).map_err(|e| e.to_string())?;
+            let b64 = BASE64.encode(json);
+
+            let original_png = std::fs::read(avatar_path).map_err(|e| e.to_string())?;
+            let updated_png = Self::write_png_text_chunks(&original_png, &[("chara", &b64), ("ccv3", &b64)])?;
+            std::fs::write(path, updated_png).map_err(|e| e.to_string())?;
+
+            Ok(())
+        } else {
+            let card = crate::card_v2::SillyTavernCard::from_character(character);
+            let json = serde_json::to_string_pretty(&card).map_err(|e| e.to_string())?;
+            std::fs::write(path.with_extension("json"), json).map_err(|e| e.to_string())
+        }
+    }
+
+    fn write_png_text_chunks(
+        png_bytes: &[u8],
+        chunks: &[(&str, &str)],
+    ) -> Result<Vec<u8>, String> {
+        const PNG_SIGNATURE: &[u8; 8] = b"\x89PNG\r\n\x1a\n";
+
+        if png_bytes.len() < PNG_SIGNATURE.len() || &png_bytes[..8] != PNG_SIGNATURE {
+            return Err("Avatar is not a valid PNG file. Use a PNG avatar for ST PNG export.".to_string());
+        }
+
+        let mut output = Vec::with_capacity(png_bytes.len() + 4096);
+        output.extend_from_slice(PNG_SIGNATURE);
+
+        let mut offset = 8;
+        while offset + 12 <= png_bytes.len() {
+            let length = u32::from_be_bytes([
+                png_bytes[offset],
+                png_bytes[offset + 1],
+                png_bytes[offset + 2],
+                png_bytes[offset + 3],
+            ]) as usize;
+            let chunk_start = offset;
+            let chunk_type_start = offset + 4;
+            let data_start = offset + 8;
+            let data_end = data_start + length;
+            let chunk_end = data_end + 4;
+
+            if chunk_end > png_bytes.len() {
+                return Err("Invalid PNG chunk length while writing ST metadata.".to_string());
+            }
+
+            let chunk_type = &png_bytes[chunk_type_start..chunk_type_start + 4];
+
+            if chunk_type == b"IEND" {
+                for (key, value) in chunks {
+                    Self::append_png_text_chunk(&mut output, key, value);
+                }
+                output.extend_from_slice(&png_bytes[chunk_start..chunk_end]);
+                return Ok(output);
+            }
+
+            let is_replaced_text_chunk = chunk_type == b"tEXt"
+                && chunks.iter().any(|(key, _)| {
+                    let key_bytes = key.as_bytes();
+                    length > key_bytes.len()
+                        && png_bytes[data_start..data_start + key_bytes.len()] == *key_bytes
+                        && png_bytes[data_start + key_bytes.len()] == 0
+                });
+
+            if !is_replaced_text_chunk {
+                output.extend_from_slice(&png_bytes[chunk_start..chunk_end]);
+            }
+
+            offset = chunk_end;
+        }
+
+        Err("PNG ended before IEND chunk while writing ST metadata.".to_string())
+    }
+
+    fn append_png_text_chunk(output: &mut Vec<u8>, key: &str, value: &str) {
+        let mut data = Vec::with_capacity(key.len() + 1 + value.len());
+        data.extend_from_slice(key.as_bytes());
+        data.push(0);
+        data.extend_from_slice(value.as_bytes());
+
+        output.extend_from_slice(&(data.len() as u32).to_be_bytes());
+        output.extend_from_slice(b"tEXt");
+        output.extend_from_slice(&data);
+
+        let mut crc_data = Vec::with_capacity(4 + data.len());
+        crc_data.extend_from_slice(b"tEXt");
+        crc_data.extend_from_slice(&data);
+        let crc = Self::png_crc32(&crc_data);
+        output.extend_from_slice(&crc.to_be_bytes());
+    }
+
+    fn png_crc32(bytes: &[u8]) -> u32 {
+        let mut crc = 0xFFFF_FFFFu32;
+        for &byte in bytes {
+            crc ^= byte as u32;
+            for _ in 0..8 {
+                if crc & 1 != 0 {
+                    crc = (crc >> 1) ^ 0xEDB8_8320;
+                } else {
+                    crc >>= 1;
+                }
+            }
+        }
+        !crc
+    }
+
     // Instance methods wrappers for compatibility and cleaner calls
     pub fn write_character_native(
         &self,
@@ -232,11 +344,17 @@ impl CrapApp {
     /// Import character from file (JSON, PNG, or CRAPP)
     pub fn import_character_from_file(&self, target_id: Option<u64>) {
         let tx = self.tx.clone();
-        tokio::spawn(async move {
-            if let Some(path) = rfd::FileDialog::new()
-                .add_filter("Supported", &["crapp", "json", "png"])
-                .pick_file()
-            {
+        let ctx = self.ctx.clone();
+        crate::task::spawn_supervised(ctx.clone(), async move {
+            let path_opt = tokio::task::spawn_blocking(move || {
+                rfd::FileDialog::new()
+                    .add_filter("Supported", &["crapp", "json", "png"])
+                    .pick_file()
+            })
+            .await
+            .map_err(|e| crate::error::AppError::TokioTask(e.to_string()))?;
+
+            if let Some(path) = path_opt {
                 match std::fs::read(&path) {
                     Ok(bytes) => {
                         let ext = path
@@ -355,10 +473,13 @@ impl CrapApp {
                             .await;
                     }
                 }
+                ctx.request_repaint();
             }
-        });
+            Ok(())
+        }, self.tx.clone());
     }
 }
+
 
 impl CrapApp {
     fn build_sillytavern_export_character(character: &Character) -> Character {
@@ -449,137 +570,6 @@ impl CrapApp {
                 let _ = CrapApp::write_character_sillytavern_png_static(&char_clone, &path);
             }
         });
-    }
-
-    fn png_crc32(bytes: &[u8]) -> u32 {
-        let mut crc: u32 = 0xFFFF_FFFF;
-        for &byte in bytes {
-            crc ^= byte as u32;
-            for _ in 0..8 {
-                if crc & 1 != 0 {
-                    crc = (crc >> 1) ^ 0xEDB8_8320;
-                } else {
-                    crc >>= 1;
-                }
-            }
-        }
-        !crc
-    }
-
-    fn make_png_text_chunk(keyword: &str, text: &str) -> Vec<u8> {
-        let mut chunk_data = Vec::with_capacity(keyword.len() + 1 + text.len());
-        chunk_data.extend_from_slice(keyword.as_bytes());
-        chunk_data.push(0);
-        chunk_data.extend_from_slice(text.as_bytes());
-
-        let mut crc_input = Vec::with_capacity(4 + chunk_data.len());
-        crc_input.extend_from_slice(b"tEXt");
-        crc_input.extend_from_slice(&chunk_data);
-        let crc = Self::png_crc32(&crc_input);
-
-        let mut chunk = Vec::with_capacity(12 + chunk_data.len());
-        chunk.extend_from_slice(&(chunk_data.len() as u32).to_be_bytes());
-        chunk.extend_from_slice(b"tEXt");
-        chunk.extend_from_slice(&chunk_data);
-        chunk.extend_from_slice(&crc.to_be_bytes());
-        chunk
-    }
-
-    fn remove_character_card_text_chunks(png_bytes: &[u8]) -> Result<Vec<u8>, String> {
-        const PNG_SIGNATURE: &[u8; 8] = b"\x89PNG\r\n\x1a\n";
-        if !png_bytes.starts_with(PNG_SIGNATURE) {
-            return Err("Avatar image is not PNG data".to_string());
-        }
-
-        let mut output = Vec::with_capacity(png_bytes.len());
-        output.extend_from_slice(PNG_SIGNATURE);
-
-        let mut offset = PNG_SIGNATURE.len();
-        while offset + 12 <= png_bytes.len() {
-            let length = u32::from_be_bytes([
-                png_bytes[offset],
-                png_bytes[offset + 1],
-                png_bytes[offset + 2],
-                png_bytes[offset + 3],
-            ]) as usize;
-            let chunk_end = offset
-                .checked_add(12)
-                .and_then(|v| v.checked_add(length))
-                .ok_or_else(|| "PNG chunk length overflow".to_string())?;
-
-            if chunk_end > png_bytes.len() {
-                return Err("PNG file appears to be truncated".to_string());
-            }
-
-            let chunk_type = &png_bytes[offset + 4..offset + 8];
-            let chunk_data = &png_bytes[offset + 8..offset + 8 + length];
-            let skip_chunk = chunk_type == b"tEXt"
-                && (chunk_data.starts_with(b"chara\0") || chunk_data.starts_with(b"ccv3\0"));
-
-            if !skip_chunk {
-                output.extend_from_slice(&png_bytes[offset..chunk_end]);
-            }
-
-            offset = chunk_end;
-            if chunk_type == b"IEND" {
-                break;
-            }
-        }
-
-        Ok(output)
-    }
-
-    fn add_sillytavern_card_chunks_to_png(
-        png_bytes: &[u8],
-        card_base64: &str,
-    ) -> Result<Vec<u8>, String> {
-        let mut clean_png = Self::remove_character_card_text_chunks(png_bytes)?;
-        let iend_len = 12;
-        if clean_png.len() < iend_len || &clean_png[clean_png.len() - iend_len + 4..clean_png.len() - iend_len + 8] != b"IEND" {
-            return Err("PNG file is missing IEND chunk".to_string());
-        }
-
-        let iend_start = clean_png.len() - iend_len;
-        let iend_chunk = clean_png.split_off(iend_start);
-        clean_png.extend_from_slice(&Self::make_png_text_chunk("chara", card_base64));
-        clean_png.extend_from_slice(&Self::make_png_text_chunk("ccv3", card_base64));
-        clean_png.extend_from_slice(&iend_chunk);
-        Ok(clean_png)
-    }
-
-    fn image_bytes_to_png_bytes(image_bytes: &[u8]) -> Result<Vec<u8>, String> {
-        const PNG_SIGNATURE: &[u8; 8] = b"\x89PNG\r\n\x1a\n";
-        if image_bytes.starts_with(PNG_SIGNATURE) {
-            return Ok(image_bytes.to_vec());
-        }
-
-        let img = image::load_from_memory(image_bytes).map_err(|e| e.to_string())?;
-        let mut png_bytes = Vec::new();
-        let mut cursor = std::io::Cursor::new(&mut png_bytes);
-        img.write_to(&mut cursor, image::ImageOutputFormat::Png)
-            .map_err(|e| e.to_string())?;
-        Ok(png_bytes)
-    }
-
-    pub fn write_character_sillytavern_png_static(
-        character: &Character,
-        path: &std::path::Path,
-    ) -> Result<(), String> {
-        if let Some(avatar_path) = &character.avatar_path {
-            let card = crate::card_v2::SillyTavernCard::from_character(character);
-            let json = serde_json::to_string(&card).map_err(|e| e.to_string())?;
-            let b64 = BASE64.encode(json);
-
-            let img_bytes = std::fs::read(avatar_path).map_err(|e| e.to_string())?;
-            let png_bytes = Self::image_bytes_to_png_bytes(&img_bytes)?;
-            let png_with_card = Self::add_sillytavern_card_chunks_to_png(&png_bytes, &b64)?;
-
-            std::fs::write(path, png_with_card).map_err(|e| e.to_string())
-        } else {
-            let card = crate::card_v2::SillyTavernCard::from_character(character);
-            let json = serde_json::to_string_pretty(&card).map_err(|e| e.to_string())?;
-            std::fs::write(path.with_extension("json"), json).map_err(|e| e.to_string())
-        }
     }
 
     /// Export character as SillyTavern V3 JSON card (uses ST-specific fields only)

@@ -19,29 +19,6 @@ pub fn render_sillytavern_tab(
         EditorFontFamily::Monospace => Family::Monospace,
     };
 
-    egui::Frame::none()
-        .fill(egui::Color32::from_rgb(30, 60, 30))
-        .rounding(6.0)
-        .inner_margin(8.0)
-        .show(ui, |ui| {
-            ui.horizontal(|ui| {
-                ui.label(
-                    egui::RichText::new("🎭 SillyTavern Format")
-                        .strong()
-                        .color(egui::Color32::from_rgb(100, 220, 100)),
-                );
-                ui.label(
-                    egui::RichText::new(
-                        "  These fields are independent from Main Data and export as a V3 character card.",
-                    )
-                    .size(11.0)
-                    .color(egui::Color32::from_rgb(160, 200, 160)),
-                );
-            });
-        });
-
-    ui.add_space(6.0);
-
     ui.horizontal(|ui| {
         ui.selectable_value(&mut app.active_st_tab, StTab::Main, "Main");
         ui.selectable_value(&mut app.active_st_tab, StTab::Advanced, "Advanced");

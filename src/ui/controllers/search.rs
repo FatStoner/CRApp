@@ -22,7 +22,7 @@ impl CrapApp {
         let lore_filters = self.deep_search_lore_field_filters.clone();
 
         let ctx = self.ctx.clone();
-        tokio::spawn(async move {
+        crate::task::spawn_supervised(ctx.clone(), async move {
             let mut results = Vec::new();
 
             // 1. Search Characters Text
@@ -300,7 +300,8 @@ impl CrapApp {
 
             let _ = tx.send(UiEvent::DeepSearchCompleted(Ok(results))).await;
             ctx.request_repaint();
-        });
+            Ok(())
+        }, self.tx.clone());
     }
 
     pub fn sort_deep_search_results(&mut self) {
@@ -350,7 +351,8 @@ impl CrapApp {
         let include_scen = self.count_scenario_in_total;
         let include_ex = self.count_example_in_total;
 
-        tokio::spawn(async move {
+        let ctx = self.ctx.clone();
+        crate::task::spawn_supervised(ctx.clone(), async move {
             let mut total_tokens = 0;
             let mut total_chars = 0;
 
@@ -397,6 +399,8 @@ impl CrapApp {
                     total_chars,
                 ))
                 .await;
-        });
+            ctx.request_repaint();
+            Ok(())
+        }, self.tx.clone());
     }
 }

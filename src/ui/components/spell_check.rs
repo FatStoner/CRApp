@@ -10,10 +10,11 @@ pub struct SpellChecker {
 }
 
 impl SpellChecker {
-    pub fn new() -> Option<Self> {
-        let dictionary_dir = Self::find_dictionary_dir()?;
-        let aff_path = dictionary_dir.join("en_US.aff");
-        let dic_path = dictionary_dir.join("en_US.dic");
+    pub fn new(lang: &crate::models::SpellcheckLanguage) -> Option<Self> {
+        let prefix = lang.to_string();
+        let dictionary_dir = Self::find_dictionary_dir(&prefix)?;
+        let aff_path = dictionary_dir.join(format!("{}.aff", prefix));
+        let dic_path = dictionary_dir.join(format!("{}.dic", prefix));
 
         let aff_content = std::fs::read_to_string(&aff_path).ok()?;
         let dic_content = std::fs::read_to_string(&dic_path).ok()?;
@@ -45,9 +46,10 @@ impl SpellChecker {
         })
     }
 
-
-    fn find_dictionary_dir() -> Option<std::path::PathBuf> {
+    fn find_dictionary_dir(prefix: &str) -> Option<std::path::PathBuf> {
         let relative_dictionary_dir = std::path::PathBuf::from("data").join("dictionaries");
+        let aff_file = format!("{}.aff", prefix);
+        let dic_file = format!("{}.dic", prefix);
 
         let mut candidates = Vec::new();
 
@@ -66,7 +68,7 @@ impl SpellChecker {
         candidates.push(std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(&relative_dictionary_dir));
 
         candidates.into_iter().find(|dir| {
-            dir.join("en_US.aff").is_file() && dir.join("en_US.dic").is_file()
+            dir.join(&aff_file).is_file() && dir.join(&dic_file).is_file()
         })
     }
 
@@ -83,6 +85,17 @@ impl SpellChecker {
                 .map(|(offset, word)| (offset, offset + word.len()))
                 .collect()
         }
+    }
+
+    pub fn suggest(&self, word: &str) -> Vec<String> {
+        self.dict
+            .entry(word)
+            .suggest()
+            .unwrap_or_default()
+            .into_iter()
+            .take(5)
+            .map(|s| s.to_string())
+            .collect()
     }
 
     pub fn add_word(&self, word: &str) {

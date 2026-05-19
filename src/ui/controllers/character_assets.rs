@@ -99,7 +99,8 @@ impl CrapApp {
     /// Add image to character gallery (async operation)
     pub fn add_gallery_image_async(&self, character_id: i64) {
         let tx = self.tx.clone();
-        tokio::spawn(async move {
+        let ctx = self.ctx.clone();
+        crate::task::spawn_supervised(ctx.clone(), async move {
             if let Some(path) = rfd::FileDialog::new()
                 .add_filter("image", &["png", "jpg", "jpeg", "webp"])
                 .pick_file()
@@ -118,7 +119,9 @@ impl CrapApp {
                     let _ = tx.send(UiEvent::UiRepaint).await;
                 }
             }
-        });
+            ctx.request_repaint();
+            Ok(())
+        }, self.tx.clone());
     }
 
     /// Paste image to character gallery from clipboard
@@ -183,7 +186,8 @@ impl CrapApp {
     /// Load gallery images asynchronously with thumbnail generation
     pub fn load_gallery_images_async(&self, character_id: i64) {
         let tx = self.tx.clone();
-        tokio::spawn(async move {
+        let ctx = self.ctx.clone();
+        crate::task::spawn_supervised(ctx.clone(), async move {
             let gallery_dir = format!("data/gallery/{}", character_id);
             let thumb_dir = format!("data/.thumbnails/{}", character_id);
             let _ = std::fs::create_dir_all(&gallery_dir);
@@ -251,6 +255,8 @@ impl CrapApp {
                 .send(UiEvent::GalleryImagesLoaded(character_id, images))
                 .await;
             let _ = tx.send(UiEvent::UiRepaint).await;
-        });
+            ctx.request_repaint();
+            Ok(())
+        }, self.tx.clone());
     }
 }

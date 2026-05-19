@@ -92,7 +92,7 @@ pub fn render_subfolder_card(
     }
 
     response.context_menu(|ui| {
-        ui.style_mut().wrap = Some(false);
+        ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Extend);
         ui.set_min_width(0.0);
         if ui.button("✏ Rename Folder").clicked() {
             actions.push(BrowserAction::RenameCollection(
@@ -178,7 +178,7 @@ pub fn render_subfolder_list_item(
                 }
 
                 response.context_menu(|ui| {
-                    ui.style_mut().wrap = Some(false);
+                    ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Extend);
                     ui.set_min_width(0.0);
                     if ui.button("✏ Rename Folder").clicked() {
                         actions.push(BrowserAction::RenameCollection(

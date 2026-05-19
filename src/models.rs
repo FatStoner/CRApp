@@ -48,6 +48,32 @@ impl std::str::FromStr for ThemeMode {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum SpellcheckLanguage {
+    EnUS,
+    EnGB,
+}
+
+impl std::fmt::Display for SpellcheckLanguage {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SpellcheckLanguage::EnUS => write!(f, "en_US"),
+            SpellcheckLanguage::EnGB => write!(f, "en_GB"),
+        }
+    }
+}
+
+impl std::str::FromStr for SpellcheckLanguage {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "en_GB" => Ok(SpellcheckLanguage::EnGB),
+            _ => Ok(SpellcheckLanguage::EnUS),
+        }
+    }
+}
+
 #[derive(Debug, Clone, FromRow, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Tag {
     pub id: i64,
@@ -192,7 +218,10 @@ impl Character {
             && self.is_nsfw == other.is_nsfw
             && self.blur_avatar == other.blur_avatar
             && self.spell_check_overrides == other.spell_check_overrides
-            && self.urls.iter().filter(|u| !u.url.trim().is_empty())
+            && self
+                .urls
+                .iter()
+                .filter(|u| !u.url.trim().is_empty())
                 .eq(other.urls.iter().filter(|u| !u.url.trim().is_empty()))
             // ST fields
             && self.st_name == other.st_name

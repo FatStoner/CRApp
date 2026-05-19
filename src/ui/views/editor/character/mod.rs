@@ -44,7 +44,7 @@ pub fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
 
         // Render toolbar and handle its actions
         let toolbar_action =
-            super::toolbar::render_toolbar(ui, app, &character, is_dirty, &mut trigger_import);
+            super::toolbar::render_toolbar(ui, app, &mut character, is_dirty, &mut trigger_import);
 
         if toolbar_action.template_requested {
             app.popup_state = crate::ui::PopupState::TemplateSelector;
@@ -131,6 +131,11 @@ pub fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                 CharacterTab::MainData,
                 "Main Data",
             );
+            ui.selectable_value(
+                &mut app.active_char_tab,
+                CharacterTab::SillyTavern,
+                "Silly Tavern",
+            );
             ui.selectable_value(&mut app.active_char_tab, CharacterTab::Notes, "Notes");
             ui.selectable_value(
                 &mut app.active_char_tab,
@@ -138,11 +143,6 @@ pub fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                 "Lorebooks",
             );
             ui.selectable_value(&mut app.active_char_tab, CharacterTab::Gallery, "Gallery");
-            ui.selectable_value(
-                &mut app.active_char_tab,
-                CharacterTab::SillyTavern,
-                egui::RichText::new("🎭 Silly Tavern").color(egui::Color32::from_rgb(100, 220, 100)),
-            );
         });
         ui.separator();
 
@@ -190,6 +190,16 @@ pub fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                         &mut tag_remove_request,
                     );
                 }
+                CharacterTab::SillyTavern => {
+                    render_sillytavern_tab(
+                        app,
+                        ui,
+                        &mut character,
+                        &mut status_update,
+                        &mut tag_add_request,
+                        &mut tag_remove_request,
+                    );
+                }
                 CharacterTab::Notes => {
                     render_notes_tab(app, ui, &mut character);
                 }
@@ -198,9 +208,6 @@ pub fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                 }
                 CharacterTab::Gallery => {
                     render_gallery_tab(app, ui, &mut character, &mut status_update);
-                }
-                CharacterTab::SillyTavern => {
-                    render_sillytavern_tab(app, ui, &mut character, &mut status_update, &mut tag_add_request, &mut tag_remove_request);
                 }
             });
 

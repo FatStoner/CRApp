@@ -18,10 +18,12 @@ impl CrapApp {
         let include_scen = self.count_scenario_in_total;
         let include_ex = self.count_example_in_total;
 
-        tokio::spawn(async move {
+        let ctx = self.ctx.clone();
+
+        crate::task::spawn_supervised(ctx.clone(), async move {
             let count = characters.len();
             if count == 0 {
-                return;
+                return Ok(());
             }
 
             let mut total_tokens_sum = 0;
@@ -135,6 +137,8 @@ impl CrapApp {
             };
 
             let _ = tx.send(UiEvent::StatisticsCalculated(data)).await;
-        });
+            ctx.request_repaint();
+            Ok(())
+        }, self.tx.clone());
     }
 }

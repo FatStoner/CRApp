@@ -31,7 +31,7 @@ pub fn render_export_menu(ui: &mut egui::Ui, app: &CrapApp, character: &Characte
             }
 
             ui.separator();
-            if ui.button("🎭 SillyTavern Card V3 (.json)").clicked() {
+            if ui.button("SillyTavern Card V3 (.json)").clicked() {
                 app.export_character_sillytavern(character);
                 ui.close_menu();
             }
@@ -66,7 +66,7 @@ pub fn render_export_menu(ui: &mut egui::Ui, app: &CrapApp, character: &Characte
 
             ui.separator();
             ui.label(
-                egui::RichText::new("Switch to 🎭 Silly Tavern tab\nto export ST format.")
+                egui::RichText::new("Switch to Silly Tavern tab\nto export ST format.")
                     .size(10.0)
                     .color(egui::Color32::GRAY),
             );

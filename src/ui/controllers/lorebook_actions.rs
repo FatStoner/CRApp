@@ -7,7 +7,9 @@ impl CrapApp {
         let tx = self.tx.clone();
         let db = self.db.clone();
 
-        tokio::spawn(async move {
+        let ctx = self.ctx.clone();
+
+        crate::task::spawn_supervised(ctx.clone(), async move {
             match db.delete_lorebook_entry(entry_id).await {
                 Ok(_) => {
                     tracing::info!("Deleted lorebook entry ID: {} (Lorebook ID: {})", entry_id, lorebook_id);
@@ -25,6 +27,8 @@ impl CrapApp {
                     .send(UiEvent::LorebookEntriesLoaded(Ok((lorebook_id, entries))))
                     .await;
             }
-        });
+            ctx.request_repaint();
+            Ok(())
+        }, self.tx.clone());
     }
 }

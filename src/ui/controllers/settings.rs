@@ -1,5 +1,5 @@
 use super::state::CrapApp;
-use crate::models::ThemeMode;
+use crate::models::{ThemeMode, SpellcheckLanguage};
 use crate::ui::types::EditorFontFamily;
 use eframe::egui;
 
@@ -10,9 +10,11 @@ impl CrapApp {
 
         let db = self.db.clone();
         let val = theme.to_string();
-        tokio::spawn(async move {
-            let _ = db.set_setting("theme", &val).await;
-        });
+        let ctx = self.ctx.clone();
+        crate::task::spawn_supervised(ctx.clone(), async move {
+            db.set_setting("theme", &val).await?;
+            Ok(())
+        }, self.tx.clone());
     }
 
     pub fn apply_theme(&self) {
@@ -35,45 +37,67 @@ impl CrapApp {
 
         let db = self.db.clone();
         let val = scale.to_string();
-        tokio::spawn(async move {
-            let _ = db.set_setting("ui_scale", &val).await;
-        });
+        let ctx = self.ctx.clone();
+        crate::task::spawn_supervised(ctx.clone(), async move {
+            db.set_setting("ui_scale", &val).await?;
+            Ok(())
+        }, self.tx.clone());
     }
 
     pub fn set_custom_background_mode(&mut self, enabled: bool) {
         self.use_custom_background = enabled;
         let db = self.db.clone();
         let val = if enabled { "true" } else { "false" };
-        tokio::spawn(async move {
-            let _ = db.set_setting("use_custom_background", val).await;
-        });
+        let ctx = self.ctx.clone();
+        crate::task::spawn_supervised(ctx.clone(), async move {
+            db.set_setting("use_custom_background", val).await?;
+            Ok(())
+        }, self.tx.clone());
     }
 
     pub fn set_watermark_visibility(&mut self, visible: bool) {
         self.show_watermark = visible;
         let db = self.db.clone();
         let val = visible.to_string();
-        tokio::spawn(async move {
-            let _ = db.set_setting("show_watermark", &val).await;
-        });
+        let ctx = self.ctx.clone();
+        crate::task::spawn_supervised(ctx.clone(), async move {
+            db.set_setting("show_watermark", &val).await?;
+            Ok(())
+        }, self.tx.clone());
     }
 
     pub fn set_background_visibility(&mut self, visible: bool) {
         self.show_background = visible;
         let db = self.db.clone();
         let val = visible.to_string();
-        tokio::spawn(async move {
-            let _ = db.set_setting("show_background", &val).await;
-        });
+        let ctx = self.ctx.clone();
+        crate::task::spawn_supervised(ctx.clone(), async move {
+            db.set_setting("show_background", &val).await?;
+            Ok(())
+        }, self.tx.clone());
     }
 
     pub fn set_spell_check(&mut self, enabled: bool) {
         self.enable_spell_check = enabled;
         let db = self.db.clone();
         let val = enabled.to_string();
-        tokio::spawn(async move {
-            let _ = db.set_setting("enable_spell_check", &val).await;
-        });
+        let ctx = self.ctx.clone();
+        crate::task::spawn_supervised(ctx.clone(), async move {
+            db.set_setting("enable_spell_check", &val).await?;
+            Ok(())
+        }, self.tx.clone());
+    }
+
+    pub fn set_spellcheck_language(&mut self, lang: SpellcheckLanguage) {
+        self.spellcheck_language = lang;
+        self.spell_checker = crate::ui::spell_check::SpellChecker::new(&lang).map(std::sync::Arc::new);
+        let db = self.db.clone();
+        let val = lang.to_string();
+        let ctx = self.ctx.clone();
+        crate::task::spawn_supervised(ctx.clone(), async move {
+            db.set_setting("spellcheck_language", &val).await?;
+            Ok(())
+        }, self.tx.clone());
     }
 
     pub fn set_background_scale(&mut self, scale: f32) {
@@ -81,45 +105,55 @@ impl CrapApp {
         self.ctx.request_repaint();
 
         let db = self.db.clone();
-        tokio::spawn(async move {
-            let _ = db.set_setting("background_scale", &scale.to_string()).await;
-        });
+        let ctx = self.ctx.clone();
+        crate::task::spawn_supervised(ctx.clone(), async move {
+            db.set_setting("background_scale", &scale.to_string()).await?;
+            Ok(())
+        }, self.tx.clone());
     }
 
     pub fn set_check_updates_at_start(&mut self, enabled: bool) {
         self.check_updates_at_start = enabled;
         let db = self.db.clone();
         let val = enabled.to_string();
-        tokio::spawn(async move {
-            let _ = db.set_setting("check_updates_at_start", &val).await;
-        });
+        let ctx = self.ctx.clone();
+        crate::task::spawn_supervised(ctx.clone(), async move {
+            db.set_setting("check_updates_at_start", &val).await?;
+            Ok(())
+        }, self.tx.clone());
     }
 
     pub fn set_editor_font(&mut self, font: EditorFontFamily) {
         self.editor_font = font;
         let db = self.db.clone();
         let val = font.to_string();
-        tokio::spawn(async move {
-            let _ = db.set_setting("editor_font", &val).await;
-        });
+        let ctx = self.ctx.clone();
+        crate::task::spawn_supervised(ctx.clone(), async move {
+            db.set_setting("editor_font", &val).await?;
+            Ok(())
+        }, self.tx.clone());
     }
 
     pub fn set_editor_large_font(&mut self, enabled: bool) {
         self.editor_large_font = enabled;
         let db = self.db.clone();
         let val = enabled.to_string();
-        tokio::spawn(async move {
-            let _ = db.set_setting("editor_large_font", &val).await;
-        });
+        let ctx = self.ctx.clone();
+        crate::task::spawn_supervised(ctx.clone(), async move {
+            db.set_setting("editor_large_font", &val).await?;
+            Ok(())
+        }, self.tx.clone());
     }
 
     pub fn set_editor_bright_mode(&mut self, enabled: bool) {
         self.editor_bright_mode = enabled;
         let db = self.db.clone();
         let val = enabled.to_string();
-        tokio::spawn(async move {
-            let _ = db.set_setting("editor_bright_mode", &val).await;
-        });
+        let ctx = self.ctx.clone();
+        crate::task::spawn_supervised(ctx.clone(), async move {
+            db.set_setting("editor_bright_mode", &val).await?;
+            Ok(())
+        }, self.tx.clone());
     }
 
     pub fn set_blur_all_images(&mut self, enabled: bool) {
@@ -127,9 +161,11 @@ impl CrapApp {
         self.blur_overrides.clear(); // Reset overrides on global change
         let db = self.db.clone();
         let val = enabled.to_string();
-        tokio::spawn(async move {
-            let _ = db.set_setting("blur_all_images", &val).await;
-        });
+        let ctx = self.ctx.clone();
+        crate::task::spawn_supervised(ctx.clone(), async move {
+            db.set_setting("blur_all_images", &val).await?;
+            Ok(())
+        }, self.tx.clone());
     }
 
     pub fn set_blur_all_nsfw(&mut self, enabled: bool) {
@@ -137,8 +173,10 @@ impl CrapApp {
         self.blur_overrides.clear(); // Reset overrides on global change
         let db = self.db.clone();
         let val = enabled.to_string();
-        tokio::spawn(async move {
-            let _ = db.set_setting("blur_all_nsfw", &val).await;
-        });
+        let ctx = self.ctx.clone();
+        crate::task::spawn_supervised(ctx.clone(), async move {
+            db.set_setting("blur_all_nsfw", &val).await?;
+            Ok(())
+        }, self.tx.clone());
     }
 }

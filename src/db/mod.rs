@@ -1,3 +1,4 @@
+use crate::error::DbError;
 use crate::models::{Character, CharacterUrl, Collection, Lorebook, LorebookEntry, Tag, Template};
 use sqlx::{
     migrate::{MigrateDatabase, Migrator},
@@ -25,6 +26,33 @@ impl Database {
         let db_url = "sqlite://crap_data.db";
         let db_path = "crap_data.db";
 
+        match Self::try_init(db_url, db_path).await {
+            Ok(db) => Ok(db),
+            Err(e) => {
+                if std::path::Path::new(db_path).exists() {
+                    tracing::error!(
+                        "Database initialization failed: {}. Attempting corruption isolation and automatic recovery...",
+                        e
+                    );
+                    let ts = std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .map(|d| d.as_secs())
+                        .unwrap_or(0);
+                    let corrupt_path = format!("crap_data.corrupted.{}.db", ts);
+                    if let Ok(_) = std::fs::rename(db_path, &corrupt_path) {
+                        tracing::warn!(
+                            "Corrupted database isolated at '{}'. Creating fresh database...",
+                            corrupt_path
+                        );
+                        return Self::try_init(db_url, db_path).await;
+                    }
+                }
+                Err(e)
+            }
+        }
+    }
+
+    async fn try_init(db_url: &str, db_path: &str) -> Result<Self, Box<dyn Error + Send + Sync>> {
         // 1. Safety Backup
         if std::path::Path::new(db_path).exists() {
             tracing::info!("Found existing database. Creating safety backup at 'crap_data.db.bak'...");
@@ -131,7 +159,7 @@ impl Database {
                     }
                 });
 
-        // 7. Ensure SillyTavern fields in 'characters'
+        // Ensure SillyTavern fields in 'characters' for existing databases.
         let st_columns = [
             "ALTER TABLE characters ADD COLUMN st_name TEXT NOT NULL DEFAULT ''",
             "ALTER TABLE characters ADD COLUMN st_description TEXT NOT NULL DEFAULT ''",
@@ -164,15 +192,15 @@ impl Database {
     }
 
     // --- Characters ---
-    pub async fn get_all_characters(&self) -> Result<Vec<Character>, sqlx::Error> {
+    pub async fn get_all_characters(&self) -> Result<Vec<Character>, DbError> {
         characters::get_all(&self.pool).await
     }
 
-    pub async fn upsert_character(&self, character: &mut Character) -> Result<(), sqlx::Error> {
+    pub async fn upsert_character(&self, character: &mut Character) -> Result<(), DbError> {
         characters::upsert(&self.pool, character).await
     }
 
-    pub async fn delete_character(&self, id: i64) -> Result<(), sqlx::Error> {
+    pub async fn delete_character(&self, id: i64) -> Result<(), DbError> {
         characters::delete(&self.pool, id).await
     }
 
@@ -180,36 +208,36 @@ impl Database {
         &self,
         char_id: i64,
         collection_id: Option<i64>,
-    ) -> Result<(), sqlx::Error> {
+    ) -> Result<(), DbError> {
         characters::move_to_collection(&self.pool, char_id, collection_id).await
     }
 
-    pub async fn get_characters_by_ids(&self, ids: &[i64]) -> Result<Vec<Character>, sqlx::Error> {
+    pub async fn get_characters_by_ids(&self, ids: &[i64]) -> Result<Vec<Character>, DbError> {
         characters::get_by_ids(&self.pool, ids).await
     }
 
-    pub async fn search_characters_text(&self, query: &str) -> Result<Vec<Character>, sqlx::Error> {
+    pub async fn search_characters_text(&self, query: &str) -> Result<Vec<Character>, DbError> {
         characters::search_text(&self.pool, query).await
     }
 
-    pub async fn get_all_character_urls_flat(&self) -> Result<Vec<CharacterUrl>, sqlx::Error> {
+    pub async fn get_all_character_urls_flat(&self) -> Result<Vec<CharacterUrl>, DbError> {
         characters::get_all_urls_flat(&self.pool).await
     }
 
     // --- Collections ---
-    pub async fn get_all_collections(&self) -> Result<Vec<Collection>, sqlx::Error> {
+    pub async fn get_all_collections(&self) -> Result<Vec<Collection>, DbError> {
         collections::get_all(&self.pool).await
     }
 
-    pub async fn upsert_collection(&self, collection: &Collection) -> Result<i64, sqlx::Error> {
+    pub async fn upsert_collection(&self, collection: &Collection) -> Result<i64, DbError> {
         collections::upsert(&self.pool, collection).await
     }
 
-    pub async fn delete_collection(&self, id: i64) -> Result<(), sqlx::Error> {
+    pub async fn delete_collection(&self, id: i64) -> Result<(), DbError> {
         collections::delete(&self.pool, id).await
     }
 
-    pub async fn reorder_collection(&self, id: i64, move_up: bool) -> Result<(), sqlx::Error> {
+    pub async fn reorder_collection(&self, id: i64, move_up: bool) -> Result<(), DbError> {
         collections::reorder(&self.pool, id, move_up).await
     }
 
@@ -218,7 +246,7 @@ impl Database {
         &self,
         char_id: i64,
         is_external: bool,
-    ) -> Result<Vec<Tag>, sqlx::Error> {
+    ) -> Result<Vec<Tag>, DbError> {
         tags::get_for_character(&self.pool, char_id, is_external).await
     }
 
@@ -227,7 +255,7 @@ impl Database {
         char_id: i64,
         tag_name: &str,
         is_external: bool,
-    ) -> Result<(), sqlx::Error> {
+    ) -> Result<(), DbError> {
         tags::add_to_character(&self.pool, char_id, tag_name, is_external).await
     }
 
@@ -236,7 +264,7 @@ impl Database {
         char_id: i64,
         tag_id: i64,
         is_external: bool,
-    ) -> Result<(), sqlx::Error> {
+    ) -> Result<(), DbError> {
         tags::remove_from_character(&self.pool, char_id, tag_id, is_external).await
     }
 
@@ -244,42 +272,42 @@ impl Database {
         &self,
         char_id: i64,
         is_external: bool,
-    ) -> Result<(), sqlx::Error> {
+    ) -> Result<(), DbError> {
         tags::remove_all_from_character(&self.pool, char_id, is_external).await
     }
 
     pub async fn get_all_tags_flat(
         &self,
         is_external: bool,
-    ) -> Result<Vec<(i64, Tag)>, sqlx::Error> {
+    ) -> Result<Vec<(i64, Tag)>, DbError> {
         tags::get_all_flat(&self.pool, is_external).await
     }
 
     pub async fn search_tags_matching(
         &self,
         query: &str,
-    ) -> Result<Vec<(i64, String, bool)>, sqlx::Error> {
+    ) -> Result<Vec<(i64, String, bool)>, DbError> {
         tags::search_matching(&self.pool, query).await
     }
 
     // --- Lorebooks ---
-    pub async fn get_all_lorebooks(&self) -> Result<Vec<Lorebook>, sqlx::Error> {
+    pub async fn get_all_lorebooks(&self) -> Result<Vec<Lorebook>, DbError> {
         lorebooks::get_all(&self.pool).await
     }
 
-    pub async fn get_lorebooks_by_ids(&self, ids: &[i64]) -> Result<Vec<Lorebook>, sqlx::Error> {
+    pub async fn get_lorebooks_by_ids(&self, ids: &[i64]) -> Result<Vec<Lorebook>, DbError> {
         lorebooks::get_by_ids(&self.pool, ids).await
     }
 
-    pub async fn search_lorebooks_text(&self, query: &str) -> Result<Vec<Lorebook>, sqlx::Error> {
+    pub async fn search_lorebooks_text(&self, query: &str) -> Result<Vec<Lorebook>, DbError> {
         lorebooks::search_text(&self.pool, query).await
     }
 
-    pub async fn upsert_lorebook(&self, lorebook: &mut Lorebook) -> Result<(), sqlx::Error> {
+    pub async fn upsert_lorebook(&self, lorebook: &mut Lorebook) -> Result<(), DbError> {
         lorebooks::upsert(&self.pool, lorebook).await
     }
 
-    pub async fn delete_lorebook(&self, id: i64) -> Result<(), sqlx::Error> {
+    pub async fn delete_lorebook(&self, id: i64) -> Result<(), DbError> {
         lorebooks::delete(&self.pool, id).await
     }
 
@@ -287,26 +315,26 @@ impl Database {
     pub async fn get_entries_for_lorebook(
         &self,
         lorebook_id: i64,
-    ) -> Result<Vec<LorebookEntry>, sqlx::Error> {
+    ) -> Result<Vec<LorebookEntry>, DbError> {
         lorebooks::get_entries(&self.pool, lorebook_id).await
     }
 
-    pub async fn add_entry_to_lorebook(&self, entry: &LorebookEntry) -> Result<i64, sqlx::Error> {
+    pub async fn add_entry_to_lorebook(&self, entry: &LorebookEntry) -> Result<i64, DbError> {
         lorebooks::add_entry(&self.pool, entry).await
     }
 
-    pub async fn update_lorebook_entry(&self, entry: &LorebookEntry) -> Result<(), sqlx::Error> {
+    pub async fn update_lorebook_entry(&self, entry: &LorebookEntry) -> Result<(), DbError> {
         lorebooks::update_entry(&self.pool, entry).await
     }
 
-    pub async fn delete_lorebook_entry(&self, id: i64) -> Result<(), sqlx::Error> {
+    pub async fn delete_lorebook_entry(&self, id: i64) -> Result<(), DbError> {
         lorebooks::delete_entry(&self.pool, id).await
     }
 
     pub async fn search_lorebook_entries_text(
         &self,
         query: &str,
-    ) -> Result<Vec<LorebookEntry>, sqlx::Error> {
+    ) -> Result<Vec<LorebookEntry>, DbError> {
         lorebooks::search_entries_text(&self.pool, query).await
     }
 
@@ -315,7 +343,7 @@ impl Database {
         &self,
         lorebook_id: i64,
         tag_name: &str,
-    ) -> Result<(), sqlx::Error> {
+    ) -> Result<(), DbError> {
         lorebooks::add_tag(&self.pool, lorebook_id, tag_name).await
     }
 
@@ -323,57 +351,57 @@ impl Database {
         &self,
         lorebook_id: i64,
         tag_id: i64,
-    ) -> Result<(), sqlx::Error> {
+    ) -> Result<(), DbError> {
         lorebooks::remove_tag(&self.pool, lorebook_id, tag_id).await
     }
 
-    pub async fn get_tags_for_lorebook(&self, lorebook_id: i64) -> Result<Vec<Tag>, sqlx::Error> {
+    pub async fn get_tags_for_lorebook(&self, lorebook_id: i64) -> Result<Vec<Tag>, DbError> {
         lorebooks::get_tags(&self.pool, lorebook_id).await
     }
 
-    pub async fn get_all_lorebook_tags_flat(&self) -> Result<Vec<(i64, Tag)>, sqlx::Error> {
+    pub async fn get_all_lorebook_tags_flat(&self) -> Result<Vec<(i64, Tag)>, DbError> {
         lorebooks::get_all_tags_flat(&self.pool).await
     }
 
     pub async fn search_lorebook_tags_matching(
         &self,
         query: &str,
-    ) -> Result<Vec<(i64, String)>, sqlx::Error> {
+    ) -> Result<Vec<(i64, String)>, DbError> {
         lorebooks::search_tags_matching(&self.pool, query).await
     }
 
     // Lore Links
-    pub async fn get_lore_links(&self, character_id: i64) -> Result<HashSet<i64>, sqlx::Error> {
+    pub async fn get_lore_links(&self, character_id: i64) -> Result<HashSet<i64>, DbError> {
         lorebooks::get_links(&self.pool, character_id).await
     }
 
-    pub async fn link_lore(&self, character_id: i64, lore_id: i64) -> Result<(), sqlx::Error> {
+    pub async fn link_lore(&self, character_id: i64, lore_id: i64) -> Result<(), DbError> {
         lorebooks::link(&self.pool, character_id, lore_id).await
     }
 
-    pub async fn unlink_lore(&self, character_id: i64, lore_id: i64) -> Result<(), sqlx::Error> {
+    pub async fn unlink_lore(&self, character_id: i64, lore_id: i64) -> Result<(), DbError> {
         lorebooks::unlink(&self.pool, character_id, lore_id).await
     }
 
-    pub async fn get_all_lore_links_flat(&self) -> Result<Vec<(i64, i64)>, sqlx::Error> {
+    pub async fn get_all_lore_links_flat(&self) -> Result<Vec<(i64, i64)>, DbError> {
         lorebooks::get_all_links_flat(&self.pool).await
     }
 
     // --- Templates ---
-    pub async fn get_all_templates(&self) -> Result<Vec<Template>, sqlx::Error> {
+    pub async fn get_all_templates(&self) -> Result<Vec<Template>, DbError> {
         templates::get_all(&self.pool).await
     }
 
-    pub async fn upsert_template(&self, template: &mut Template) -> Result<(), sqlx::Error> {
+    pub async fn upsert_template(&self, template: &mut Template) -> Result<(), DbError> {
         templates::upsert(&self.pool, template).await
     }
 
-    pub async fn delete_template(&self, id: i64) -> Result<(), sqlx::Error> {
+    pub async fn delete_template(&self, id: i64) -> Result<(), DbError> {
         templates::delete(&self.pool, id).await
     }
 
     // --- Settings ---
-    pub async fn get_setting(&self, key: &str) -> Result<Option<String>, sqlx::Error> {
+    pub async fn get_setting(&self, key: &str) -> Result<Option<String>, DbError> {
         let row: Option<(String,)> = sqlx::query_as("SELECT value FROM settings WHERE key = ?")
             .bind(key)
             .fetch_optional(&self.pool)
@@ -382,7 +410,7 @@ impl Database {
         Ok(row.map(|r| r.0))
     }
 
-    pub async fn set_setting(&self, key: &str, value: &str) -> Result<(), sqlx::Error> {
+    pub async fn set_setting(&self, key: &str, value: &str) -> Result<(), DbError> {
         sqlx::query("INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = ?")
             .bind(key)
             .bind(value)
@@ -393,14 +421,14 @@ impl Database {
     }
 
     // --- DB Management ---
-    pub async fn checkpoint(&self) -> Result<(), sqlx::Error> {
+    pub async fn checkpoint(&self) -> Result<(), DbError> {
         sqlx::query("PRAGMA wal_checkpoint(TRUNCATE)")
             .execute(&self.pool)
             .await?;
         Ok(())
     }
 
-    pub async fn create_checkpoint_and_vacuum(&self, target_path: &str) -> Result<(), sqlx::Error> {
+    pub async fn create_checkpoint_and_vacuum(&self, target_path: &str) -> Result<(), DbError> {
         self.checkpoint().await?;
         let query = format!("VACUUM INTO '{}'", target_path);
         sqlx::query(&query).execute(&self.pool).await?;

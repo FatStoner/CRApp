@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+#[allow(non_snake_case)]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SillyTavernEntry {
     pub uid: usize,
@@ -12,7 +13,7 @@ pub struct SillyTavernEntry {
     pub selective: bool,
     pub folder: String,
     pub order: usize,
-    pub position: String,
+    pub position: usize,
     pub use_regex: bool,
     pub exclude_recursion: bool,
     pub prevent_recursion: bool,
@@ -23,6 +24,7 @@ pub struct SillyTavernEntry {
     pub scan_depth: Option<usize>,
     pub probability: usize,
     pub disable: bool,
+    pub enabled: bool,
     pub depth: usize,
     // Extensions and other fields observed in reference
     pub selectiveLogic: Option<usize>,
@@ -59,7 +61,7 @@ impl Default for SillyTavernEntry {
             selective: true,
             folder: "".to_string(),
             order: 100,
-            position: "before_char".to_string(),
+            position: 0,
             use_regex: false,
             exclude_recursion: false,
             prevent_recursion: false,
@@ -70,6 +72,7 @@ impl Default for SillyTavernEntry {
             scan_depth: None,
             probability: 100,
             disable: false,
+            enabled: true,
             depth: 4,
             selectiveLogic: Some(0),
             addMemo: Some(true),
