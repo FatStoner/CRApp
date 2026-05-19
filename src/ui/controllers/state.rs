@@ -38,6 +38,7 @@ pub struct CrapApp {
     pub selected_template: Option<Template>,
     pub selected_entry: Option<crate::models::LorebookEntry>,
     pub active_char_tab: CharacterTab,
+    pub active_st_tab: StTab,
     pub active_settings_tab: SettingsTab,
     pub active_lorebook_tab: LorebookTab,
     pub central_view: CentralView,
@@ -167,6 +168,7 @@ impl CrapApp {
             selected_entry: None,
 
             active_char_tab: CharacterTab::MainData,
+            active_st_tab: StTab::Main,
             active_settings_tab: SettingsTab::General,
             active_lorebook_tab: LorebookTab::Entries,
             central_view: CentralView::Browser,

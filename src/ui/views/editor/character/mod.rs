@@ -5,11 +5,13 @@ mod gallery;
 mod lorebooks;
 mod main_data;
 mod notes;
+mod sillytavern;
 
 use gallery::render_gallery_tab;
 use lorebooks::render_lorebooks_tab;
 use main_data::render_main_data_tab;
 use notes::render_notes_tab;
+use sillytavern::render_sillytavern_tab;
 
 pub fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
     let mut trigger_import = false;
@@ -136,6 +138,11 @@ pub fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                 "Lorebooks",
             );
             ui.selectable_value(&mut app.active_char_tab, CharacterTab::Gallery, "Gallery");
+            ui.selectable_value(
+                &mut app.active_char_tab,
+                CharacterTab::SillyTavern,
+                egui::RichText::new("🎭 Silly Tavern").color(egui::Color32::from_rgb(100, 220, 100)),
+            );
         });
         ui.separator();
 
@@ -191,6 +198,9 @@ pub fn render_editor_view(app: &mut CrapApp, ui: &mut egui::Ui) {
                 }
                 CharacterTab::Gallery => {
                     render_gallery_tab(app, ui, &mut character, &mut status_update);
+                }
+                CharacterTab::SillyTavern => {
+                    render_sillytavern_tab(app, ui, &mut character, &mut status_update, &mut tag_add_request, &mut tag_remove_request);
                 }
             });
 

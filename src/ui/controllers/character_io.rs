@@ -359,3 +359,252 @@ impl CrapApp {
         });
     }
 }
+
+impl CrapApp {
+    fn build_sillytavern_export_character(character: &Character) -> Character {
+        let mut export_character = character.clone();
+        let export_name = if character.st_name.trim().is_empty() {
+            character.name.clone()
+        } else {
+            character.st_name.clone()
+        };
+
+        export_character.name = export_name.clone();
+        export_character.char_name = export_name;
+        export_character.char_title = character.st_description.clone();
+        export_character.personality = character.st_personality.clone();
+        export_character.scenario = character.st_scenario.clone();
+        export_character.first_message = character.st_first_mes.clone();
+        export_character.example_dialogue = character.st_mes_example.clone();
+        export_character.author_notes = character.st_creator_notes.clone();
+
+        export_character
+    }
+
+    fn sillytavern_export_file_stem(character: &Character) -> String {
+        let base_name = if character.st_name.trim().is_empty() {
+            character.name.trim()
+        } else {
+            character.st_name.trim()
+        };
+
+        format!("{}_st", base_name.replace(" ", "_"))
+    }
+
+    pub fn export_character_native_from_sillytavern(&self, character: &Character) {
+        let char_clone = Self::build_sillytavern_export_character(character);
+        let task_name = format!("{}.crapp", Self::sillytavern_export_file_stem(character));
+
+        tokio::task::spawn_blocking(move || {
+            if let Some(path) = rfd::FileDialog::new()
+                .set_directory("exports")
+                .set_file_name(task_name)
+                .save_file()
+            {
+                let _ = CrapApp::write_character_native_static(&char_clone, &path);
+            }
+        });
+    }
+
+    pub fn export_character_v2_json_from_sillytavern(&self, character: &Character) {
+        let char_clone = Self::build_sillytavern_export_character(character);
+        let task_name = format!("{}.json", Self::sillytavern_export_file_stem(character));
+
+        tokio::task::spawn_blocking(move || {
+            if let Some(path) = rfd::FileDialog::new()
+                .set_directory("exports")
+                .set_file_name(task_name)
+                .save_file()
+            {
+                let _ = CrapApp::write_character_v2_json_static(&char_clone, &path);
+            }
+        });
+    }
+
+    pub fn export_character_markdown_from_sillytavern(&self, character: &Character) {
+        let char_clone = Self::build_sillytavern_export_character(character);
+        let task_name = format!("{}.md", Self::sillytavern_export_file_stem(character));
+
+        tokio::task::spawn_blocking(move || {
+            if let Some(path) = rfd::FileDialog::new()
+                .set_directory("exports")
+                .set_file_name(task_name)
+                .save_file()
+            {
+                let _ = CrapApp::write_character_markdown_static(&char_clone, &path);
+            }
+        });
+    }
+
+    pub fn export_character_png_from_sillytavern(&self, character: &Character) {
+        let char_clone = character.clone();
+        let task_name = format!("{}.png", Self::sillytavern_export_file_stem(character));
+
+        tokio::task::spawn_blocking(move || {
+            if let Some(path) = rfd::FileDialog::new()
+                .set_directory("exports")
+                .set_file_name(task_name)
+                .save_file()
+            {
+                let _ = CrapApp::write_character_sillytavern_png_static(&char_clone, &path);
+            }
+        });
+    }
+
+    fn png_crc32(bytes: &[u8]) -> u32 {
+        let mut crc: u32 = 0xFFFF_FFFF;
+        for &byte in bytes {
+            crc ^= byte as u32;
+            for _ in 0..8 {
+                if crc & 1 != 0 {
+                    crc = (crc >> 1) ^ 0xEDB8_8320;
+                } else {
+                    crc >>= 1;
+                }
+            }
+        }
+        !crc
+    }
+
+    fn make_png_text_chunk(keyword: &str, text: &str) -> Vec<u8> {
+        let mut chunk_data = Vec::with_capacity(keyword.len() + 1 + text.len());
+        chunk_data.extend_from_slice(keyword.as_bytes());
+        chunk_data.push(0);
+        chunk_data.extend_from_slice(text.as_bytes());
+
+        let mut crc_input = Vec::with_capacity(4 + chunk_data.len());
+        crc_input.extend_from_slice(b"tEXt");
+        crc_input.extend_from_slice(&chunk_data);
+        let crc = Self::png_crc32(&crc_input);
+
+        let mut chunk = Vec::with_capacity(12 + chunk_data.len());
+        chunk.extend_from_slice(&(chunk_data.len() as u32).to_be_bytes());
+        chunk.extend_from_slice(b"tEXt");
+        chunk.extend_from_slice(&chunk_data);
+        chunk.extend_from_slice(&crc.to_be_bytes());
+        chunk
+    }
+
+    fn remove_character_card_text_chunks(png_bytes: &[u8]) -> Result<Vec<u8>, String> {
+        const PNG_SIGNATURE: &[u8; 8] = b"\x89PNG\r\n\x1a\n";
+        if !png_bytes.starts_with(PNG_SIGNATURE) {
+            return Err("Avatar image is not PNG data".to_string());
+        }
+
+        let mut output = Vec::with_capacity(png_bytes.len());
+        output.extend_from_slice(PNG_SIGNATURE);
+
+        let mut offset = PNG_SIGNATURE.len();
+        while offset + 12 <= png_bytes.len() {
+            let length = u32::from_be_bytes([
+                png_bytes[offset],
+                png_bytes[offset + 1],
+                png_bytes[offset + 2],
+                png_bytes[offset + 3],
+            ]) as usize;
+            let chunk_end = offset
+                .checked_add(12)
+                .and_then(|v| v.checked_add(length))
+                .ok_or_else(|| "PNG chunk length overflow".to_string())?;
+
+            if chunk_end > png_bytes.len() {
+                return Err("PNG file appears to be truncated".to_string());
+            }
+
+            let chunk_type = &png_bytes[offset + 4..offset + 8];
+            let chunk_data = &png_bytes[offset + 8..offset + 8 + length];
+            let skip_chunk = chunk_type == b"tEXt"
+                && (chunk_data.starts_with(b"chara\0") || chunk_data.starts_with(b"ccv3\0"));
+
+            if !skip_chunk {
+                output.extend_from_slice(&png_bytes[offset..chunk_end]);
+            }
+
+            offset = chunk_end;
+            if chunk_type == b"IEND" {
+                break;
+            }
+        }
+
+        Ok(output)
+    }
+
+    fn add_sillytavern_card_chunks_to_png(
+        png_bytes: &[u8],
+        card_base64: &str,
+    ) -> Result<Vec<u8>, String> {
+        let mut clean_png = Self::remove_character_card_text_chunks(png_bytes)?;
+        let iend_len = 12;
+        if clean_png.len() < iend_len || &clean_png[clean_png.len() - iend_len + 4..clean_png.len() - iend_len + 8] != b"IEND" {
+            return Err("PNG file is missing IEND chunk".to_string());
+        }
+
+        let iend_start = clean_png.len() - iend_len;
+        let iend_chunk = clean_png.split_off(iend_start);
+        clean_png.extend_from_slice(&Self::make_png_text_chunk("chara", card_base64));
+        clean_png.extend_from_slice(&Self::make_png_text_chunk("ccv3", card_base64));
+        clean_png.extend_from_slice(&iend_chunk);
+        Ok(clean_png)
+    }
+
+    fn image_bytes_to_png_bytes(image_bytes: &[u8]) -> Result<Vec<u8>, String> {
+        const PNG_SIGNATURE: &[u8; 8] = b"\x89PNG\r\n\x1a\n";
+        if image_bytes.starts_with(PNG_SIGNATURE) {
+            return Ok(image_bytes.to_vec());
+        }
+
+        let img = image::load_from_memory(image_bytes).map_err(|e| e.to_string())?;
+        let mut png_bytes = Vec::new();
+        let mut cursor = std::io::Cursor::new(&mut png_bytes);
+        img.write_to(&mut cursor, image::ImageOutputFormat::Png)
+            .map_err(|e| e.to_string())?;
+        Ok(png_bytes)
+    }
+
+    pub fn write_character_sillytavern_png_static(
+        character: &Character,
+        path: &std::path::Path,
+    ) -> Result<(), String> {
+        if let Some(avatar_path) = &character.avatar_path {
+            let card = crate::card_v2::SillyTavernCard::from_character(character);
+            let json = serde_json::to_string(&card).map_err(|e| e.to_string())?;
+            let b64 = BASE64.encode(json);
+
+            let img_bytes = std::fs::read(avatar_path).map_err(|e| e.to_string())?;
+            let png_bytes = Self::image_bytes_to_png_bytes(&img_bytes)?;
+            let png_with_card = Self::add_sillytavern_card_chunks_to_png(&png_bytes, &b64)?;
+
+            std::fs::write(path, png_with_card).map_err(|e| e.to_string())
+        } else {
+            let card = crate::card_v2::SillyTavernCard::from_character(character);
+            let json = serde_json::to_string_pretty(&card).map_err(|e| e.to_string())?;
+            std::fs::write(path.with_extension("json"), json).map_err(|e| e.to_string())
+        }
+    }
+
+    /// Export character as SillyTavern V3 JSON card (uses ST-specific fields only)
+    pub fn export_character_sillytavern(&self, character: &Character) {
+        let char_clone = character.clone();
+        let task_name = format!("{}.json", Self::sillytavern_export_file_stem(character));
+
+        tokio::task::spawn_blocking(move || {
+            if let Some(path) = rfd::FileDialog::new()
+                .set_directory("exports")
+                .set_file_name(task_name)
+                .save_file()
+            {
+                let card = crate::card_v2::SillyTavernCard::from_character(&char_clone);
+                match serde_json::to_string_pretty(&card) {
+                    Ok(json) => {
+                        if let Err(e) = std::fs::write(&path, json) {
+                            tracing::error!("Failed to write ST export: {}", e);
+                        }
+                    }
+                    Err(e) => {
+                        tracing::error!("Failed to serialize ST card: {}", e);
+                    }
+                }
+            }
+        });
+    }
+}

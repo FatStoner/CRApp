@@ -11,8 +11,12 @@ pub struct SpellChecker {
 
 impl SpellChecker {
     pub fn new() -> Option<Self> {
-        let aff_content = std::fs::read_to_string("data/dictionaries/en_US.aff").ok()?;
-        let dic_content = std::fs::read_to_string("data/dictionaries/en_US.dic").ok()?;
+        let dictionary_dir = Self::find_dictionary_dir()?;
+        let aff_path = dictionary_dir.join("en_US.aff");
+        let dic_path = dictionary_dir.join("en_US.dic");
+
+        let aff_content = std::fs::read_to_string(&aff_path).ok()?;
+        let dic_content = std::fs::read_to_string(&dic_path).ok()?;
 
         let dict = zspell::builder()
             .config_str(&aff_content)
@@ -20,7 +24,10 @@ impl SpellChecker {
             .build()
             .ok()?;
 
-        let ignored_words_path = "data/dictionaries/user_ignored.txt".to_string();
+        let ignored_words_path = dictionary_dir
+            .join("user_ignored.txt")
+            .to_string_lossy()
+            .to_string();
         let mut ignored_words = HashSet::new();
 
         if let Ok(content) = std::fs::read_to_string(&ignored_words_path) {
@@ -35,6 +42,31 @@ impl SpellChecker {
             dict,
             ignored_words: RwLock::new(ignored_words),
             ignored_words_path,
+        })
+    }
+
+
+    fn find_dictionary_dir() -> Option<std::path::PathBuf> {
+        let relative_dictionary_dir = std::path::PathBuf::from("data").join("dictionaries");
+
+        let mut candidates = Vec::new();
+
+        if let Ok(current_dir) = std::env::current_dir() {
+            candidates.push(current_dir.join(&relative_dictionary_dir));
+        }
+
+        if let Ok(exe_path) = std::env::current_exe() {
+            if let Some(exe_dir) = exe_path.parent() {
+                candidates.push(exe_dir.join(&relative_dictionary_dir));
+                candidates.push(exe_dir.join("..").join(&relative_dictionary_dir));
+                candidates.push(exe_dir.join("..").join("..").join(&relative_dictionary_dir));
+            }
+        }
+
+        candidates.push(std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(&relative_dictionary_dir));
+
+        candidates.into_iter().find(|dir| {
+            dir.join("en_US.aff").is_file() && dir.join("en_US.dic").is_file()
         })
     }
 

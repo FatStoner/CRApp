@@ -94,6 +94,40 @@ pub struct Character {
     pub external_tags: Vec<Tag>,
     #[sqlx(skip)]
     pub urls: Vec<CharacterUrl>,
+
+    // --- SillyTavern-specific fields (fully independent from main data) ---
+    #[sqlx(default)]
+    pub st_name: String,
+    #[sqlx(default)]
+    pub st_description: String,
+    #[sqlx(default)]
+    pub st_personality: String,
+    #[sqlx(default)]
+    pub st_scenario: String,
+    #[sqlx(default)]
+    pub st_first_mes: String,
+    #[sqlx(default)]
+    pub st_mes_example: String,
+    #[sqlx(default)]
+    pub st_creator_notes: String,
+    #[sqlx(default)]
+    pub st_alternate_greetings_json: Option<String>,
+    #[sqlx(skip)]
+    pub st_alternate_greetings: Vec<String>,
+    #[sqlx(default)]
+    pub st_creator: String,
+    #[sqlx(default)]
+    pub st_character_version: String,
+    #[sqlx(default)]
+    pub st_talkativeness: f64,
+    #[sqlx(default)]
+    pub st_world: String,
+    #[sqlx(default)]
+    pub st_depth_prompt: String,
+    #[sqlx(default)]
+    pub st_depth_prompt_depth: i64,
+    #[sqlx(default)]
+    pub st_depth_prompt_role: String,
 }
 
 impl Default for Character {
@@ -121,6 +155,22 @@ impl Default for Character {
             app_tags: Vec::new(),
             external_tags: Vec::new(),
             urls: Vec::new(),
+            st_name: "".to_string(),
+            st_description: "".to_string(),
+            st_personality: "".to_string(),
+            st_scenario: "".to_string(),
+            st_first_mes: "".to_string(),
+            st_mes_example: "".to_string(),
+            st_creator_notes: "".to_string(),
+            st_alternate_greetings_json: None,
+            st_alternate_greetings: Vec::new(),
+            st_creator: "".to_string(),
+            st_character_version: "".to_string(),
+            st_talkativeness: 0.5,
+            st_world: "".to_string(),
+            st_depth_prompt: "".to_string(),
+            st_depth_prompt_depth: 4,
+            st_depth_prompt_role: "system".to_string(),
         }
     }
 }
@@ -142,17 +192,35 @@ impl Character {
             && self.is_nsfw == other.is_nsfw
             && self.blur_avatar == other.blur_avatar
             && self.spell_check_overrides == other.spell_check_overrides
-            && self
-                .urls
-                .iter()
-                .filter(|u| !u.url.trim().is_empty())
+            && self.urls.iter().filter(|u| !u.url.trim().is_empty())
                 .eq(other.urls.iter().filter(|u| !u.url.trim().is_empty()))
+            // ST fields
+            && self.st_name == other.st_name
+            && self.st_description == other.st_description
+            && self.st_personality == other.st_personality
+            && self.st_scenario == other.st_scenario
+            && self.st_first_mes == other.st_first_mes
+            && self.st_mes_example == other.st_mes_example
+            && self.st_creator_notes == other.st_creator_notes
+            && self.st_alternate_greetings == other.st_alternate_greetings
+            && self.st_creator == other.st_creator
+            && self.st_character_version == other.st_character_version
+            && self.st_talkativeness == other.st_talkativeness
+            && self.st_world == other.st_world
+            && self.st_depth_prompt == other.st_depth_prompt
+            && self.st_depth_prompt_depth == other.st_depth_prompt_depth
+            && self.st_depth_prompt_role == other.st_depth_prompt_role
     }
 
     pub fn post_load(&mut self) {
         if let Some(json) = &self.spell_check_overrides_json {
             if let Ok(set) = serde_json::from_str(json) {
                 self.spell_check_overrides = set;
+            }
+        }
+        if let Some(json) = &self.st_alternate_greetings_json.clone() {
+            if let Ok(v) = serde_json::from_str::<Vec<String>>(json) {
+                self.st_alternate_greetings = v;
             }
         }
     }

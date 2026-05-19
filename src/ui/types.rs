@@ -17,6 +17,13 @@ pub enum CharacterTab {
     Notes,
     Lorebooks,
     Gallery,
+    SillyTavern,
+}
+
+#[derive(PartialEq, Eq, Clone, Copy, Debug)]
+pub enum StTab {
+    Main,
+    Advanced,
 }
 
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
@@ -102,6 +109,7 @@ pub struct NavigationState {
     pub selected_lorebook_entry_id: Option<i64>,
     pub selected_lorebook_entry_name: Option<String>,
     pub active_char_tab: CharacterTab,
+    pub active_st_tab: StTab,
     pub active_lorebook_tab: LorebookTab,
 }
 

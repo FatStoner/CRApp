@@ -18,12 +18,18 @@ pub async fn upsert(pool: &SqlitePool, character: &mut Character) -> Result<(), 
     } else {
         serde_json::to_string(&character.spell_check_overrides).ok()
     };
+    character.st_alternate_greetings_json = if character.st_alternate_greetings.is_empty() {
+        None
+    } else {
+        serde_json::to_string(&character.st_alternate_greetings).ok()
+    };
 
     if character.id == 0 {
         // INSERT
         let id = sqlx::query(
-            "INSERT INTO characters (name, char_name, char_title, personality, scenario, example_dialogue, first_message, author_notes, avatar_path, created_at, updated_at, collection_id, is_favorite, is_nsfw, blur_avatar, spell_check_overrides_json, quick_notes)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            "INSERT INTO characters (name, char_name, char_title, personality, scenario, example_dialogue, first_message, author_notes, avatar_path, created_at, updated_at, collection_id, is_favorite, is_nsfw, blur_avatar, spell_check_overrides_json, quick_notes,
+             st_name, st_description, st_personality, st_scenario, st_first_mes, st_mes_example, st_creator_notes, st_alternate_greetings_json, st_creator, st_character_version, st_talkativeness, st_world, st_depth_prompt, st_depth_prompt_depth, st_depth_prompt_role)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
         )
         .bind(&character.name)
         .bind(&character.char_name)
@@ -42,6 +48,21 @@ pub async fn upsert(pool: &SqlitePool, character: &mut Character) -> Result<(), 
         .bind(character.blur_avatar)
         .bind(&character.spell_check_overrides_json)
         .bind(&character.quick_notes)
+        .bind(&character.st_name)
+        .bind(&character.st_description)
+        .bind(&character.st_personality)
+        .bind(&character.st_scenario)
+        .bind(&character.st_first_mes)
+        .bind(&character.st_mes_example)
+        .bind(&character.st_creator_notes)
+        .bind(&character.st_alternate_greetings_json)
+        .bind(&character.st_creator)
+        .bind(&character.st_character_version)
+        .bind(character.st_talkativeness)
+        .bind(&character.st_world)
+        .bind(&character.st_depth_prompt)
+        .bind(character.st_depth_prompt_depth)
+        .bind(&character.st_depth_prompt_role)
         .execute(pool)
         .await?
         .last_insert_rowid();
@@ -50,7 +71,9 @@ pub async fn upsert(pool: &SqlitePool, character: &mut Character) -> Result<(), 
     } else {
         // UPDATE
         sqlx::query(
-            "UPDATE characters SET name=?, char_name=?, char_title=?, personality=?, scenario=?, example_dialogue=?, first_message=?, author_notes=?, avatar_path=?, updated_at=?, collection_id=?, is_favorite=?, is_nsfw=?, blur_avatar=?, spell_check_overrides_json=?, quick_notes=? WHERE id=?"
+            "UPDATE characters SET name=?, char_name=?, char_title=?, personality=?, scenario=?, example_dialogue=?, first_message=?, author_notes=?, avatar_path=?, updated_at=?, collection_id=?, is_favorite=?, is_nsfw=?, blur_avatar=?, spell_check_overrides_json=?, quick_notes=?,
+             st_name=?, st_description=?, st_personality=?, st_scenario=?, st_first_mes=?, st_mes_example=?, st_creator_notes=?, st_alternate_greetings_json=?, st_creator=?, st_character_version=?, st_talkativeness=?, st_world=?, st_depth_prompt=?, st_depth_prompt_depth=?, st_depth_prompt_role=?
+             WHERE id=?"
         )
         .bind(&character.name)
         .bind(&character.char_name)
@@ -68,6 +91,21 @@ pub async fn upsert(pool: &SqlitePool, character: &mut Character) -> Result<(), 
         .bind(character.blur_avatar)
         .bind(&character.spell_check_overrides_json)
         .bind(&character.quick_notes)
+        .bind(&character.st_name)
+        .bind(&character.st_description)
+        .bind(&character.st_personality)
+        .bind(&character.st_scenario)
+        .bind(&character.st_first_mes)
+        .bind(&character.st_mes_example)
+        .bind(&character.st_creator_notes)
+        .bind(&character.st_alternate_greetings_json)
+        .bind(&character.st_creator)
+        .bind(&character.st_character_version)
+        .bind(character.st_talkativeness)
+        .bind(&character.st_world)
+        .bind(&character.st_depth_prompt)
+        .bind(character.st_depth_prompt_depth)
+        .bind(&character.st_depth_prompt_role)
         .bind(character.id)
         .execute(pool)
         .await?;

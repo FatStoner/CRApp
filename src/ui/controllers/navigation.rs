@@ -15,6 +15,7 @@ impl CrapApp {
             selected_lorebook_entry_id: self.selected_entry.as_ref().map(|e| e.id),
             selected_lorebook_entry_name: self.selected_entry.as_ref().map(|e| e.name.clone()),
             active_char_tab: self.active_char_tab,
+            active_st_tab: self.active_st_tab,
             active_lorebook_tab: self.active_lorebook_tab,
         };
         // Avoid pushing duplicates if nothing changed
@@ -39,6 +40,7 @@ impl CrapApp {
             self.central_view = state.central_view;
             self.selected_collection_id = state.selected_collection_id;
             self.active_char_tab = state.active_char_tab;
+            self.active_st_tab = state.active_st_tab;
             self.active_lorebook_tab = state.active_lorebook_tab;
             self.blur_overrides.clear(); // Clear overrides on navigation
 
